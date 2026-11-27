@@ -1,4 +1,4 @@
-const BUILD_TAG = '467a420f@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '1f9f6665@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -63972,7 +63972,7 @@ const WB_ASN = { id: 'wb_oathknife', name: 'Nightblades', one: 'Nightblade', sho
    quicker each. Her strikes come no slower for it: the game's own interval is untouched (the cut lands inside it), and
    a Nightblade whose interval is shorter than the whole sequence plays it quicker to fit (never under fit of its length:
    the old leap's 0.68 s). */
-const WBA = { vs: .5, land: .55, camSide: .3, hop: .24, hold: .45, back: .3, cutU: .42, chain: { hop: .22, hold: .38 }, fit: .68, van: .5, ret: .45,   // (van, ret: the share of a way out, and of the way home, she spends vanishing where she stood)
+const WBA = { vs: .5, land: .55, camSide: .3, hop: .24, hold: .45, back: .3, cutU: .42, blood: { life: .4, arc: [7, 11], n: [14, 24], critFar: 1.35 }, chain: { hop: .22, hold: .38 }, fit: .68, van: .5, ret: .45,   // (van, ret: the share of a way out, and of the way home, she spends vanishing where she stood)
   quietus: { m: 2.2 }, step: { m: 1.7 }, hunt: { m: 1.5 },
   lone: { r: 2, per: .1 }, bane: .1, finish: { at: .35, per: .15 }, unseen: .6, tier0: { dmg: 24, rate: 1.5, range: 2.2 } };
 const wbaCaster = c => !!c && !!c.def && (isRole(c, 'cloth') || isRole(c, 'support'));
@@ -64016,7 +64016,7 @@ function wbaBeats(t, st, n, kind) {
 }
 const wbaLeapT = n => { const b = wbaBeats(null, null, n); return n * (b.hop + b.hold) + b.back; };
 // start a leap through the foes L (one for a strike); hit(c, k) lands on each as he arrives behind it. Returns its length
-function wbaLeap(t, st, L, kind, hit) {
+function wbaLeap(t, st, L, kind, hit, crit) {
   const P = L.map(c => { const p = wbaBehind(t, c); return { x: p[0], z: p[1], c, a: Math.atan2(c.x - p[0], c.y - p[1]) }; });
   const B = wbaBeats(t, st, P.length, kind), T = P.length * (B.hop + B.hold) + B.back, last = P[P.length - 1];
   t.chg = { leap: 1, kind, x: last.x, z: last.z, at: G.time, T, P, B, rd: 1 };
@@ -64028,7 +64028,8 @@ function wbaLeap(t, st, L, kind, hit) {
     if (!c) return;
     p.a = Math.atan2(c.x - p.x, c.y - p.z);
     hit(c, k, t.st || st);
-    fxSpark(c.x, c.y, hitH(c) + .05, WB_COL.gold, 4); sfx('glaiveHit', kind === 'atk' ? 0 : .5);
+    wbaBlood(c, p, !!crit);
+    fxSpark(c.x, c.y, hitH(c) + .05, WB_COL.gold, 3); sfx('glaiveHit', kind === 'atk' ? 0 : .5);
   } }));
   // the smoke: a small dark puff where she vanishes and where she steps out, each time (owner, 27 Nov 2026: "dont like how
   // it jumps around, make it a smoke then appear from behind and perform an attack")
@@ -64038,6 +64039,32 @@ function wbaLeap(t, st, L, kind, hit) {
   puff(n * seg, () => last.x, () => last.z); puff(n * seg + B.back * WBA.ret, () => t.x, () => t.y);
   t.recoil = 1;
   return T;
+}
+/* The cut draws blood (owner, 28 Nov 2026: "add a dagger glint and a blood spurt"; and of the first, which used the game's
+   shared spurt: a few big flat blobs that sat on the foe's side "like paint splats" for a third of a second). Her own:
+   a quick spray along the cut. A thin line of fine drops leads out from the wound (the same way, each a little faster
+   than the last, so they draw an arc as they fall), with a short burst of small drops round it, mostly tiny; all of it
+   thrown across her foe to the side nearer the eye (straight through, it fell behind the foe's body), falling, and gone
+   within WBA.blood.life (0.4 s); now and then a speck or two on the ground that fades in a second. Dark reds (the
+   crawling things' ichor a dark green; nothing from the bloodless: the game's own bloodOf). A critical strike throws
+   more drops and a longer arc, never bigger ones. Fewer when the field is busy. */
+function wbaBlood(c, p, crit) {
+  if (!c || typeof part !== 'function' || typeof bloodOf !== 'function') return;
+  const base = bloodOf(c); if (!base) return;
+  const B = WBA.blood, red = base === '#a8120f', cols = red ? ['#7c0d0b', '#5a0706', '#8e1512'] : ['#75801f', '#566017', '#8a9628'];
+  const ax = c.x - p.x, az = c.y - p.z, l = Math.hypot(ax, az) || 1, ux = ax / l, uz = az / l;
+  let sx = -uz, sz = ux; if (sz < 0 || (sz === 0 && sx < 0)) { sx = -sx; sz = -sz; }   // (across the cut, on the side toward the camera: +y is lower on the screen)
+  let dx = sx + ux * .3, dz = sz + uz * .3 + .2; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
+  const busy = G.parts.length > 360 ? .5 : 1, h = hitH(c), x0 = c.x + dx * .1, z0 = c.y + dz * .1, far = crit ? B.critFar : 1;
+  // the arc: a line of fine drops, one behind the other
+  const na = Math.round((crit ? B.arc[1] : B.arc[0]) * busy), up = R(.9, 1.3);
+  for (let i = 0; i < na; i++) { const q = (i + 1) / na, v = (1.3 + 2.5 * q) * far; part({ k: 'blood', x: x0, z: z0, h, vx: dx * v + R(-.06, .06), vz: dz * v + R(-.06, .06), vh: up * (.55 + .6 * q), g: 9, drag: .6, life: B.life * (.6 + .4 * q), max: B.life, size: R(.015, .021), col: cols[i % 2] }); }
+  // the burst round it: small drops, mostly tiny, a few a little larger
+  const nb = Math.round((crit ? B.n[1] : B.n[0]) * busy);
+  for (let i = 0; i < nb; i++) { const v = R(.8, 2.9) * far, big = Math.random() < .25; part({ k: 'blood', x: x0 + R(-.03, .03), z: z0 + R(-.03, .03), h: h + R(-.05, .05), vx: dx * v + R(-.7, .7), vz: dz * v + R(-.7, .7), vh: R(.1, 1.8), g: 9, drag: .8, life: R(.2, B.life), max: B.life, size: big ? R(.026, .034) : R(.013, .022), col: cols[i % 3] }); }
+  // a speck or two on the ground where it falls
+  if (typeof decal === 'function' && Math.random() < (crit ? .7 : .4) && G.decals.reduce((n, d) => n + (d.k === 'blood'), 0) < 20)
+    for (let i = 0, n = crit ? 2 : 1; i < n; i++) { const r = R(.3, .55) * far; decal('blood', c.x + dx * r + R(-.08, .08), c.y + dz * r + R(-.08, .08), R(.035, .06), cols[1], 1.1); }
 }
 // a puff of sable smoke the height of her, with two or three gold motes: small and brief, so it never hides a foe or a unit
 function wbaPuff(x, z) {
@@ -64096,10 +64123,11 @@ if (typeof plainLife === 'function' && !plainLife._wba) {
 /* ---------- the strike ---------- */
 FORCE_ATTACK.wbStalk = (t, st, tg, pow, echo) => {
   if (echo || (t.chg && t.chg.leap && wbaAt(t))) { wbaCut(t, st, tg, pow); return; }   // (an echoed strike, or one asked for mid-leap: a cut where he stands)
+  const crit = pow >= (st.critM || 2.5) * .95;   // (fire() has already folded a critical strike into pow)
   wbaLeap(t, st, [tg], 'atk', (c, k, s) => {
     wbaCut(t, s, c, pow);
     if (wbCap(s, 'wbaUnseen') && wbaAlone(t) && !c.dead) G.delayed.push({ t: .14, fn: () => { if (G.state === 'play' && G.towers.includes(t) && !t.wrecked && !c.dead) { wbaCut(t, t.st || s, c, pow * WBA.unseen); fxSpark(c.x, c.y, hitH(c) + .1, WB_COL.goldL, 4); } } });   // Unseen Hand: a second cut
-  });
+  }, crit);
 };
 
 /* ---------- Lone Wolf: no other unit within WBA.lone.r cells (walls are not units) ---------- */
@@ -100696,94 +100724,204 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -100792,75 +100930,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -130283,6 +130553,66 @@ function rgPipsAt(R, id) {
   const raw = gar + here.reduce((s, a) => s + a.pips, 0) + edge.length;
   return { gar, armies: here, edge, raw, g: Math.min(RG_WAR.gcap, raw) };
 }
+/* ---- the war's pieces as troops in the battle (owner, 28 Nov 2026: armies and garrisons made a battle "just far harder across the
+   board"). A place keeps its own waves and its foes' own health. What the war adds is soldiers you can see coming:
+   - a garrison: a squad of the place's own defenders a pip, in its first waves ("the first few fights are easier because you're
+     dealing with the usual garrison then you start dealing with the main threat");
+   - an army: a squad of its own kinds a pip (the ones on its map card: a Storm Wing brings flyers), in the later waves, and its
+     commander in person on the last (or the one before a boss wave): a mini-boss, the leader on its portrait. Slay the commander
+     and the army is beaten; let it through and the army slips away hurt.
+   S.troops: [{ type, count, w, hpK, from, cmd? }], laid into the waves by the waveSpec hook; S.add: how much they add (the
+   rating reads it). ---- */
+const RG_TROOPS = { squad: 4, hpK: 1.3, cmdHp: .6, cmdW: 8, pay: .25 };   // foes a squad, their health (a troop's, as waveSpec gives one), a commander's health share, its weight, the pay a pip
+function rgGarKinds(R, id, w) {
+  let F = null; try { F = typeof ffHome === 'function' ? ffHome(R.force, id) : null; } catch (e) { F = null; }
+  const ks = F && F.roles ? ['armoured', 'melee', 'ranged', 'caster'].map(k => F.roles[k]).filter(t => t && CREEPS[t]) : [];
+  if (ks.length) return ks;
+  const st = R.st[id] || {}, T = ((CAMP_FAMILIES[st.fam] || {}).tiers || []).filter(([w0, ty]) => w0 <= w && CREEPS[ty]).map(t => t[1]);
+  return T.length ? [...new Set(T)].reverse() : ['gnoll'];
+}
+function rgTroops(R, id, w0, w1, lord) {
+  const out = [], len = w1 - w0 + 1, half = Math.max(1, Math.ceil(len / 2)), early = [], late = [];
+  for (let w = w0; w <= w1; w++) (w - w0 < half ? early : late).push(w);
+  if (!late.length) late.push(w1);
+  const P = rgPipsAt(R, id), sq = RG_TROOPS.squad;
+  if (P.gar) { const ks = rgGarKinds(R, id, w0); for (let i = 0; i < P.gar; i++) out.push({ type: ks[i % ks.length], count: sq, w: early[i % early.length], hpK: RG_TROOPS.hpK, from: 'gar' }); }
+  for (const a of P.armies) {
+    const mix = typeof rgArmyMix === 'function' ? rgArmyMix(R, a).map(m => m[0]) : [], ks = mix.length ? mix : [((CAMP_FAMILIES[a.fam] || {}).tiers || [[0, 'gnoll']]).slice(-1)[0][1]];
+    const n = a.pips + P.edge.filter(([x]) => x === a).length;   // (its edge from a place the warlord holds: one squad more)
+    for (let i = 0; i < n; i++) out.push({ type: ks[i % ks.length], count: sq, w: late[i % late.length], hpK: RG_TROOPS.hpK, from: a.id });
+    const cmd = typeof rgArmyCmd === 'function' ? rgArmyCmd(R, a) : null;
+    if (cmd && CREEPS[cmd] && cmd !== lord) {
+      const bw = w => w % 5 === 0 && !(rgNode(R, id).kind === 'trouble' && rgNode(R, id).tier <= RG_GENTLE.tier);   // (a boss wave, as a force run has them: core.js bossWave, which reads Classic's rules on the map)
+      const cw = bw(w1) && w1 - 1 >= w0 ? w1 - 1 : w1;
+      out.push({ type: cmd, count: 1, w: cw, hpK: RG_TROOPS.cmdHp, from: a.id, cmd: true });
+    }
+  }
+  return out;
+}
+// how much the troops add against the place's own waves: r (their weight over the waves' own), and the rating's bump
+function rgTroopsAdd(S) {
+  const T = S.troops || []; if (!T.length) return { r: 0, bump: 0 };
+  const own = (S.w1 - S.w0 + 1) * WAVE_TROOPS * TROOP_MORE, hpOf = t => Math.max(.4, Math.min(3, (CREEPS[t] && CREEPS[t].hp) || 1));
+  const add = T.reduce((s, t) => s + (t.cmd ? RG_TROOPS.cmdW : t.count * t.hpK * hpOf(t.type) / TROOP_MORE), 0), r = add / own;
+  return { r, bump: r >= .45 ? 2 : r >= .12 ? 1 : 0 };
+}
+// the troops in a few plain lines, for the cards: [who, html of their faces, words, the mark]
+function rgTroopLines(R, S) {
+  const T = S.troops || [], by = {};
+  for (const t of T) (by[t.from] = by[t.from] || []).push(t);
+  return Object.keys(by).map(k => {
+    const L = by[k], sq = L.filter(t => !t.cmd), cm = L.find(t => t.cmd), a = k === 'gar' ? null : (R.war && R.war.armies.find(x => x.id === k));
+    const kinds = [...new Set(sq.map(t => t.type))], from = sq.length ? Math.min(...sq.map(t => t.w)) : null, to = sq.length ? Math.max(...sq.map(t => t.w)) : null;
+    const fly = kinds.some(t => CREEPS[t].fly), face = t => { const im = typeof rgFoeImg === 'function' ? rgFoeImg(t) : ''; return im ? `<img alt="" src="${im}" title="${rgEsc(CREEPS[t].name)}">` : ''; };
+    const words = `${sq.length} ${fly && kinds.every(t => CREEPS[t].fly) ? 'flyer ' : ''}squad${sq.length === 1 ? '' : 's'} (${kinds.map(t => CREEPS[t].name).join(', ')})${from ? (from === to ? ` on wave ${from}` : ` from wave ${from}`) : ''}${cm ? `; ${CREEPS[cm.type].name} on wave ${cm.w}` : ''}`;
+    const r = rgTroopsAdd({ w0: S.w0, w1: S.w1, troops: L }).r;
+    return { who: a ? a.name : 'Garrison', faces: kinds.concat(cm ? [cm.type] : []).map(face).join(''), words, mark: r >= .3 ? 'heavy' : r >= .12 ? 'some' : 'light', cmd: cm, army: a };
+  });
+}
+function rgTroopsHTML(R, S) {
+  const L = rgTroopLines(R, S); if (!L.length) return '';
+  return `<div class="rg-troops">${L.map(l => `<p class="rg-trl ${l.mark}"><span class="rg-trf">${l.faces}</span><span><b>+ ${rgEsc(l.who)}</b> <em class="rg-trm ${l.mark}">${{ heavy: '▲▲', some: '▲', light: '△' }[l.mark]}</em><small>${rgEsc(l.words)}</small></span></p>`).join('')}</div>`;
+}
 // the plans an army could take, scored: the best wins (ties broken by the run's seed, so a run's war replays the same)
 function rgWarChoose(R, a) {
   const W = R.war, L = rgLair(R), D = rgDef(R), dA = rgDist(R, a.at), dH = rgDist(R, R.at), max = a.main ? RG_WAR.main.max : RG_WAR.band.max;
@@ -130362,6 +130692,14 @@ function rgWarBeat(R, a, out) {
   a.at = back; a.plan = { k: 'muster', to: L, left: 99 }; a.next = null;
   out.push(`${a.name} is broken (−${rgPipW(cut)} for good) and falls back to ${rgNode(R, back).name}`);
 }
+// an army whose commander got through: it slips away with a third of its strength gone (slain, half or all), a road back toward the lair
+function rgWarFlee(R, a, out, who) {
+  const W = R.war, L = rgLair(R), cut = Math.max(1, Math.round(a.pips / 3)); a.pips -= cut; W.lost += cut;
+  const d = rgDist(R, L), back = rgNb(R, a.at).filter(nb => !rgMine(R, nb) && nb !== R.at).sort((x, y) => (d[x] - d[y]) || (x < y ? -1 : 1))[0];
+  if (a.pips <= 0 || !back) { a.pips = 0; a.dead = true; out.push(`${a.name} is destroyed`); return; }
+  a.at = back; a.plan = { k: 'muster', to: L, left: 99 }; a.next = null;
+  out.push(`${who} got through: ${a.name} slips away to ${rgNode(R, back).name} with ${rgPipW(a.pips)}`);
+}
 // the enemy's turn, after every march or battle: sieges count down, cut-off garrisons weaken, the lair musters, each army takes
 // one road step, the warlord's stance and the armies' plans are worked out again. Returns the news, for the map's notice
 function rgWarTurn(R, out) {
@@ -130420,7 +130758,16 @@ function rgWarTurn(R, out) {
 function rgWarAfter(R, S, won, retreat, out) {
   if (!R.war || S.kind === 'waylay' || S.kind === 'patrol') return;
   const W = R.war, id = S.node, here = rgArmiesAt(R, id);
-  if (won) { delete W.gar[id]; delete W.siege[id]; for (const a of here) rgWarBeat(R, a, out); return; }
+  if (won) {
+    delete W.gar[id]; delete W.siege[id];
+    for (const a of here) {
+      const cm = (S.troops || []).find(t => t.cmd && t.from === a.id);
+      if (cm && !(S.cmdDead || {})[a.id]) { rgWarFlee(R, a, out, CREEPS[cm.type].name); continue; }
+      if (cm) { const p = (S.cmdPay || {})[a.id] | 0; if (p) { R.chest += p; out.push(`${CREEPS[cm.type].name} slain: +${p} gold`); } }
+      rgWarBeat(R, a, out);
+    }
+    return;
+  }
   if (S.kind === 'defend') {
     const a = here[0], town = rgNode(R, id).kind === 'town', s = W.siege[id];
     if (!(retreat && town && s && s.left > 0)) rgWarFall(R, id, a, out);
@@ -130450,7 +130797,7 @@ const RG_WAR2 = {
   idle: 4,                                    // turns an army holds or guards one place before it grows restless
 };
 // the warlord's rating of a place's battle now, and what it would be with no garrison or army
-function rgRateAt(R, id) { const S = rgSpec(R, id, 'trouble'), k = rgDiff(R, S).k, b = rgDiff(R, Object.assign({}, S, { g: 0 })).k; return { k, base: b, g: S.g }; }
+function rgRateAt(R, id) { const S = rgSpec(R, id, 'trouble'), k = rgDiff(R, S).k, b = rgDiff(R, Object.assign({}, S, { g: 0, bump: 0 })).k; return { k, base: b, g: rgPipsAt(R, id).raw }; }
 // is the battle at an enemy place one the host can take on (no harder than the last place won, or empty and one step past it)
 function rgSoft(R, id) {
   const n = rgNode(R, id); if (!n || rgMine(R, id) || n.kind === 'lair') return false;
@@ -130548,7 +130895,7 @@ function rgPrizeHTML(R, id) {
 const RG_DIFF_W = ['', 'Easy', 'Normal', 'Hard', 'Deadly', 'Deadly'];
 function rgDiff(R, S) {
   const n = rgNode(R, S.node), base = S.kind === 'waylay' ? (S.gentle ? 1 : 2) : n.kind === 'lair' ? 5 : S.gentle ? 1 : clamp(n.tier || 2, 2, 4);
-  const k = clamp(base + (S.g | 0), 1, 5);
+  const k = clamp(base + (S.g | 0) + (S.bump | 0), 1, 5);   // (S.g: a patrol's step; S.bump: what the war's troops add, rgTroopsAdd)
   return { k, word: RG_DIFF_W[k], stars: '★'.repeat(k) + '☆'.repeat(5 - k) };
 }
 // the war at a place, in a few plain words: its garrison, the armies there and near, a siege, cut off, an edge it gives
@@ -130570,10 +130917,8 @@ function rgDiffWhy(R, S) {
   const b = rgBossesOf(R, S), parts = [];
   if (S.kind === 'patrol' && S.g) parts.push(`A patrol: ${RG_STEP.w * S.g} waves later, foes +${Math.round(RG_STEP.hp * 100 * S.g)}% health`);
   else if (S.kind !== 'waylay' && S.war) {
-    const P = S.war, bits = [];
-    if (P.gar) bits.push(`garrison ${P.gar}`); for (const a of P.armies) bits.push(`${a.name} ${a.pips}`); for (const [a] of P.edge) bits.push(`${a.name}'s edge 1`);
-    if (S.g) parts.push(`${bits.join(' + ')}: ${RG_STEP.w * S.g} waves later, foes +${Math.round(RG_STEP.hp * 100 * S.g)}% health${P.raw > S.g ? ` (at most ${RG_WAR.gcap} pips count)` : ''}`);
-    else parts.push('No garrison and no army: as it first stood');
+    const L = rgTroopLines(R, S);
+    parts.push(L.length ? `Its own waves, plus: ${L.map(l => `${l.who}: ${l.words}`).join('; ')}` : 'No garrison and no army: as it first stood');
   }
   if (S.town) parts.push(`Defending your town: your maze stands ready, foes ×${S.town.hp}, +${S.town.line} lives on the line, +${S.town.gold} gold from its stores`);
   if (S.farm) parts.push(`Fought here lately: ${Math.round(S.farmK * 100)}% of the gold, XP and drops (it recovers after ${RG_WAR2.farm.recover} turns away)`);
@@ -130611,13 +130956,15 @@ function rgSpec(R, id, kind, road) {
   // (a start town has no battle of its own: its tier's waves when it must be defended)
   const n = rgNode(R, id), st = R.st[id], nw = n.w || [RG_TIER_W[n.tier] || 2, (RG_TIER_W[n.tier] || 2) + 5], len = nw[1] - nw[0], patrol = kind === 'patrol';
   const P = patrol ? null : rgPipsAt(R, id), war = P && { gar: P.gar, raw: P.raw, armies: P.armies.map(a => ({ id: a.id, name: a.name, pips: a.pips, fam: a.fam })), edge: P.edge.map(([a, sid]) => [{ name: a.name }, sid]) };
-  const g = patrol ? (st.p | 0) + 1 : P.g, w0 = Math.min(50 - len, nw[0] + RG_STEP.w * g);
+  const g = patrol ? (st.p | 0) + 1 : 0, w0 = Math.min(50 - len, nw[0] + RG_STEP.w * g);   // (the war's pips no longer push the waves: they bring troops, below)
   const up = n.kind === 'lair' ? rgHelpersUp(R) : [];
-  const fam = st.fam || (P && P.armies[0] ? P.armies[0].fam : null), fams = up.map(h => h.fam).concat(P ? P.armies.map(a => a.fam) : []);
+  const fam = st.fam || (P && P.armies[0] ? P.armies[0].fam : null), fams = up.map(h => h.fam);
   const farm = rgFarmK(R, id), town = kind === 'defend' && n.kind === 'town', TD = RG_WAR2.town;
-  const pay = Math.round((40 + 10 * nw[0]) * (1 + RG_STEP.pay * (patrol ? 0 : g)) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) * farm.k / 5) * 5;
+  const pay0 = (40 + 10 * nw[0]) * farm.k, pay = Math.round(pay0 * (1 + RG_TROOPS.pay * (patrol ? 0 : P.gar)) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) / 5) * 5;
+  const troops = patrol ? [] : rgTroops(R, id, w0, w0 + len, n.kind === 'lair' ? D.lord : null), tadd = rgTroopsAdd({ w0, w1: w0 + len, troops });
+  const cmdPay = patrol ? {} : Object.fromEntries(P.armies.map(a => [a.id, Math.round(pay0 * RG_TROOPS.pay * a.pips / 5) * 5]));   // (paid for its commander slain)
   const gentle = (n.kind === 'trouble' || kind === 'defend') && n.tier <= RG_GENTLE.tier, ease = !gentle && n.kind !== 'lair' && n.tier === RG_EASE.tier, B = rgBehind(R, w0);
-  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam, extra: [...new Set(fams)].filter(f => f && f !== fam), war, hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k * (town ? TD.hp : 1), gentle, ease, marched: B.maze, behind: B.from, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null, farm: farm.rep, farmK: farm.k,
+  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam, extra: [...new Set(fams)].filter(f => f && f !== fam), war, troops, add: tadd, bump: tadd.bump, cmdPay, hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k * (town ? TD.hp : 1), gentle, ease, marched: B.maze, behind: B.from, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null, farm: farm.rep, farmK: farm.k,
     town: town ? { hp: TD.hp, line: TD.line, gold: Math.round(TD.gold * rgEarned(w0) / 5) * 5 } : null, maze: town && R.maze && R.maze.rows && R.maze.rows.length ? 'keep' : undefined, prize: rgPrizeAt(R, id) && kind === 'trouble' ? Object.assign({}, rgPrizeAt(R, id)) : null };
 }
 // the bosses in a battle's waves (the standard march's; the lair's last is its lord)
@@ -130911,7 +131258,7 @@ function rgTown(R, k) {
 // how difficulty works, on the map and the start screen
 const RG_HOW = `<details class="rg-how"><summary>How difficulty works</summary><ul>
   <li>Each place shows how hard it is (Easy, Normal, Hard, Deadly) and why. The first places are Easy: no boss and gentle foes.</li>
-  <li>The warlord's strength is counted in <b>pips</b>. A battle is its place's own fight plus one pip for each <b>garrison</b> pip there and each pip of every <b>army</b> standing there. Each pip: its waves start ${RG_STEP.w} later, its foes have ${Math.round(RG_STEP.hp * 100)}% more health, its reward is ${Math.round(RG_STEP.pay * 100)}% bigger (at most ${RG_WAR.gcap} pips a battle). An empty place he holds is as it first stood.</li>
+  <li>The warlord's strength is counted in <b>pips</b>. A place keeps its own waves; what he has there joins as soldiers you can see coming. Each <b>garrison</b> pip is a squad of its defenders in the first waves. Each pip of an <b>army</b> there is a squad of its own kinds in the later waves (a Storm Wing brings flyers), and its <b>commander</b> fights in person on the last: slay the commander to beat the army. The place card lists them, wave by wave. An empty place he holds is as it first stood.</li>
   <li>Every march or battle is a <b>turn</b>. After it, each army takes one road step: the arrow on the map shows where it goes next, its icon its plan (⚔ hunt you, ♜ besiege a town, ↺ retake a place, ⚑ guard, ✚ muster at the lair). Shopping, the forge, resting and re-specs take no turn.</li>
   <li>Beat an army and its pips are gone for good: a band is destroyed, the Main Host is broken and falls back. Lose a battle (away from the first places) and the Main Host comes hunting you.</li>
   <li>An army that reaches a town you hold <b>besieges</b> it: it falls in ${RG_WAR.siege} turns unless you march there and break the siege. Armies cannot march through your towns.</li>
@@ -131020,7 +131367,7 @@ function rgLegendHTML() {
     ${item(ic(20, 20, '<g class="rg-sg" transform="translate(10 10)"><circle r="9"/><text y="4">3</text></g>'), 'Siege: turns left')}
     ${item(ic(20, 20, '<g class="rg-ev" transform="translate(10 10)"><circle r="8.5"/><text y="4" style="font-size:10px">⌂</text></g>'), 'Road event')}
     <span class="lg-road">Road danger <b>/</b><b>//</b><b>///</b></span>
-    <span class="lg-plan">Plans: ⚔ hunt · ♜ siege · ↺ retake · ⚑ guard · ✚ muster. Hover (or tap) an army for its forces.</span></div>`;
+    <span class="lg-plan">Plans: ⚔ hunt · ♜ siege · ↺ retake · ⚑ guard · ✚ muster. Hover (or tap) an army for its forces. A place keeps its own waves; garrison and army squads join them (▲ adds a lot, △ a little), the commander last.</span></div>`;
 }
 // the warlord's intent in one line (owner, 27 Nov 2026: "need more of a sense of the threat"): what the Main Host is doing,
 // and the sharpest danger after it (a siege about to land, an army marching on the host)
@@ -131102,7 +131449,7 @@ function rgNodeHTML(R, id) {
   const n = rgNode(R, id), st = R.st[id], here = R.at === id, i = rgRoadIx(R, R.at, id), P = rgPrimary(R, id);
   const state = st.s === 'held' ? (n.kind === 'town' ? 'Held town' : 'Settled') : st.s === 'lost' ? 'Lost to the enemy' : n.kind === 'town' ? 'Enemy-held town' : n.kind === 'lair' ? 'The warlord’s lair' : 'Trouble';
   const S = st.s !== 'held' ? rgSpec(R, id, 'trouble') : R.war && rgArmiesAt(R, id).length ? rgSpec(R, id, 'defend') : n.kind === 'trouble' && (st.p | 0) < RG_PATROLS ? rgSpec(R, id, 'patrol') : null;
-  const wl = rgWarLine(R, id), warl = wl ? `<p class="rg-warl">${rgEsc(wl)}</p>` : '';
+  const wl = rgWarLine(R, id), warl = (wl ? `<p class="rg-warl">${rgEsc(wl)}</p>` : '') + (S ? rgTroopsHTML(R, S) : '');
   const btn = P.can ? `<button class="btn rg-go" id="rgAct">${rgEsc(P.label)}<small>${rgEsc(P.sub)}</small></button>` : `<p class="rg-note">${rgEsc(P.why)}</p>`;
   let more = `<p class="cm-say">${rgEsc(n.say)}</p>${here ? '<p class="rg-here">Your host is here.</p>' : ''}`;
   if (!here && i >= 0) { const r = R.roads[i]; more += `<p class="rg-road-card"><b>The road from ${rgEsc(rgNode(R, R.at).name)}:</b> danger ${r.d} of 3 · ${Math.round(RG_WAY[r.d] * 100)}% to be waylaid${r.d ? ` by ${rgEsc(CAMP_FAMILIES[r.fam].name)} (a 2-wave skirmish)` : ''}${r.ev && !r.evDone ? ` · <b>${RG_EVENTS[r.ev].name}</b> on the way (a choice)` : ''}.</p>`; }
@@ -131394,6 +131741,16 @@ function rgUnlearn(type, i) {
     try { return F && typeof ffSpec === 'function' ? ffSpec(n, g, F) : g; } catch (e) { return g; }
   };
   if (typeof ffBossWave === 'function') { const _fb = ffBossWave; ffBossWave = function (n) { const S = G && G.region; return S && (S.gentle || (S.ease && RG_EASE.first && n === S.w0)) ? false : _fb.apply(this, arguments); }; }   // (no boss banner, card or boss on a first place)
+  // the war's troops (S.troops) march in their waves, after everything else has shaped the wave (the place's own, a first place's gentle
+  // roles): they are the army's own kinds whatever the place's faction
+  const _wsT = waveSpec;
+  waveSpec = function (n) {
+    const g = _wsT.apply(this, arguments), S = G && G.region;
+    if (!S || G.vs || !Array.isArray(S.troops) || !S.troops.length) return g;
+    const add = S.troops.filter(t => t.w === n && CREEPS[t.type]).map(t => ({ type: t.type, count: t.count, swift: false, siege: false, hpK: t.hpK, rgFrom: t.from }));
+    return add.length ? g.concat(add) : g;
+  };
+  if (typeof kill === 'function') { const _kl = kill; kill = function (c) { const S = G && G.region; if (S && Array.isArray(S.troops) && c && !c.splitCopy && !c.kid) for (const t of S.troops) if (t.cmd && t.type === c.type) (S.cmdDead || (S.cmdDead = {}))[t.from] = 1; return _kl.apply(this, arguments); }; }
   const _hp = waveHP;
   waveHP = function () { return _hp.apply(this, arguments) * (G && G.region && !G.vs ? G.region.hpK || 1 : 1); };
   const _mw = makeWave;
@@ -131912,7 +132269,7 @@ function rgBossTick(dt) {
    name and one line on hover (a tap on touch). The boss stands first, larger, with its rule. */
 const RG_FOES = {}, RG_FIMG = {};
 function rgFoesOf(R, S) {
-  const key = [R.force, S.kind, S.node, S.w0, S.w1, S.gentle ? 1 : 0, S.ease ? 1 : 0, (S.extra || []).join(','), S.fam || '', S.lord || ''].join('|');
+  const key = [R.force, S.kind, S.node, S.w0, S.w1, S.gentle ? 1 : 0, S.ease ? 1 : 0, (S.extra || []).join(','), S.fam || '', S.lord || '', (S.troops || []).map(t => t.type + '*' + t.count + '@' + t.w).join(',')].join('|');   // (the war's troops too: a place with an army is not the same fight)
   if (RG_FOES[key]) return RG_FOES[key];
   const out = { troops: [], bosses: [] };
   if (typeof waveSpec !== 'function' || typeof WAVES === 'undefined' || typeof campWaves !== 'function' || typeof G === 'undefined' || !G) return out;
@@ -132010,12 +132367,13 @@ function rgArmyCmd(R, a) {
   return a.cmd;
 }
 // the waves a battle with this army would be fought at: its place's (or the host's last) first wave
-const rgArmyW = (R, a) => { const n = rgNode(R, a.at); return Math.max(1, (n && n.w ? n.w[0] : (RG_TIER_W[n && n.tier] || 2)) + RG_STEP.w * a.pips); };
+const rgArmyW = (R, a) => { const n = rgNode(R, a.at); return Math.max(1, (n && n.w ? n.w[0] : (RG_TIER_W[n && n.tier] || 2)) ); };   // (the place's own waves: the war no longer pushes them)
 // its kinds, newest first, with rough counts: [[type, count]]
 function rgArmyMix(R, a) {
   const w = rgArmyW(R, a), T = ((CAMP_FAMILIES[a.fam] || {}).tiers || []).filter(([w0, ty]) => w0 <= w && CREEPS[ty]).map(t => t[1]);
-  const kinds = [...new Set(T)].slice(-3).reverse(), tot = 6 * a.pips + 4, share = [.5, .3, .2].slice(0, kinds.length), sum = share.reduce((x, y) => x + y, 0) || 1;
-  return kinds.map((ty, i) => [ty, Math.max(1, Math.round(tot * share[i] / sum))]);
+  // (as it marches into a battle, region.js rgTroops: a squad a pip, its kinds in turn, newest first)
+  const kinds = [...new Set(T)].slice(-3).reverse(), sq = typeof RG_TROOPS !== 'undefined' ? RG_TROOPS.squad : 4, n = Math.max(1, a.pips | 0);
+  return kinds.map((ty, i) => [ty, sq * Math.floor((n - i + kinds.length - 1) / kinds.length)]).filter(m => m[1] > 0);
 }
 // what the kinds in it do, in plain words
 function rgArmyTraits(types) {
@@ -132031,6 +132389,8 @@ const rgPlanWords = (R, a) => { const P = RG_PLAN[a.plan ? a.plan.k : 'hold'] ||
   return a.plan && (a.plan.k === 'pursue' || a.plan.k === 'muster') ? P[2] : `${P[2]} ${to ? to.name : ''}`; };
 // how hard a battle with it would be where it stands
 function rgArmyDiff(R, a) { try { const S = rgSpec(R, a.at, rgMine(R, a.at) ? 'defend' : 'trouble'); return rgDiff(R, S); } catch (e) { return null; } }
+// when it joins a battle where it stands: its squads' first wave, its commander's wave
+function rgArmyJoin(R, a) { try { const S = rgSpec(R, a.at, rgMine(R, a.at) ? 'defend' : 'trouble'), L = rgTroopLines(R, S).find(l => l.army && l.army.id === a.id); return L ? L.words : ''; } catch (e) { return ''; } }
 // the hover (tap) card of an army
 function rgArmyCard(R, a) {
   const cmd = rgArmyCmd(R, a), d = CREEPS[cmd], img = rgFoeImg(cmd), mix = rgArmyMix(R, a), tr = rgArmyTraits(mix.map(m => m[0])), D = rgArmyDiff(R, a), n = rgNode(R, a.at);
@@ -132039,7 +132399,7 @@ function rgArmyCard(R, a) {
     <p class="rg-astr"><b>${'◆'.repeat(a.pips)}</b> ${rgPipW(a.pips)} · at ${rgEsc(n ? n.name : '')} · ${rgEsc(rgPlanWords(R, a))}${a.next ? `, next ${rgEsc(rgNode(R, a.next).name)}` : ''}</p>
     <ul class="rg-amix">${mix.map(([ty, c]) => { const im = rgFoeImg(ty); return `<li>${im ? `<img alt="" src="${im}">` : ''}<span>${rgEsc(CREEPS[ty].name)} <b>×${c}</b></span></li>`; }).join('')}</ul>
     ${tr.length ? `<p class="rg-atr">${tr.map(t => `<em>${t}</em>`).join('')}</p>` : ''}
-    ${D ? `<p class="rg-adf rg-d${D.k}">Fought at ${rgEsc(n ? n.name : '')}: <span aria-hidden="true">${D.stars}</span> <b>${D.word}</b></p>` : ''}</div>`;
+    ${D ? `<p class="rg-adf rg-d${D.k}">Fought at ${rgEsc(n ? n.name : '')}: <span aria-hidden="true">${D.stars}</span> <b>${D.word}</b>${(() => { const l = rgArmyJoin(R, a); return l ? `<small>${rgEsc(l)}</small>` : ''; })()}</p>` : ''}</div>`;
 }
 function rgArmyTip(el) {
   const R = typeof rgGet === 'function' && typeof rgLastForce === 'function' ? rgGet(rgLastForce()) : null, a = R && rgArmy(R, el.dataset.army);
@@ -143811,13 +144171,26 @@ const OK2 = (() => {
     if (live) {
       const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
       const tipR = w(BI.swordR, MK.tipR), tipL = w(BI.swordL, MK.tipL), chest = w(BI.chest, [0, .8, 0]);
+      const grdR = w(BI.swordR, MK.grdR || MK.gripR), grdL = w(BI.swordL, MK.grdL || MK.gripL);
       t.tipW = tipR; t.tipYaw = yaw; t.tipAt = G.time; t._okDrawn = G.time; t._okClip = P.c; t._okClipS = P.s; t._okTipL = tipL;
       // a glint on the dagger as it cuts (the smoke is the game's: wbaPuff)
       if (typeof QADD !== 'undefined' && typeof RD !== 'undefined') {
         const L = t._okTrail || (t._okTrail = []);
         if (L.length) L.length = 0;   // (no streak: she no longer crosses the air)
         for (let i = 1; i < L.length; i++) { const a0 = L[i - 1], a1 = L[i], f = Math.max(0, 1 - (G.time - a1[3]) / .18); if (f > 0) QADD.beam(RD, [a0[0], a0[1], a0[2]], [a1[0], a1[1], a1[2]], .05 * s, [.75, .5, .16, .26 * f]); }
-        if (p && p.ph === 'hold' && p.u >= (p.cut || 0) && p.u < (p.cut || 0) + .3) { const g = P.c === 'cutL' ? tipL : tipR, f = 1 - (p.u - (p.cut || 0)) / .3; QADD.bill(RD, g[0], g[1], g[2], .1 * f + .04, .1 * f + .04, [1, .8, .4, .5 * f], 1, 0); if (P.c === 'plunge') QADD.bill(RD, tipL[0], tipL[1], tipL[2], .1 * f + .04, .1 * f + .04, [1, .8, .4, .5 * f], 1, 0); }
+        /* a glint along the dagger's edge (owner: "a quick, sharp glint running along the daggers' edges just before or at the
+           strike"): a short bright stroke that runs guard to point over the wind-up's last tenth of a second and leaves the
+           point as the blow lands; the edge behind it lit faintly. The striking hand's (both for Quietus); the other dagger's
+           as it is slashed across after. Thin and brief: nothing of her foe is covered. */
+        if (p && p.ph === 'hold') {
+          const cu = p.cut || 0, run = (g0, g1, a, b) => { const q = (p.u - a) / (b - a); if (q < 0 || q > 1) return;
+            const e = q * q * (3 - 2 * q), h0 = Math.max(0, e * 1.25 - .25), h1 = Math.min(1, e * 1.25), at = k => [g0[0] + (g1[0] - g0[0]) * k, g0[1] + (g1[1] - g0[1]) * k, g0[2] + (g1[2] - g0[2]) * k], fa = Math.sin(Math.PI * q);
+            QADD.beam(RD, g0, at(h1), .014 * s, [1, .86, .55, .2 * fa]); QADD.beam(RD, at(h0), at(h1), .03 * s, [1, .95, .8, .8 * fa]);
+            const hd = at(h1); QADD.bill(RD, hd[0], hd[1], hd[2], .07 * s * fa + .01, .07 * s * fa + .01, [1, .95, .8, .75 * fa], 1, 0); };
+          const both = P.c === 'plunge', left = P.c === 'cutL';
+          if (both || !left) run(grdR, tipR, cu - .24, cu + .06); if (both || left) run(grdL, tipL, cu - .24, cu + .06);
+          if (!both) { if (left) run(grdR, tipR, cu + .14, cu + .34); else run(grdL, tipL, cu + .14, cu + .34); }
+        }
       }
     }
     return true;
