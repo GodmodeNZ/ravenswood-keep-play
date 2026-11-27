@@ -1,4 +1,4 @@
-const BUILD_TAG = '55ff5e3e@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '87d9da10@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -1523,7 +1523,7 @@ function makeWave(n, diff) {
     const hk = g.hpK || 1, intro = !!atk && !(typeof G !== 'undefined' && G && G.vs) && siegeFirst(g.type, !def.atk) === n && (!def.boss || n === siegeFirst());   // this kind of siege troop's first wave (a boss only on the very first siege)
     const el = eliteWave(n) && !def.boss && !def.lead;   // an elite wave's troops are elites (loot.js LOOT_RULES)
     const pk = (pspec.find(x => x.type === g.type) || {}).hpK || 1;   // a plain troop of its kind on this wave: the elite tag shows hk / pk (x ELITE_HP for a random elite)
-    return { gap: (GAP[g.type] || .9) * (sw ? sw.gap : 1) * Math.min(1.4, Math.sqrt(hk)) / minionSpd(def), even: def.boss && !def.lead ? (GAP[g.type] || 3) : SPACING * Math.max(1, def.r / .36) / (BASE_SPD * def.spd * (sw ? sw.spd : 1) * minionSpd(def)), e: { wv: n, elite: el || undefined, eliteX: el ? hk / pk : undefined, type: g.type, hp: waveHP(n, diff) * def.hp * bf * mh * (sw ? sw.hp : 1) * hk * (intro && !def.boss && !def.lead ? SIEGE_INTRO.hp : 1) * hpBuff(def, n), bounty: Math.max(1, Math.round(bountyFor(n, def) * hk)), spdM: sw ? sw.spd : 1, atk, atkM: atk ? siegeMult(n) * (intro ? SIEGE_INTRO.atk : 1) : 0, intro } };
+    return { gap: (GAP[g.type] || .9) * (sw ? sw.gap : 1) * Math.min(1.4, Math.sqrt(hk)) / minionSpd(def), even: def.boss && !def.lead ? (GAP[g.type] || 3) : SPACING * Math.max(1, def.r / .36) / (BASE_SPD * def.spd * (sw ? sw.spd : 1) * minionSpd(def)), e: { wv: n, cmd: g.cmd || undefined, elite: el || undefined, eliteX: el ? hk / pk : undefined, type: g.type, hp: waveHP(n, diff) * def.hp * bf * mh * (sw ? sw.hp : 1) * hk * (intro && !def.boss && !def.lead ? SIEGE_INTRO.hp : 1) * hpBuff(def, n), bounty: Math.max(1, Math.round(bountyFor(n, def) * hk)), spdM: sw ? sw.spd : 1, atk, atkM: atk ? siegeMult(n) * (intro ? SIEGE_INTRO.atk : 1) : 0, intro } };
   };
   const cntOf = (g, def) => n > MAX_WAVE && !def.boss ? Math.round(g.count * 1.15) : g.count;
   if (!army) {
@@ -2580,7 +2580,7 @@ function updateCreeps(dt) {
   const coals = talentHas('flame', 'coals'), creepCold = talentHas('frost', 'creepcold'), wake = talentHas('frost', 'wake'), kindle = talentHas('flame', 'kindle'), panicF = talentHas('flame', 'panicfire'), fester = talentHas('venom', 'fester'), taint = talentHas('venom', 'taint'), puppet = talentHas('shadow', 'puppet');
   // warband auras: who stands near a Pack Alpha or a Torchbearer this frame, and which Shieldbearers still hold a shield
   const alphas = [], torches = []; G.guards.length = 0; G.banners = G.banners || []; G.banners.length = 0;
-  for (const c of G.creeps) { if (c.dead) continue; if (c.def.pack) alphas.push(c); if (c.def.thaw) torches.push(c); if (c.def.guard && c.shield > 0) G.guards.push(c); if (c.def.lead === 'banner') G.banners.push(c); }
+  for (const c of G.creeps) { if (c.dead) continue; if (c.def.pack) alphas.push(c); if (c.def.thaw) torches.push(c); if (c.def.guard && c.shield > 0) G.guards.push(c); if (c.def.lead === 'banner' && !c.bmNoAura) G.banners.push(c); }
   leaderWorld(dt); bossRuleWorld();
   if (G.corpses.length) { for (const k of G.corpses) k.t -= dt; G.corpses = G.corpses.filter(k => k.t > 0 && !k.gone); }
   for (const c of G.creeps) {
@@ -3850,6 +3850,7 @@ function hurt(c, amt, type, src, dot, kb, elem) {
   if (c.drT > 0) { wlAside('Wings of Dusk and shrouds', amt * (c.drK || .5)); amt *= 1 - (c.drK || .5); }   // Shroud of Wings
   if (c.phal) { wlAside('Phalanx', amt * .55); amt *= .45; }   // Captain Varn's phalanx
   if (c.def.brule) { const k = bossRuleHit(c, type, dot, src); if (k < 1) wlAside('Unbroken Ground', amt * (1 - k)); amt *= k; }   // bossrules.js (force runs)
+  if (c.bm && typeof bmHurt === 'function') amt = bmHurt(c, amt, type, dot, src);   // a boss's or a commander's rule (forces_*_bossmech.js)
   if (c.momDR) { wlAside("Mother's Wrath", amt * c.momDR); amt *= 1 - c.momDR; }   // Arachnara, hardened by her fallen brood
   const ss = src && src.st;
   if (G.qx && typeof qxHurtK === 'function') amt *= qxHurtK(c, type, dot, src);   // a challenge's twist (quests.js)
@@ -56540,6 +56541,8 @@ const FPH = (() => {
    fuse running down (white while he is stunned and it waits); the First Cap's ring fills toward its next shedding.
    Hooks only: the bosses' own files are untouched. Off for a look: BCUE.on = false in the console. Check: sim/boss_cue_check.js. */
 const BCUE = { on: true, lab: 1.7, ringK: 2.3, th: .13, lift: .35 };
+// who the cues treat as a boss (bossmech.js adds the war bands' commanders)
+function bcIsBoss(c) { return !!(c && c.def && c.def.boss); }
 const bcK = h => typeof c4 === 'function' ? c4(h) : [1, 1, 1, 1];
 // a word or two over the boss (or a unit, or a point): rises and fades as the numbers do, but in its own small capitals
 function bcSay(o, s, col, dh) {
@@ -56563,7 +56566,7 @@ const bcPct = k => `+${Math.round((k - 1) * 100)}%`;
 function bcTick() {
   if (!BCUE.on || G.state !== 'play') return;
   for (const c of G.creeps) {
-    if (c.dead || !c.def.boss) continue;
+    if (c.dead || !bcIsBoss(c)) continue;
     const S = c.bcS || (c.bcS = { orSpoiled: c.orSpoiled | 0, orTolls: c.orTolls | 0, ysSpoiled: c.ysSpoiled | 0, ysHymns: c.ysHymns | 0, flood: !!c.ysFlood, gcShed: c.gcShed | 0,
       knSpoiled: c.knSpoiled | 0, tolls: c.tolls | 0, forgeN: c.forgeN | 0, cracks: c.cracks | 0, onGround: !!c.onGround, phased: !!c.phased, momAt: 0, rage: !!c.rgRage, law: c.brLaw });
     // Orragar: the bell caught, or the toll rung
@@ -56626,7 +56629,7 @@ function bcTick() {
 
 /* ---- the drawing: a ring at a boss's feet, its own touches; and the field's (Brakka's charges, Kragmor's cracked ground) ---- */
 function bcDraw(c, r) {
-  if (!BCUE.on || !c.def.boss || c.dead || typeof QG === 'undefined') return;
+  if (!BCUE.on || !bcIsBoss(c) || c.dead || typeof QG === 'undefined') return;
   const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), R_ = bcR(c, r), p = .5 + .5 * Math.sin(vt * 6 + (c.anim || 0));
   // Orragar: the bell's wind-up fills, the open heart beats and its window empties, the fallen burn as wisps
   if (c.type === 'orragar' && typeof HT !== 'undefined') {
@@ -56699,7 +56702,7 @@ function bcLate() {
   if (BCUE._late) return;
   if (typeof drawCreepFx !== 'function' || typeof drawLeaderMarks !== 'function') return;
   BCUE._late = true;
-  const _d = drawCreepFx; drawCreepFx = function (c, r) { const v = _d.apply(this, arguments); try { if (c && c.def && c.def.boss) bcDraw(c, r); } catch (e) {} return v; };
+  const _d = drawCreepFx; drawCreepFx = function (c, r) { const v = _d.apply(this, arguments); try { if (bcIsBoss(c)) bcDraw(c, r); } catch (e) {} return v; };
   const _m = drawLeaderMarks; drawLeaderMarks = function () { const v = _m.apply(this, arguments); try { bcField(); } catch (e) {} return v; };
 }
 if (typeof setTimeout === 'function') setTimeout(() => { try { bcLate(); } catch (e) {} }, 0);
@@ -56798,15 +56801,15 @@ function bcCalls(c, S) {
   S.wind = winding;
   const w = !!bcWeak(c);
   if (w && !S.weak) bcCall(c, c.type === 'orragar' ? 'open' : c.zone ? 'crack' : c.pile ? 'bones' : 'open');
-  else if (!w && S.weak && !c.pile && !c.dead) { bcCall(c, 'shut'); bcSay(c, c.type === 'orragar' ? 'Heart closed' : 'Holds again', '#d8d8d8'); }
+  else if (!w && S.weak && !c.pile && !c.dead && (c.type === 'orragar' || c.zone)) { bcCall(c, 'shut'); bcSay(c, c.type === 'orragar' ? 'Heart closed' : 'Holds again', '#d8d8d8'); }   // (the windows with an end worth a word; bossmech.js's own windows end quietly)
   S.weak = w;
   if (!S.out) { S.out = true; bcCall(c, 'out'); }
 }
 { const _t = bcTick; bcTick = function () {
-    const before = new Map(); for (const c of G.creeps) if (!c.dead && c.def.boss && c.bcS) before.set(c, { flood: c.bcS.flood, gcShed: c.bcS.gcShed, forgeN: c.bcS.forgeN, onGround: c.bcS.onGround, phased: c.bcS.phased, mom: c.bcS.mom });
+    const before = new Map(); for (const c of G.creeps) if (!c.dead && bcIsBoss(c) && c.bcS) before.set(c, { flood: c.bcS.flood, gcShed: c.bcS.gcShed, forgeN: c.bcS.forgeN, onGround: c.bcS.onGround, phased: c.bcS.phased, mom: c.bcS.mom });
     const r = _t.apply(this, arguments);
     if (BCUE.on && G.state === 'play') for (const c of G.creeps) {
-      if (c.dead || !c.def.boss || !c.bcS) continue;
+      if (c.dead || !bcIsBoss(c) || !c.bcS) continue;
       const S = c.bcS, B = before.get(c);
       if (B) {
         if (S.flood && !B.flood) bcCall(c, 'flood');
@@ -56838,15 +56841,15 @@ function bcLateWeak() {
   BCUE._weak = true;
   const _b = dfBars; dfBars = function (c, x, top, z, w, h) {
     const v = _b.apply(this, arguments);
-    try { if (BCUE.on && c && c.def && c.def.boss && bcWeak(c)) { const p = .5 + .5 * Math.sin(vt * 9), f = clamp(c.hp / c.maxHp, 0, 1); QO.barRect(RD, x, top, z, -w / 2, w * f, h, [1, .85, .25, .35 + .55 * p]); } } catch (e) {}
+    try { if (BCUE.on && bcIsBoss(c) && bcWeak(c)) { const p = .5 + .5 * Math.sin(vt * 9), f = clamp(c.hp / c.maxHp, 0, 1); QO.barRect(RD, x, top, z, -w / 2, w * f, h, [1, .85, .25, .35 + .55 * p]); } } catch (e) {}
     return v; };
   if (typeof bossAdaptTags === 'function') { const _g = bossAdaptTags; bossAdaptTags = function () {
     const L = _g.apply(this, arguments) || [];
-    try { if (BCUE.on && G.state === 'play') for (const c of G.creeps) { if (c.dead || !c.def.boss) continue; const W = bcWeak(c); if (W) L.push([c, `${W.say} ${Math.ceil(W.left)}s`, '#ffd34a']); } } catch (e) {}
+    try { if (BCUE.on && G.state === 'play') for (const c of G.creeps) { if (c.dead || !bcIsBoss(c)) continue; const W = bcWeak(c); if (W) L.push([c, `${W.say} ${Math.ceil(W.left)}s`, '#ffd34a']); } } catch (e) {}
     return L; }; }
 }
 { const _l = bcLate; bcLate = function () { _l.apply(this, arguments); bcLateWeak(); }; }
-{ const _d = bcDraw; bcDraw = function (c, r) { _d.apply(this, arguments); try { if (BCUE.on && c.def.boss && !c.dead) bcWeakDraw(c, r); } catch (e) {} }; }
+{ const _d = bcDraw; bcDraw = function (c, r) { _d.apply(this, arguments); try { if (BCUE.on && bcIsBoss(c) && !c.dead) bcWeakDraw(c, r); } catch (e) {} }; }
 
 /* Crit numbers in the colour of the unit that crit (owner, 19 Nov 2026: "can you make crits show in the colour of the unit
    that did the crit", "each unit type should have a colour associated with it"). A unit type's colour is its talent tree's
@@ -56879,6 +56882,317 @@ if (typeof fire === 'function') fire = (f => function (t, st, tg) {
   try { if (tg && tg.critT > G.time + .85 && tg.critT !== was) { const col = critOwn(t); if (col) { tg.critCol = col; tg.critColT = tg.critT; } } } catch (e) {}
   return r;
 })(fire);
+
+/* ================= BOSS MECHANICS: more bosses to anticipate and play around =================
+   Owner, 27 Nov 2026: "i like bosses having mechanics you have to play around so implement more but make it obvious". The bosses
+   that were passive or random, and the war bands' commanders (the family's hardest troop, a stat block), each get one clear rule
+   with a tell, a counter every force has (focus, timing, a stun, a burst, where you build) and, where it fits, a weak window.
+   Force runs only; Classic keeps its bosses. Every rule speaks through bosscues.js (the counter on the card and the preview, a
+   call as it starts, the wind-up ring, the weak glow, tag and ring, a word or two). Early bosses are the gentlest.
+     Rattlefang (w5)      War Banner     at the start and at half health he plants a banner on the road; while it stands he, and
+                                         foes within BM.ban.r of it, take BM.ban.dr less. Broken: he is Exposed (BM.ban.weak)
+     Arachnara (w10)      Brood Call     at BM.brood.at health she rears up, rooted, for BM.brood.t s (+BM.brood.k damage):
+                                         deal BM.brood.need of her health in it or BM.brood.n spiderlings pour from the tunnel
+     Void Wyrm (w25)      Void Dive      every BM.dive.every s it marks your unit that has dealt the most (BM.dive.mark s), then
+                                         lands on it for BM.dive.land s: the unit is silenced, and every unit can hit the Wyrm,
+                                         +BM.dive.k. Its blinks stay; its random phase is gone
+     The First Cap        Bare Cap       after each shedding it stands bare BM.bare.t s, +BM.bare.k
+   The commanders (region.js war bands; marked c.bmCmd):
+     Troll Berserker      Rampage        every BM.ramp.every s a BM.ramp.wind s wind-up, then a charge down the road; stunned
+                                         in the charge it is Dazed BM.ramp.daze s and takes double
+     Rock Golem           Stone Turn     steel-hard (steel x BM.turn.k) or spell-hard (spells x BM.turn.k) in BM.turn.t s turns,
+                                         the next turn shown BM.turn.warn s ahead
+     Shade                Grave Wards    raises BM.ward.n ward stones on the road; while one stands it takes BM.ward.dr less.
+                                         Broken: Exposed
+     Rot Shaman           Rot Stone      one stone that mends foes near it BM.rot.heal a second. Broken: Exposed
+     Mire Matriarch       Split          at half health she splits in two, each with BM.split.k of her health
+     Pack Alpha           Howl           at BM.howl.at it howls BM.howl.t s, rooted (+k): deal BM.howl.need or BM.howl.n wolves come
+     Storm Wisp           Strike Mark    marks the nearest unit BM.mark.t s, then strikes it: silenced BM.mark.sil s. A stun or
+                                         its death in the mark cancels it
+   Hooks: game.js hurt calls bmHurt (one line); the field ticks after update. Checks: sim/boss_mech_check.js. */
+const BM = {
+  off: false,   // (true: every rule here off, the old ones back: the bot's before, sim/boss_mech_bal.sh)
+  ban: { r: 1.6, dr: .4, hp: .14, wind: 1.5, ahead: .9, weak: 5, wk: 1.25 },
+  brood: { at: .6, t: 4, k: 1.3, need: .08, n: 6 },
+  dive: { first: 6, every: 14, mark: 3, land: 3, k: 1.35, sil: 3 },
+  bare: { t: 4, k: 1.35 },
+  ramp: { first: 5, every: 12, wind: 1.5, run: 1.1, spd: 3.2, daze: 3, k: 2 },
+  turn: { t: 10, warn: 3, k: .4 },
+  ward: { n: 2, dr: .6, hp: .5, wind: 2, weak: 5, wk: 1.25 },
+  rot: { hp: .6, r: 2, heal: .02, wind: 2, weak: 5, wk: 1.25 },
+  split: { at: .5, k: .3 },
+  howl: { at: .6, t: 3, k: 1.3, need: .08, n: 4 },
+  mark: { first: 4, every: 12, t: 3, r: 3.5, sil: 3 },
+  col: { ban: '#f0c24f', brood: '#c9a0ff', dive: '#c08cff', bare: '#f090b8', ramp: '#ff6a40', steel: '#c8d0dc', spell: '#b080ff', ward: '#9a8cff', rot: '#8ad060', split: '#90c070', howl: '#d0b080', mark: '#9fd8ff' },
+};
+const BM_CMD = { berserker: 'ramp', golem: 'turn', shade: 'ward', rotshaman: 'rot', matriarch: 'split', alpha: 'howl', stormwisp: 'mark' };
+// the still things on the road: a banner, a ward stone, a rot stone (they stand where planted; your units strike them as foes)
+CREEPS.bm_banner = { name: 'War Banner', fallback: 'hextotem', hp: 1, spd: 0, r: .3, bounty: 0, noCorpse: true, bmStill: true, tint: [1.5, 1.1, .5, .3], trait: 'Guards the foes near it', eco: 'Rattlefang\'s banner: break it and he stands exposed.', roles: ['support'], rk: {} };
+CREEPS.bm_ward = { name: 'Ward Stone', fallback: 'hextotem', hp: 1, spd: 0, r: .3, bounty: 0, noCorpse: true, bmStill: true, tint: [.7, .65, 1.4, .3], trait: 'Wards its commander', eco: 'While a ward stone stands, the Shade that raised it takes far less damage.', roles: ['support'], rk: {} };
+CREEPS.bm_rot = { name: 'Rot Stone', fallback: 'hextotem', hp: 1, spd: 0, r: .3, bounty: 0, noCorpse: true, bmStill: true, tint: [.7, 1.3, .5, .3], trait: 'Mends the foes near it', eco: 'It mends the foes around it until it is broken.', roles: ['support'], rk: {} };
+const bmOn = () => !BM.off && typeof G !== 'undefined' && G && G.force && !G.vs && G.state === 'play' && !(typeof brOld === 'function' && brOld());
+
+/* ---- the words on the cards and the calls (bosscues.js tables) ---- */
+if (typeof BOSS_PLAY !== 'undefined') {
+  BOSS_PLAY.rattlefang.m = [['War Banner', 'break the banner, then him']];
+  BOSS_PLAY.arachnara.m = [['Brood Call', 'burst her when she rears']];
+  BOSS_PLAY.voidwyrm.m = [['Void Dive', 'it lands on the marked unit: burst it there']];
+  BOSS_PLAY.gc_firstcap.m = [['The Shedding', 'area damage on the sprouts'], ['Bare Cap', 'burst it bare after each shed']];
+  Object.assign(BOSS_PLAY, {
+    berserker: { who: 'The Berserker', col: BM.col.ramp, m: [['Rampage', 'stun the charge: dazed, it takes double']] },
+    golem: { who: 'The Golem', col: BM.col.steel, m: [['Stone Turn', 'switch steel and spells with its turns']] },
+    shade: { who: 'The Shade', col: BM.col.ward, m: [['Grave Wards', 'break the wards first']] },
+    rotshaman: { who: 'The Rot Shaman', col: BM.col.rot, m: [['Rot Stone', 'break the stone first']] },
+    matriarch: { who: 'The Matriarch', col: BM.col.split, m: [['Split', 'area damage at the split']] },
+    alpha: { who: 'The Pack Alpha', col: BM.col.howl, m: [['Howl', 'burst it when it howls']] },
+    stormwisp: { who: 'The Storm Wisp', col: BM.col.mark, m: [['Strike Mark', 'stun it, or kill it in the mark']] },
+  });
+}
+if (typeof BC_CALL !== 'undefined') {
+  Object.assign(BC_CALL.rattlefang, { plant: 'plants his War Banner: break it, then him!', exposed: 'The banner falls: he stands exposed!' });
+  delete BC_CALL.rattlefang.out;
+  Object.assign(BC_CALL.arachnara, { rear: 'rears up to call her brood: burst her down!', fail: 'Her brood pours from the tunnel!', held: 'The brood stays home.' });
+  delete BC_CALL.arachnara.wrath;
+  Object.assign(BC_CALL.voidwyrm, { mark: 'marks your strongest unit: it dives there next!', land: 'It has landed: burst it now!' });
+  delete BC_CALL.voidwyrm.phase;
+  Object.assign(BC_CALL.gc_firstcap, { bare: 'It stands bare: burst it now!' });
+  Object.assign(BC_CALL, {
+    berserker: { wind: 'lowers its head to charge: stun it mid-charge!', dazed: 'Dazed: burst it now!' },
+    golem: { steel: 'turns to stone: spells bite!', spell: 'turns spell-hard: steel bites!' },
+    shade: { out: 'raises grave wards: break them first!', exposed: 'Its wards are broken: burst it!' },
+    rotshaman: { out: 'raises a rot stone: break it first!', exposed: 'The stone is broken: burst it!' },
+    matriarch: { split: 'splits in two!' },
+    alpha: { rear: 'howls for the pack: burst it down!', fail: 'The pack runs from the tunnel!', held: 'The pack stays home.' },
+    stormwisp: { mark: 'marks a unit: stun it, or kill it first!' },
+  });
+}
+// the force-run words for the reworked bosses (Classic keeps its own: core.js CREEP_SAY_F does the same)
+{
+  const F = (k, f, v) => { const d = CREEPS[k]; if (!d) return; const pd = Object.getOwnPropertyDescriptor(d, f); const old = pd ? (pd.get ? pd.get : () => pd.value) : () => undefined;
+    Object.defineProperty(d, f, { enumerable: true, configurable: true, get: () => forceRunNow() ? v : old.call(d) }); };
+  F('arachnara', 'abil', ['Brood Call', `At ${Math.round(BM.brood.at * 100)}% health she rears up for ${BM.brood.t}s; burst her then or ${BM.brood.n} spiderlings come.`]);
+  F('arachnara', 'eco', `At ${Math.round(BM.brood.at * 100)}% health she rears up for ${BM.brood.t} seconds and calls her brood. Hit her hard while she rears or ${BM.brood.n} spiderlings pour from the tunnel.`);
+  F('voidwyrm', 'abil', ['Void Dive', `Every ${BM.dive.every}s it marks the unit that has dealt the most, then lands on it for ${BM.dive.land}s: the unit falls silent, and every unit can hit the Wyrm.`]);
+  F('voidwyrm', 'eco', `Every ${BM.dive.every} seconds it marks the unit that has dealt the most and dives onto it, silencing it for ${BM.dive.land} seconds. Landed, it is in reach of every unit and takes more damage. Each quarter of its health lost, it blinks ahead.`);
+  if (typeof RATTLE_SAY !== 'undefined') {
+    RATTLE_SAY.abil = ['War Banner', `He plants a war banner on the road at the start and at half health; while it stands he and foes near it take ${Math.round(BM.ban.dr * 100)}% less. Break the banner first.`];
+    RATTLE_SAY.eco = `He plants a war banner on the road ahead, at the start and again at half health. While it stands he, and every foe within ${BM.ban.r} cells of it, take ${Math.round(BM.ban.dr * 100)}% less damage. Break the banner and he stands exposed for ${BM.ban.weak} seconds. Every 14 seconds he calls two gnolls.`;
+  }
+  if (typeof BOSS_RULES !== 'undefined') {
+    Object.assign(BOSS_RULES.rattlefang, { name: 'War Banner', text: RATTLE_SAY ? RATTLE_SAY.eco : '', ways: ['Break the banner, then him', 'Splash the pack around the banner'] });
+    Object.assign(BOSS_RULES.arachnara, { name: 'Brood Call', text: CREEPS.arachnara.eco, ways: ['Burst her when she rears', 'Area damage for the brood if it comes'] });
+    Object.assign(BOSS_RULES.voidwyrm, { name: 'Void Dive', text: CREEPS.voidwyrm.eco, ways: ['Burst it where it lands', 'Spread your damage so no one unit draws it'] });
+  }
+}
+
+/* ---- the helpers ---- */
+const bmWeak = (c, t, k, say) => { c.bmWeakUntil = G.time + t; c.bmWeakMax = t; c.bmWeakK = k; c.bmWeakSay = say || 'WEAK'; c.bm = 1; };
+const bmIsWeak = c => c.bmWeakUntil > G.time;
+// a troop's health on this wave (a stand-in's or a summon's), as Classic's totems reckon it
+const bmTroopHp = (type, k) => { const n = G.wave || 1; try { return waveHP(n, G.diff) * CREEPS[type].hp * minionHP(n, !!CREEPS[type].fly) * (k || 1); } catch (e) { return 50; } };
+function bmPlant(c, type, hp, dx, dy) {
+  const o = spawn({ type, hp: Math.max(1, hp), bounty: 0, at: { x: c.x + (dx || 0), y: c.y + (dy || 0), ti: c.ti, tj: c.tj, tx: c.x + (dx || 0), ty: c.y + (dy || 0), state: 'walk' } });
+  if (o) { o.bmBy = c; o.kid = 1; o.age = .2; o.bm = 1; o.ox = 0; o.oy = 0; part({ k: 'ring', x: o.x, z: o.y, h: .05, life: .5, max: .5, size: .9, col: BM.col[type === 'bm_banner' ? 'ban' : type === 'bm_ward' ? 'ward' : 'rot'] }); if (typeof fxDust === 'function') fxDust(o.x, o.y, 8); }
+  return o;
+}
+const bmStones = c => G.creeps.filter(o => !o.dead && o.bmBy === c && o.def.bmStill);
+// the unit that has dealt the most (this wave's damage if kept, else all of it)
+function bmTopUnit() { let best = null, b = -1; for (const t of G.towers) { if (t.def.wall || t.wrecked) continue; const d = t.dmgWave || t.dmgDone || 0; if (d > b) { b = d; best = t; } } return best; }
+// foes from the tunnel, as a wave's own
+function bmFromTunnel(type, n, k) { const hp = bmTroopHp(type, k); for (let i = 0; i < n; i++) G.delayed.push({ t: i * .35, fn: () => { if (G.state === 'play') { const o = spawn({ type, hp, bounty: 0 }); if (o) o.kid = 1; } } }); }
+// the stop: a still boss (a wind-up, a rear-up)
+const bmHold = (c, k) => { c.stepT = .15; c.stepK = k == null ? 0 : k; };
+
+/* ---- what a hit does to a foe with a rule (game.js hurt, after the boss rules) ---- */
+function bmHurt(c, amt, type, dot, src) {
+  if (!bmOn()) return amt;
+  const spell = type === 'magic' || type === 'arcane';
+  if (bmIsWeak(c)) amt *= c.bmWeakK || 1;
+  if (c.bmDaze > G.time) amt *= BM.ramp.k;
+  if (c.bmGuardT > G.time) amt *= 1 - (c.bmGuardK || 0);
+  if (c.bmTurn) { if (c.bmTurn === 'steel' && !spell && type !== 'pure') amt *= BM.turn.k; else if (c.bmTurn === 'spell' && spell) amt *= BM.turn.k; }
+  if (c.bmBurst) c.bmBurst.d += amt;   // a rear-up or a howl: what the army has put into it
+  return amt;
+}
+
+/* ---- each rule, once a frame ---- */
+function bmRattle(c) {
+  const S = c.bmS || (c.bmS = { plants: 0 });
+  c.bmNoAura = true;
+  const ban = bmStones(c)[0];
+  if (ban) { c.bmGuardT = G.time + .2; c.bmGuardK = BM.ban.dr; for (const o of G.creeps) if (!o.dead && o !== ban && !o.def.bmStill && Math.hypot(o.x - ban.x, o.y - ban.y) <= BM.ban.r) { o.bm = 1; o.bmGuardT = G.time + .2; o.bmGuardK = BM.ban.dr; } }
+  if (S.ban && (!ban) && !S.fell) { S.fell = true; c.bmGuardT = 0; if (!c.dead) { bmWeak(c, BM.ban.weak, BM.ban.wk, 'EXPOSED'); bcSay(c, 'Exposed', BM.col.ban); bcCall(c, 'exposed'); } }
+  if (S.plantW > 0) { bmHold(c, .05); if ((S.plantW -= 1 / 30) <= 0) { S.ban = bmPlant(c, 'bm_banner', c.maxHp * BM.ban.hp, 0, BM.ban.ahead); S.fell = false; S.plants++; bcSay(c, 'Banner', BM.col.ban); } return; }
+  const want = (S.plants === 0 && c.y > 1.2 && !c.ent) || (S.plants === 1 && c.hp < c.maxHp * .5);
+  if (want && !ban && !(c.stunT > 0)) { S.plantW = BM.ban.wind; c.bmWind = { t0: G.time, T: BM.ban.wind, col: BM.col.ban }; bcCall(c, 'plant'); }
+}
+function bmBurstTick(c, cfg, key, type) {   // Arachnara's Brood Call, the Pack Alpha's Howl
+  const S = c.bmS || (c.bmS = {});
+  if (c.bmBurst) {
+    bmHold(c, 0); c.bmBurst.left -= 1 / 30;
+    if (c.bmBurst.d >= c.bmBurst.need) { c.bmBurst = null; c.bmWeakUntil = 0; bcSay(c, key === 'brood' ? 'Brood held' : 'Howl broken', '#f2ffe0'); bcCall(c, 'held'); if (typeof sfx === 'function') sfx('shieldBreak', 0); return; }
+    if (c.bmBurst.left <= 0) { c.bmBurst = null; bmFromTunnel(type, cfg.n, key === 'brood' ? 1 : 1); bcSay(c, `${cfg.n} come`, '#ff9a8a'); bcCall(c, 'fail'); }
+    return;
+  }
+  if (!S.done && c.hp <= c.maxHp * cfg.at && !c.ent) { S.done = true; c.bmBurst = { d: 0, need: c.maxHp * cfg.need, left: cfg.t, T: cfg.t }; bmWeak(c, cfg.t, cfg.k, 'BURST'); bcCall(c, 'rear'); bcSay(c, key === 'brood' ? 'Brood Call' : 'Howl', BM.col[key]); }
+}
+function bmDive(c, dt) {
+  const D = BM.dive, S = c.bmS || (c.bmS = { t: D.first });
+  c.phased = false; c.phT = 1e9;   // (its random phase is gone in a force run)
+  if (S.land > 0) {
+    const t = S.tg; if (t && !t.wrecked) { c.x = t.x; c.y = t.y + .05; }
+    bmHold(c, 0);
+    if ((S.land -= dt) <= 0) { c.fly = true; c.x = S.back.x; c.y = S.back.y; c.bx = S.back.bx; S.tg = null; S.t = D.every; c.bmLanded = false; }
+    return;
+  }
+  if (S.mark > 0) {
+    if (!S.tg || S.tg.wrecked) { S.mark = 0; S.t = 2; return; }
+    if ((S.mark -= dt) <= 0) {
+      const t = S.tg; S.back = { x: c.x, y: c.y, bx: c.bx }; c.fly = false; c.bmLanded = true; S.land = D.land; c.x = t.x; c.y = t.y + .05;
+      t.silT = Math.max(t.silT || 0, D.sil); t.silCol = 'void';
+      bmWeak(c, D.land, D.k, 'LANDED'); bcCall(c, 'land'); bcSay(c, 'Landed', BM.col.dive);
+      if (typeof fxQuake === 'function') fxQuake(c.x, c.y, 1, .6); part({ k: 'ring', x: c.x, z: c.y, h: .05, life: .5, max: .5, size: 1.3, col: BM.col.dive }); G.shake = Math.max(G.shake || 0, .2);
+    }
+    return;
+  }
+  if (c.ent || c.stunT > 0) return;
+  if ((S.t -= dt) <= 0) { const t = bmTopUnit(); if (!t) { S.t = 2; return; } S.tg = t; S.mark = D.mark; c.bmWind = { t0: G.time, T: D.mark, col: BM.col.dive }; bcCall(c, 'mark'); bcSay(c, 'Marked', BM.col.dive); }
+}
+function bmBare(c) {
+  const S = c.bmS || (c.bmS = { shed: c.gcShed | 0 });
+  if ((c.gcShed | 0) > S.shed) { S.shed = c.gcShed | 0; bmWeak(c, BM.bare.t, BM.bare.k, 'BARE'); bcSay(c, 'Bare', BM.col.bare); bcCall(c, 'bare'); }
+}
+function bmRamp(c, dt) {
+  const R_ = BM.ramp, S = c.bmS || (c.bmS = { t: R_.first });
+  if (S.run > 0) {
+    if (c.stunT > 0) { S.run = 0; c.bmDaze = G.time + R_.daze; stun(c, Math.max(c.stunT, R_.daze * .5), false, null); bmWeak(c, R_.daze, 1, 'DAZED'); bcSay(c, 'Dazed', '#ffd34a'); bcCall(c, 'dazed'); S.t = R_.every; return; }
+    c.stepT = .1; c.stepK = R_.spd; if ((S.run -= dt) <= 0) S.t = R_.every;
+    if (typeof VLIVE !== 'undefined' && VLIVE && Math.random() < .5 && typeof fxDust === 'function') fxDust(c.x, c.y, 2);
+    return;
+  }
+  if (S.wind > 0) { bmHold(c, 0); if (c.stunT > 0) { S.wind = 0; S.t = R_.every; bcSay(c, 'Charge broken', '#f2ffe0'); return; } if ((S.wind -= dt) <= 0) { S.run = R_.run; bcSay(c, 'Charge', BM.col.ramp); } return; }
+  if (c.ent || c.stunT > 0) return;
+  if ((S.t -= dt) <= 0) { S.wind = R_.wind; c.bmWind = { t0: G.time, T: R_.wind, col: BM.col.ramp }; bcCall(c, 'wind'); }
+}
+function bmTurn(c, dt) {
+  const T = BM.turn, S = c.bmS || (c.bmS = { t: T.t });
+  if (!c.bmTurn) { c.bmTurn = 'steel'; c.bm = 1; }
+  if ((S.t -= dt) <= 0) { S.t = T.t; c.bmTurn = c.bmTurn === 'steel' ? 'spell' : 'steel'; bcSay(c, c.bmTurn === 'steel' ? 'Stone' : 'Spell-hard', c.bmTurn === 'steel' ? BM.col.steel : BM.col.spell); bcCall(c, c.bmTurn); }
+}
+function bmWards(c, kind) {   // the Shade's two wards, the Rot Shaman's stone
+  const W = kind === 'ward' ? BM.ward : BM.rot, S = c.bmS || (c.bmS = {});
+  if (!S.planted) {
+    if (c.ent || c.y < 1.2) return;
+    if (S.w == null) { S.w = W.wind; c.bmWind = { t0: G.time, T: W.wind, col: BM.col[kind] }; bcCall(c, 'out'); }
+    bmHold(c, .05);
+    if ((S.w -= 1 / 30) <= 0) {
+      S.planted = true; const hp = bmTroopHp(c.type, W.hp * 2);
+      if (kind === 'ward') { bmPlant(c, 'bm_ward', hp, -.35, .6); bmPlant(c, 'bm_ward', hp, .35, .6); } else bmPlant(c, 'bm_rot', hp, 0, .6);
+      bcSay(c, kind === 'ward' ? 'Wards' : 'Rot Stone', BM.col[kind]);
+    }
+    return;
+  }
+  const st = bmStones(c);
+  if (kind === 'ward' && st.length) { c.bmGuardT = G.time + .2; c.bmGuardK = W.dr; }
+  if (kind === 'rot') for (const s of st) for (const o of G.creeps) if (!o.dead && !o.def.bmStill && o.hp < o.maxHp && Math.hypot(o.x - s.x, o.y - s.y) <= W.r) healFoe(o, o.maxHp * W.heal / 30);
+  if (!st.length && !S.broke) { S.broke = true; c.bmGuardT = 0; bmWeak(c, W.weak, W.wk, 'EXPOSED'); bcSay(c, 'Exposed', BM.col[kind]); bcCall(c, 'exposed'); }
+}
+function bmSplit(c) {
+  const S = c.bmS || (c.bmS = {});
+  if (S.done || c.bmHalf || c.hp > c.maxHp * BM.split.at) return;
+  S.done = true; const hp = c.maxHp * BM.split.k;
+  const o = spawn({ type: c.type, hp, bounty: 1, at: { x: c.x, y: c.y, ti: c.ti, tj: c.tj, tx: c.tx, ty: c.ty, state: c.state || 'walk' } });
+  c.hp = Math.min(c.hp, hp);
+  if (o) { o.bmHalf = true; o.kid = 1; o.ox = .25; o.oy = .15; o.hp = hp; o.maxHp = c.maxHp; o.bmCmd = c.bmCmd; o.bm = 1; }
+  c.bmHalf = true; part({ k: 'ring', x: c.x, z: c.y, h: .05, life: .5, max: .5, size: 1.1, col: BM.col.split }); bcSay(c, 'Split', BM.col.split); bcCall(c, 'split');
+}
+function bmMark(c, dt) {
+  const M = BM.mark, S = c.bmS || (c.bmS = { t: M.first });
+  if (S.tg) {
+    if (c.stunT > 0 || S.tg.wrecked) { S.tg = null; S.t = M.every; bcSay(c, 'Mark broken', '#f2ffe0'); return; }
+    if ((S.m -= dt) <= 0) { const t = S.tg; S.tg = null; S.t = M.every; t.silT = Math.max(t.silT || 0, M.sil); t.silCol = 'storm'; G.bolts.push({ pts: [[c.x, hitH(c) + .3, c.y], [t.x, towerTop(t), t.y]], life: .4, max: .4, col: [.7, .9, 1.4] }); bcSay(t, 'Silenced', BM.col.mark); if (typeof sfx === 'function') sfx('zap', 0); }
+    return;
+  }
+  if (c.ent || c.stunT > 0) return;
+  if ((S.t -= dt) <= 0) {
+    let best = null, bd = M.r; for (const t of G.towers) { if (t.def.wall || t.wrecked) continue; const d = Math.hypot(t.x - c.x, t.y - c.y); if (d < bd) { bd = d; best = t; } }
+    if (!best) { S.t = 1; return; } S.tg = best; S.m = M.t; c.bmWind = { t0: G.time, T: M.t, col: BM.col.mark }; bcCall(c, 'mark');
+  }
+}
+function bmTick(dt) {
+  if (!bmOn()) return;
+  for (const c of G.creeps) {
+    if (c.dead) continue;
+    if (c.bmGuardT && c.bmGuardT <= G.time && c.def.bmStill === undefined && !c.def.boss && !c.bmCmd) { c.bmGuardT = 0; }
+    switch (c.type) {
+      case 'rattlefang': if (c.def.boss) { c.bm = 1; bmRattle(c); } break;
+      case 'arachnara': c.bm = 1; c.momDR = 0; bmBurstTick(c, BM.brood, 'brood', 'spider'); break;
+      case 'voidwyrm': c.bm = 1; bmDive(c, dt); break;
+      case 'gc_firstcap': c.bm = 1; bmBare(c); break;
+    }
+    if (c.bmCmd) switch (BM_CMD[c.type]) {
+      case 'ramp': bmRamp(c, dt); break;
+      case 'turn': bmTurn(c, dt); break;
+      case 'ward': bmWards(c, 'ward'); break;
+      case 'rot': bmWards(c, 'rot'); break;
+      case 'split': bmSplit(c); break;
+      case 'howl': bmBurstTick(c, BM.howl, 'howl', 'wolf'); break;
+      case 'mark': bmMark(c, dt); break;
+    }
+  }
+  // a stone outlives its maker by nothing
+  for (const o of G.creeps) if (!o.dead && o.def.bmStill && (!o.bmBy || o.bmBy.dead)) { o.dead = true; o.leaked = true; if (typeof fxDust === 'function') fxDust(o.x, o.y, 8); }
+}
+
+/* ---- the commanders: marked as they march in (region.js lays them into the waves with cmd: true) ---- */
+{
+  const _sp = spawn;
+  spawn = function (s) {
+    const c = _sp.apply(this, arguments);
+    if (c && s && s.cmd && BM_CMD[c.type]) { c.bmCmd = true; c.bm = 1; }
+    return c;
+  };
+  const _u = update; update = function (dt) { const r = _u.apply(this, arguments); try { bmTick(dt); } catch (e) { if (typeof console !== 'undefined') console.error(e); } return r; };
+}
+
+/* ---- the cues: the commanders read as bosses to bosscues.js; every rule's windows are weak windows; the drawing ---- */
+if (typeof bcIsBoss === 'function') { const _b = bcIsBoss; bcIsBoss = c => _b(c) || !!(c && c.bmCmd); }
+if (typeof bcWeak === 'function') { const _w = bcWeak; bcWeak = function (c) { const r = _w.apply(this, arguments); if (r) return r; return c && c.bmWeakUntil > G.time ? { left: c.bmWeakUntil - G.time, max: c.bmWeakMax || 1, say: c.bmWeakSay || 'WEAK' } : null; }; }
+function bmDraw(c, r) {
+  if (!bmOn() || typeof QG === 'undefined' || c.dead) return;
+  const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0), R_ = typeof bcR === 'function' ? bcR(c, r) : .9, p = .5 + .5 * Math.sin(vt * 6);
+  // a wind-up ring (the plant, the mark, the charge's wind-up)
+  if (c.bmWind && G.time - c.bmWind.t0 < c.bmWind.T) bcRing(x, z, R_, (G.time - c.bmWind.t0) / c.bmWind.T, c.bmWind.col, .95);
+  // the burst meter: the army's damage against what it takes (inner, gold), the time left (outer)
+  if (c.bmBurst) { bcRing(x, z, R_ * .8, c.bmBurst.d / c.bmBurst.need, [1, .86, .3], .95, .2); }
+  // Rattlefang's banner and the wards: a tie from each to its maker, their reach on the ground
+  for (const s of bmStones(c)) {
+    const k = c4(s.type === 'bm_banner' ? BM.col.ban : s.type === 'bm_ward' ? BM.col.ward : BM.col.rot);
+    QADD.ground(s.x, s.y, .034, s.type === 'bm_banner' ? BM.ban.r : s.type === 'bm_rot' ? BM.rot.r : .7, s.type === 'bm_banner' ? BM.ban.r : s.type === 'bm_rot' ? BM.rot.r : .7, [k[0], k[1], k[2], .1 + .06 * p], 1, 0);
+    QG.ground(s.x, s.y, .036, .55, .55, [k[0], k[1], k[2], .85], 4, .14, vt);
+    const n = Math.max(3, Math.ceil(Math.hypot(s.x - c.x, s.y - c.y) / .3));
+    for (let q = 0; q < n; q++) { const u = (q / n + vt * .6) % 1; QADD.bill(RD, lerp(s.x, x, u), .35 + Math.sin(u * Math.PI) * .25, lerp(s.y, z, u), .09, .09, [k[0], k[1], k[2], .8], 1, 0); }
+  }
+  // the Void Wyrm's mark: a ring on the unit, a line to it
+  const S = c.bmS || {};
+  if (c.type === 'voidwyrm' && S.mark > 0 && S.tg) { const t = S.tg, k = c4(BM.col.dive); bcRing(t.x, t.y, .7, 1 - S.mark / BM.dive.mark, k, .95, .16); QADD.ground(t.x, t.y, .04, .7, .7, [k[0], k[1], k[2], .2 + .2 * p], 1, 0); QADD.beam(RD, [x, creepBaseY(c) + creepH(c) * .5, z], [t.x, towerTop(t), t.y], .03, [k[0], k[1], k[2], .5 + .3 * p], 6); }
+  if (c.type === 'stormwisp' && S.tg) { const t = S.tg, k = c4(BM.col.mark); bcRing(t.x, t.y, .65, 1 - S.m / BM.mark.t, k, .95, .16); QADD.beam(RD, [x, hitH(c) + .3, z], [t.x, towerTop(t), t.y], .025, [k[0], k[1], k[2], .45 + .3 * p], 6); }
+  // the Berserker's charge: an arrow down the road ahead while it winds up
+  if (c.type === 'berserker' && S.wind > 0) { const dx = (c.tx || c.x) - c.x, dz = (c.ty || c.y + 1) - c.y, l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l, k = c4(BM.col.ramp); for (let q = 1; q <= 4; q++) QADD.ground(c.x + ux * q * .7, c.y + uz * q * .7, .04, .22, .22, [k[0], k[1], k[2], (.35 + .5 * p) * (1 - q * .15)], 1, 0); }
+  // the Golem's turn: its state's ring, the next one's 3s ahead
+  if (c.bmTurn) { const k = c4(c.bmTurn === 'steel' ? BM.col.steel : BM.col.spell); QG.ground(x, z, .042, R_ * .95, R_ * .95, [k[0], k[1], k[2], .8], 4, .1, vt); const left = (S.t || 0); if (left <= BM.turn.warn) { const n2 = c4(c.bmTurn === 'steel' ? BM.col.spell : BM.col.steel); bcRing(x, z, R_ * 1.15, 1 - left / BM.turn.warn, n2, .9); } }
+}
+function bmLate() {
+  if (BM._late || typeof drawCreepFx !== 'function' || typeof QG === 'undefined') return;
+  BM._late = true;
+  const _d = drawCreepFx; drawCreepFx = function (c, r) { const v = _d.apply(this, arguments); try { if (c && (c.bm || c.bmCmd)) bmDraw(c, r); } catch (e) {} return v; };
+}
+{ const _u = update; update = function (dt) { const r = _u.apply(this, arguments); if (!BM._late) try { bmLate(); } catch (e) {} return r; }; }
+
+// a war band's commander marching on wave n (region.js S.troops), for the preview's card
+const bmCmdAt = (type, n) => { try { const S = G && G.region; return !!(S && Array.isArray(S.troops) && BM_CMD[type] && S.troops.some(t => t.cmd && t.type === type && t.w === n)); } catch (e) { return false; } };
+// a commander's rule in a line, for the war band's card (region_boss.js rgArmyCard)
+const bmCmdLine = type => { const P = typeof BOSS_PLAY !== 'undefined' && BM_CMD[type] && BOSS_PLAY[type]; return P ? `${P.m[0][0]} · ${P.m[0][1]}` : ''; };
 
 /* ================= THE FORCES' SET BONUSES IN PLAIN WORDS =================
    Owner (23 Nov 2026): item tooltips have "lots of keywords to understand and remember, so much that it cant fit all the
@@ -101634,7 +101948,7 @@ function fcCardHTML(spec) {
   return `<h4>${fcEsc(C.name)}${g.count > 1 && !g.boss && !g.lead ? ` <small>×${g.count}</small>` : ''}${tag ? ` <em class="fcc-tag" style="--c:${tag[1]}">${tag[0]}</em>` : ''}${g.isNew ? ' <em class="fcc-nw">New</em>' : ''}</h4>`
     + (say ? `<p class="fcc-d">${fcEsc(say)}</p>` : '')
     + (tr.length ? `<div class="fcc-tr">${tr.map(fcTraitHTML).join('')}</div>` : '')
-    + (g.boss && typeof bcMechHTML === 'function' && bcMechHTML(ty, bcAffixesAt(ty, n)) ? bcMechHTML(ty, bcAffixesAt(ty, n)) : ct ? `<p class="fcc-c"><b>Counter:</b> ${fcEsc(ct)}</p>` : '');   // a boss: each mechanic and affix with its answer (bosscues.js)
+    + ((g.boss || (typeof bmCmdAt === 'function' && bmCmdAt(ty, n))) && typeof bcMechHTML === 'function' && bcMechHTML(ty, g.boss ? bcAffixesAt(ty, n) : []) ? bcMechHTML(ty, g.boss ? bcAffixesAt(ty, n) : []) : ct ? `<p class="fcc-c"><b>Counter:</b> ${fcEsc(ct)}</p>` : '');   // a boss: each mechanic and affix with its answer (bosscues.js)
 }
 function fcShowCard(el) {
   const h = fcCardHTML(el.dataset.fc || ''); if (!h) { fcHideCard(); return; }
@@ -133316,7 +133630,7 @@ const rgRnHeld = () => typeof rnS === 'function' && G && G.rn ? rnS().v | 0 : 0;
   waveSpec = function (n) {
     const g = _wsT.apply(this, arguments), S = G && G.region;
     if (!S || G.vs || !Array.isArray(S.troops) || !S.troops.length) return g;
-    const add = S.troops.filter(t => t.w === n && CREEPS[t.type]).map(t => ({ type: t.type, count: t.count, swift: false, siege: false, hpK: t.hpK, rgFrom: t.from }));
+    const add = S.troops.filter(t => t.w === n && CREEPS[t.type]).map(t => ({ type: t.type, count: t.count, swift: false, siege: false, hpK: t.hpK, rgFrom: t.from, cmd: t.cmd || undefined }));
     return add.length ? g.concat(add) : g;
   };
   if (typeof kill === 'function') { const _kl = kill; kill = function (c) { const S = G && G.region; if (S && Array.isArray(S.troops) && c && !c.splitCopy && !c.kid) for (const t of S.troops) if (t.cmd && t.type === c.type) (S.cmdDead || (S.cmdDead = {}))[t.from] = 1; return _kl.apply(this, arguments); }; }
@@ -134003,6 +134317,7 @@ function rgArmyCard(R, a) {
   return `<div class="rg-tc rg-atc${a.main ? ' main' : ''}"><div class="rg-atop">${img ? `<img class="rg-apic" alt="" src="${img}">` : ''}<span><h4>${rgEsc(a.name)}</h4><p class="rg-tt">Led by ${rgEsc(d ? d.name : 'the warlord')}${say ? ` · ${rgEsc(say)}` : ''}</p></span></div>
     <p class="rg-astr"><b>${'◆'.repeat(a.pips)}</b> ${rgPipW(a.pips)} · at ${rgEsc(n ? n.name : '')} · ${rgEsc(rgPlanWords(R, a))}${a.next ? `, next ${rgEsc(rgNode(R, a.next).name)}` : ''}</p>
     <ul class="rg-amix">${mix.map(([ty, c]) => { const im = rgFoeImg(ty); return `<li>${im ? `<img alt="" src="${im}">` : ''}<span>${rgEsc(CREEPS[ty].name)} <b>×${c}</b></span></li>`; }).join('')}</ul>
+    ${typeof bmCmdLine === 'function' && bmCmdLine(cmd) ? `<p class="rg-amech"><b>${rgEsc(bmCmdLine(cmd).split(' · ')[0])}</b> · ${rgEsc(bmCmdLine(cmd).split(' · ')[1])}</p>` : ''}
     ${tr.length ? `<p class="rg-atr">${tr.map(t => `<em>${t}</em>`).join('')}</p>` : ''}
     ${D ? `<p class="rg-adf rg-d${D.k}">Fought at ${rgEsc(n ? n.name : '')}: <span aria-hidden="true">${D.stars}</span> <b>${D.word}</b>${(() => { const l = rgArmyJoin(R, a); return l ? `<small>${rgEsc(l)}</small>` : ''; })()}</p>` : ''}</div>`;
 }
