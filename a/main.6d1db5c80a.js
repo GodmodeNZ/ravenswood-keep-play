@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b28a23f8@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '55ff5e3e@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -6,6 +6,8 @@ const COLS = 11, ROWS = 15, TOPM = 1.75, BOTM = 2.05, N = COLS * ROWS;
 const ENTRY = [4, 5, 6], EXITC = [4, 5, 6];
 const PORTAL = { x: 5.5, y: -0.95 };
 const GATE_Y = ROWS + 0.85;
+// a wave's number as the player sees it, and how many the battle has (a Homeland battle counts its own 1 to 7: region.js rgWaveShown)
+const wvShow = n => typeof rgWaveShown === 'function' ? rgWaveShown(n) : n, wvOf = () => (typeof rgWavesOf === 'function' && rgWavesOf()) || MAX_WAVE;
 const MAX_WAVE = 50, BASE_SPD = 1.6;   // creeps march 10% faster than they did (1.45)
 const MINION_SPD = 1.152;   // the troops (not leaders or bosses): 20% faster twice over, then 20% slower again (1.44 × 0.8); their spacing in cells stays the same
 const ALL_SPD = 1.2;   // and everyone, leaders and bosses too, 20% faster on top (spawn gaps shrink to match, so spacing holds)
@@ -2188,8 +2190,8 @@ function callWave() {
   sfx('horn', d.boss);
   if (typeof AudioSys !== 'undefined' && !G.mute) AudioSys.intense(true);
   { const L = d.leader && CREEPS[d.leader], adv = typeof adviceText === 'function' ? adviceText(G.wave) : '';
-    if (d.dungeon && L) onBanner(d.dungeon.name, `Wave ${G.wave} · ${L.boss ? `Boss: ${L.name}` : `${L.name} leads`}` + (early ? ` · +${early} gold for calling early` : ''));   // each wave is a dungeon on the march
-    else onBanner(`Wave ${G.wave}`, early ? `+${early} gold for calling early` : ''); }   /* (the foes are not listed under the heading: the forecast row shows them. Owner, 11 Nov 2026) */
+    if (d.dungeon && L) onBanner(d.dungeon.name, `Wave ${wvShow(G.wave)} · ${L.boss ? `Boss: ${L.name}` : `${L.name} leads`}` + (early ? ` · +${early} gold for calling early` : ''));   // each wave is a dungeon on the march
+    else onBanner(`Wave ${wvShow(G.wave)}`, early ? `+${early} gold for calling early` : ''); }   /* (the foes are not listed under the heading: the forecast row shows them. Owner, 11 Nov 2026) */
   onDirty();
 }
 /* The wave's chiefs (its dungeon leader and any boss) march last: they wait until every other foe on the field has
@@ -2229,7 +2231,7 @@ function sendNextWave() {
   const bonus = G.vs ? 0 : sendBonus(G.wave); G.gold += bonus; G.stats.gold += bonus;
   const d = describeWave(G.wave);
   sfx('horn', d.boss);
-  { const L = d.leader && CREEPS[d.leader]; onBanner(d.dungeon && L ? d.dungeon.name : G.vs ? `Wave ${G.wave}` : `Wave ${G.wave} sent early`, (d.dungeon && L ? `Wave ${G.wave} · ${L.boss ? `Boss: ${L.name}, with` : `${L.name} leads`} ${d.names}` : d.names + (d.traits.length ? ' · ' + d.traits.join(', ') : '')) + (bonus ? ` · +${bonus} gold` : '')); }
+  { const L = d.leader && CREEPS[d.leader]; onBanner(d.dungeon && L ? d.dungeon.name : G.vs ? `Wave ${G.wave}` : `Wave ${wvShow(G.wave)} sent early`, (d.dungeon && L ? `Wave ${wvShow(G.wave)} · ${L.boss ? `Boss: ${L.name}, with` : `${L.name} leads`} ${d.names}` : d.names + (d.traits.length ? ' · ' + d.traits.join(', ') : '')) + (bonus ? ` · +${bonus} gold` : '')); }
   onDirty();
   return true;
 }
@@ -2266,7 +2268,7 @@ function waveCleared() {
   if (n >= MAX_WAVE && !G.endless) { G.phase = 'build'; victory(); return; }
   G.wave++; G.phase = 'build'; G.countdown = G.vs || (typeof calmOn === 'function' && calmOn()) ? 0 : 30;   // (Calm pace: the next wave waits for the horn)
   sfx(pts ? 'talent' : 'clear');
-  onBanner(ws.length > 1 ? `Waves ${ws[0]}–${n} cleared` : `Wave ${n} cleared`, `+${bonus} gold` + (pts ? ` · +${pts} talent point${pts > 1 ? 's' : ''}` : '') + (bw ? ` · +${bw} path point${bw > 1 ? 's' : ''}` : '') + stTxt + (intr ? ` · +${intr} interest` : '') + (aid ? ` · +${aid} war aid` : '') + (lvBack ? ` · clean wave: +${lvBack} ${lvBack > 1 ? 'lives' : 'life'}` : '') + (dmgd ? ` · ${dmgd} damaged` : ''));
+  onBanner(ws.length > 1 ? `Waves ${wvShow(ws[0])}–${wvShow(n)} cleared` : `Wave ${wvShow(n)} cleared`, `+${bonus} gold` + (pts ? ` · +${pts} talent point${pts > 1 ? 's' : ''}` : '') + (bw ? ` · +${bw} path point${bw > 1 ? 's' : ''}` : '') + stTxt + (intr ? ` · +${intr} interest` : '') + (aid ? ` · +${aid} war aid` : '') + (lvBack ? ` · clean wave: +${lvBack} ${lvBack > 1 ? 'lives' : 'life'}` : '') + (dmgd ? ` · ${dmgd} damaged` : ''));
   onDirty(); onSave();
 }
 /* ---- Keep upgrades (Keep → Castle → Fortress → Citadel) ---- */
@@ -27068,7 +27070,7 @@ function specShare(f, n) {
    - Splintering (a talent): a ward it breaks splinters, cracking the wards of foes near it open for a few seconds.
    Its element is Arcane and it gains Arcane Charge like every scholar; its hits go through ccHit (marks, reactions, items). */
 const CCS_U = 'cc_severer';
-const CCS = { TEAR: .25, STORE_K: .6, CAP: 8, OPEN: 3, COL: { ley: '#6ff0e0', shard: '#c8fff6', ward: '#b98cff' } };
+const CCS = { TEAR: .25, STORE_K: .6, CAP: 8, OPEN: 3, COL: { ley: '#a77cff', shard: '#eadcff', ward: '#b98cff' } };   // (his light violet and violet-white, as the owner's sculpt: 27 Nov 2026; it was ley-teal)
 specAdd('conclave', { id: CCS_U, name: 'Arcane Severers', short: 'Severers', key: '9', proj: 'force', attack: 'cc_sever', elem: null, dmgType: 'arcane', air: true, ground: true, ccSchool: 'arcane', visTiers: 6,
   top: [1.1, 1.16, 1.22, 1.28, 1.34, 1.4],
   blurb: `Ward-breakers of the College with crescent ley-glaives. Their severing crescents hunt warded and shielded foes: they break shields and Spell Wards outright and tear ward bars apart, and every ward they break adds damage to their next spell (twice as much at full Arcane Charge). Air and ground. Their element is Arcane. Each strike adds an Arcane Charge (up to ${CC_Q_MAX}); a spell spends them all.`,
@@ -27112,14 +27114,16 @@ function ccsSpend(t, c) {
 /* ---------- the strike: a severing crescent ---------- */
 FORCE_ATTACK.cc_sever = (t, st, tg, pow, echo) => {
   const tip = typeof unitTip === 'function' ? unitTip(t) : null;
-  rfx({ k: 'streak', x0: tip ? tip[0] : t.x, h0: tip ? tip[1] : towerTop(t) + .2, z0: tip ? tip[2] : t.y, c: tg, col: specWarded(tg) ? CCS.COL.shard : CCS.COL.ley, w: .045, trav: .12, life: .28 });
-  G.delayed.push({ t: Math.min(.22, .04 + Math.hypot(tg.x - t.x, tg.y - t.y) / 18), fn: () => {
+  const dl = Math.min(.22, .04 + Math.hypot(tg.x - t.x, tg.y - t.y) / 18);
+  if (!(typeof sevFxStrike === 'function' && sevFxStrike(t, tg, dl)))   // (the sculpted body's own crescent: unitmodels_severer2_fx.js)
+    rfx({ k: 'streak', x0: tip ? tip[0] : t.x, h0: tip ? tip[1] : towerTop(t) + .2, z0: tip ? tip[2] : t.y, c: tg, col: specWarded(tg) ? CCS.COL.shard : CCS.COL.ley, w: .045, trav: .12, life: .28 });
+  G.delayed.push({ t: dl, fn: () => {
     if (tg.dead || G.state !== 'play') return; const s = t.st || st;
     const keen = s.caps && s.caps.ccs_tear;   // (plain units, 25 Nov 2026: the crescent breaks and tears only with Keen Crescent)
     if (keen && (tg.ward > 0 || tg.shield > 0 || tg.amT > 0)) ccsBreak(t, tg, false);   // shields and Spell Wards break outright
     if (keen && tg.mw > 0 && typeof epWardTear === 'function') { const full = tg.mw; epWardTear(tg, ccsTear(s)); if (tg.mw <= 0) ccsGain(t, tg, Math.max(full, tg.mwMax * .25)); }   // a ward bar tears; one torn through breaks
     ccHit(t, s, tg, s.dmg * pow, { type: 'arcane' });
-    fxSpark(tg.x, tg.y, hitH(tg), CCS.COL.ley, 5);
+    if (!(typeof sevFxImpact === 'function' && sevFxImpact(t, tg))) fxSpark(tg.x, tg.y, hitH(tg), CCS.COL.ley, 5);
   } });
   t.recoil = 1; sfx('ward', 0);
 };
@@ -27127,7 +27131,7 @@ FORCE_ATTACK.cc_sever = (t, st, tg, pow, echo) => {
 /* ---------- the kit ---------- */
 const CCS_KIT = {
   cc_severer: { slot: SPEC_SLOT, mana: { max: 100, regen: .85, hit: .65 }, abilities: [
-    { id: 'cc_sunder', name: 'Sundering Glyph', short: 'Sunder', glyph: 'shieldbreak', hue: '#6ff0e0', mana: 70, cd: 10, research: null,
+    { id: 'cc_sunder', name: 'Sundering Glyph', short: 'Sunder', glyph: 'shieldbreak', hue: '#b48cff', mana: 70, cd: 10, research: null,
       by: { open: [3, 3, 3.5, 3.5, 4, 4.5] },
       auto: 'a warded or shielded foe in reach (the biggest ward first)',
       text: (t, st, ab) => `Breaks every ward and shield on a warded foe and hits it for ${xD(st, 2)}, plus ${Math.round(CCS.STORE_K * 100)}% of the wards she has broken since her last spell. For ${byT(ab.by.open, t)}s, spells ignore its ward.`,
@@ -27138,13 +27142,13 @@ const CCS_KIT = {
       },
       cast(t, st, c, ab) {
         const k = ccCast(t, ab);
-        rfx({ k: 'rune', x: c.x, z: c.y, r: .45, col: ab.hue, life: .6 });
+        if (!(typeof sevFxSunder === 'function' && sevFxSunder(t, c))) rfx({ k: 'rune', x: c.x, z: c.y, r: .45, col: ab.hue, life: .6 });
         G.delayed.push({ t: .22, fn: () => {
           if (c.dead || !abLive(t)) return; const s = t.st || st;
           ccsBreak(t, c, true); ccsSpend(t, c);
           if (!c.dead) ccAb(t, s, c, 2, k, { type: 'arcane' });
           if (!c.dead && c.mwMax > 0 && typeof epWardOpen === 'function') epWardOpen(c, 1, byT(ab.by.open, t));
-          fxRing(c.x, c.y, .5, ab.hue); fxShards(c.x, c.y, hitH(c), 8);
+          if (!(typeof sevFxSunderHit === 'function' && sevFxSunderHit(t, c))) { fxRing(c.x, c.y, .5, ab.hue); fxShards(c.x, c.y, hitH(c), 8); }
         } });
       } },
     { id: 'cc_shards', name: 'Shard Volley', short: 'Shards', glyph: 'shards', hue: '#c8fff6', mana: 80, cd: 11, research: { cost: 60, time: 20 },
@@ -33401,7 +33405,7 @@ function ccxSeverCut(t, st, c, k, first) {
   if (first) ccsSpend(t, c);
   if (!c.dead) ccAb(t, st, c, .75, k, { type: 'arcane' });
 }
-ccxSwap('cc_severer', { id: 'cc_shards', name: 'Returning Crescent', short: 'Crescent', glyph: 'glaive2', hue: '#c8fff6', mana: 80, cd: 11, research: { cost: 60, time: 20 },
+ccxSwap('cc_severer', { id: 'cc_shards', name: 'Returning Crescent', short: 'Crescent', glyph: 'glaive2', hue: '#e2d4ff', mana: 80, cd: 11, research: { cost: 60, time: 20 },
   by: { wide: [.9, .9, .9, .9, 1, 1] },
   auto: 'two or more foes in reach (warded and shielded ones first), or one big ward', none: 'no foes in reach',
   text: (t, st, ab) => `Throws its glaive out to a foe and back, cutting foes near its path both ways: ${xD(st, .75)} a cut; shields break and the ward bar loses ${Math.round(CCS.TEAR * 100)}%.`,
@@ -33429,7 +33433,7 @@ ccxSwap('cc_severer', { id: 'cc_shards', name: 'Returning Crescent', short: 'Cre
     }
     if (u >= 2 && !z.caught) { z.caught = 1; ccxFx('cc_shards', t, null, C => CCX_FX.crescentCatch(C, t)); sfx('ward', 0); }
   } });
-ccxSwap('cc_severer', { id: 'cc_nullfield', name: 'Rend the Veil', short: 'Rend', glyph: 'disint', hue: '#8ae8d8', mana: 100, cd: 15, research: { cost: 110, time: 30 },
+ccxSwap('cc_severer', { id: 'cc_nullfield', name: 'Rend the Veil', short: 'Rend', glyph: 'disint', hue: '#a77cff', mana: 100, cd: 15, research: { cost: 110, time: 30 },
   by: { n: [3, 3, 3, 3, 4, 4], mult: [1, 1, 1.1, 1.1, 1.2, 1.2], sev: [4, 4, 4, 4, 5, 5] },
   auto: 'two or more warded or shielded foes in reach, a warded boss or elite, or four or more foes', none: 'no foes in reach',
   text: (t, st, ab) => `Hooks up to ${byT(ab.by.n, t)} foes, warded first, and slows them 50%, then tears: wards and shields break, ${xD(st, byT(ab.by.mult, t))}, and for ${byT(ab.by.sev, t)}s they can't be shielded and spells ignore their wards.`,
@@ -63944,10 +63948,10 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
    forces_..._easy_conclave.js.
 
    THE SEER OF THE WHOLE SKY (columns 1-2): sight, reach, and picking the right foe
-     Long Lens         her range grows                                      (was reach at flyers only)
+     Long Lens         her attacks and her spells reach further             (was reach at flyers only)
      Busy Sky          each attack comes faster while she keeps attacking   (kept)
      Fated Mark        each attack on the same foe hits harder              (was Skyward Eye: flyers only)
-     Bright Fourth     foes in the outer third of her reach take more       (kept)
+     Bright Fourth     foes more than 2 cells from her take more            (was the outer third of her reach)
      Grand Orrery      her spell                                            (kept)
      Omen of Ending    foes low on health take more from her attacks        (was Shooting Bolt: one more bolt)
      Orrery Moon       Grand Orrery lasts longer                            (kept)
@@ -63969,7 +63973,14 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
    attack deals 20% less with it: the whole map is the reward.
    Numbers after the first duel (wave 16, 1050 gold, sim/duels/astrologer_tree.json): the full tree removed 80% of the wave
    against 28-31% for her old tree, so Heavy Star, Fated Mark, Omen of Ending and The Whole Sky's cost came down. */
-const CCW = { DMG: .8, RANGE: 99, H: 5.2, SPD: 15, CAP: 'ccWholeSky',
+/* The Seer's nodes and The Whole Sky (owner, 28 Nov 2026, of Long Lens and Bright Fourth: "not sure if these talents work now
+   with the new whole map talent"): each node on the way to the capstone says what it still does once she has it.
+   - Long Lens says it lengthens her spells' reach too (it always did: a spell reaches as far as st.range), which is what
+     it goes on doing with The Whole Sky. Its tag is Spell, not Damage.
+   - Bright Fourth is a plain distance now, 2 cells (her tier-I outer third began at 1.7, her tier-VI at 2.1), not a share of
+     a reach her attacks no longer have: with The Whole Sky nearly every shot is a far one, and Long Lens no longer pushes
+     the mark further out. */
+const CCW = { FAR: 2, FAR_D: .1, DMG: .8, RANGE: 99, H: 5.2, SPD: 15, CAP: 'ccWholeSky',
   REACH: .2, MARK: .03, END_AT: .35, END: .1, BURST_R: .7, BURST: .15, HEAVY_N: 4, HEAVY: .4, CRATER_R: .3, FALL_T: 6, FALL: 3 };
 (function () {
   if (typeof FORCES === 'undefined' || !FORCES.conclave || !FORCES.conclave.talents) return;
@@ -63992,10 +64003,14 @@ const CCW = { DMG: .8, RANGE: 99, H: 5.2, SPD: 15, CAP: 'ccWholeSky',
     return t;
   };
   // ---- the Seer of the Whole Sky ----
-  set('Long Lens', 'Long Lens', { tag: 'Damage', mod: n => ({ range: CCW.REACH * n }), pro: n => `Increases the Astrologer's range by ${N(CCW.REACH * n)} cells.`,
+  set('Long Lens', 'Long Lens', { tag: 'Spell', mod: n => ({ range: CCW.REACH * n }), pro: n => `Increases the reach of the Astrologer's attacks and spells by ${N(CCW.REACH * n)} cells.`,
     ladder: t => () => ({ kind: 'reach', from: 1, vals: Array.from({ length: t.max }, (_, k) => CCW.REACH * (k + 1)) }) });
   set('Skyward Eye', 'Fated Mark', { tag: 'Damage', mod: n => ({ rampD: CCW.MARK * n, rampDMax: CCW.MARK * n * 5 }),
     pro: n => `Each attack of the Astrologer on the same foe hits ${P(CCW.MARK * n)}% harder, up to 5 times.` });
+  set('Bright Fourth', 'Bright Fourth', { tag: 'Damage', cap: 'ccwFar',
+    pro: n => `Foes more than ${N(CCW.FAR)} cells away take ${P(CCW.FAR_D * n)}% more from the Astrologer's attacks.` });
+  /* (Busy Sky keeps its rule, 5% a rank; its words name her and the pause, which The Whole Sky all but ends) */
+  set('Busy Sky', 'Busy Sky', { keep: 1, pro: n => `Each attack: the Astrologer attacks ${P(.05 * n)}% faster, up to 5 times. A 2s pause between attacks resets it.` });
   set('Shooting Bolt', 'Omen of Ending', { tag: 'Damage', cap: 'ccwEnd',
     pro: n => `Foes below ${P(CCW.END_AT)}% health take ${P(CCW.END * n)}% more from the Astrologer's attacks.` });
   set('Binary Star', 'The Whole Sky', { tag: 'Damage', cap: CCW.CAP,
@@ -64033,14 +64048,18 @@ if (typeof inRange === 'function') {
   const _ccwIn = inRange;
   inRange = function (t, st, c) { return st && st.skyAll ? true : _ccwIn.apply(this, arguments); };
 }
-/* Omen of Ending: her attacks (not her spells, not an item's or a burst's damage) on a foe low on health */
+/* Omen of Ending, Bright Fourth: her attacks (not her spells, not an item's or a burst's damage) on a foe low on health,
+   and on a foe more than 2 cells away */
 if (typeof forceHook === 'function') {
   const _ccwHook = forceHook;
   forceHook = function (k, a0, a1, a2) {
     const r = _ccwHook.apply(this, arguments);
-    if (k !== 'amp' || a2 || !a0 || !a1 || !a1.st || !a1.st.caps || !a1.st.caps.ccwEnd) return r;
+    if (k !== 'amp' || a2 || !a0 || !a1 || !a1.st || !a1.st.caps || !(a1.st.caps.ccwEnd || a1.st.caps.ccwFar)) return r;
     if ((typeof AB_TAG !== 'undefined' && DTAG === AB_TAG) || DTAG === 'relic' || DTAG === 'rx') return r;
-    return a0.hp < CCW.END_AT * (a0.maxHp || a0.hp) ? (r || 0) + CCW.END * a1.st.caps.ccwEnd : r;
+    const C = a1.st.caps; let v = 0;
+    if (C.ccwEnd && a0.hp < CCW.END_AT * (a0.maxHp || a0.hp)) v += CCW.END * C.ccwEnd;
+    if (C.ccwFar && a1.x != null && Math.hypot(a0.x - a1.x, a0.y - a1.y) > CCW.FAR) v += CCW.FAR_D * C.ccwFar;
+    return v ? (r || 0) + v : r;
   };
 }
 /* her star-bolt: from the sky with The Whole Sky; every 4th a heavy star from above with Heavy Star (the same bolt and
@@ -64101,6 +64120,429 @@ if (typeof ccStarDrop === 'function') {
     } });
     return r;
   };
+}
+
+/* The Arcane Severer's own kit and tree (owner, 27 Nov 2026: "more unique and interesting", in talents and spells; two
+   fantasies, he severs things). Loaded after every other Conclave tree file, so it has the last word on this unit.
+
+   SPELLS (the ids stay, so saves, spell slots and the spell paintings keep their places)
+     Sever (cc_sunder, from the start)     a heavy crescent cuts one foe's links: its wards, shields and haste are stripped,
+                                           and for a few seconds its supporters cannot help it (no ties, heals or shields).
+                                           Null Field (no shields or heals) is folded into this.
+     Returning Crescent (cc_shards, row II) a big crescent thrown out and back, cutting foes near its path on both passes:
+                                           his bread-and-butter damage.
+     Rift Line (cc_nullfield, row II)      a glowing seam slashed across the road ahead of the thickest knot of foes in
+                                           reach; for a few seconds it cuts every foe that crosses it.
+   Units start plain (owner rule): the extras below come from the tree.
+
+   THE TREE: SPELLBREAKER (columns 1-2) and RIFT BLADE (columns 3-4), each with its own capstone. Mostly simple passives;
+   the "does X" nodes: Chain Sever and Broken Words (Spellbreaker), Splitting Edge and Deep Cut (Rift Blade). Flat-%
+   nodes: Laid Bare, Deep Cut. The one extra-hit node: Splitting Edge, not a capstone. No health nodes. No glue with other
+   units. The 16 talents keep their list places (saves load by index); a renamed talent keeps its painting (TAL_ART_ALIAS).
+     Lingering Severance  0,0  Sever's cut-off lasts longer                  (was Quick Severing)
+     Keen Severance       0,1  Sever comes sooner                           (was Keen Crescent)
+     Returning Crescent   1,1  the spell                                    (kept, reworked)
+     Chain Sever          2,0  Sever also cuts the foe's nearest supporter loose (was Hunting Crescent)
+     Laid Bare            2,1  his crescents hit harder on a foe Sever has cut off (was Honed by Spells)
+     Spellthief           3,0  every ward or shield Sever breaks gives mana  (was Ward Feedback)
+     Broken Words         4,1  enemy spells cast in his reach fizzle and give him mana (was Sever Rhythm)
+     UNMAKING             5,0  a foe he severs is cut off for the rest of the wave (was Severing Flurry)
+     Long Arc             0,2  Returning Crescent flies a wider loop and cuts further from it (was Homeward Edge)
+     Rift Line            1,2  the spell                                    (was Rend the Veil)
+     Wide Rift            2,2  Rift Line is longer                          (was Splintering)
+     Lasting Rift         2,3  Rift Line lasts longer                       (was Lone Wolf)
+     Twin Rift            3,2  a second Rift Line a cell further down the road (was Paired Crescents)
+     Splitting Edge       3,3  a crescent that crosses a Rift Line splits in two (was Glancing Crescent)
+     Deep Cut             4,2  a foe cut twice by the same Rift Line loses a share of its health (was Wardbreaker)
+     SHATTERED GROUND     5,3  his crescents leave short Rift Lines where they land (was Crescent Orbit)
+   The VFX: src/unitmodels_severer2_fx.js (SEVFX.severThreads / severSnap / seam / fizzle). */
+const SEVK = {
+  // Sever: its damage, how long the cut-off lasts by tier, Lingering Severance's seconds, Chain Sever's reach
+  SEV_D: 3, CUT: [4, 4, 4.5, 4.5, 5, 5], LINGER: 1.5, CHAIN_R: 5, TEAR_T: .6,
+  // Returning Crescent: a cut's damage, the loop's width by tier, the reach of a cut, Long Arc's widening
+  RC_D: 1.6, RC_W: [1, 1, 1, 1, 1.1, 1.1], RC_R: .55, ARC: .15,
+  // Rift Line: a cut's damage, its length and seconds by tier, Wide Rift, Lasting Rift, Twin Rift's gap
+  RL_D: 1.45, RL_LEN: [1.6, 1.6, 1.7, 1.7, 1.8, 1.8], RL_T: [3, 3, 3.5, 3.5, 4, 4], WIDE: .4, LAST: 1, TWIN: 1,
+  // the tree's "does X" nodes: Splitting Edge's share, Deep Cut's share of current health, Spellthief's and Broken Words' mana
+  SPLIT: .25, SPLIT_R: 2, DEEP: .08, THIEF: 10, HUSH_MANA: 12, HUSH_EVERY: 4, WARD: .15,
+  // Laid Bare, a rank; Shattered Ground's seams (length, seconds, damage against a Rift Line's)
+  BARE: .25, SH_LEN: .8, SH_T: 1.5, SH_D: .5,
+  cres: 0, seams: [] };
+const sevIs = t => !!(t && t.def && t.def.unit === 'cc_severer' && !t.wrecked);
+const sevCaps = t => (t && (t.st || (typeof effStats === 'function' ? effStats(t) : null)) || {}).caps || {};
+const sevTier = t => Math.min(5, (t && t.tier) | 0);
+const sevCut = c => !!(c && c.sevCutT > G.time);
+// the foes whose formation ties hold c (game.js supportTick: c.links), nearest first
+function sevSupporters(c) {
+  const out = [];
+  for (const o of G.creeps) if (!o.dead && o !== c && o.def.link && (o.links || []).includes(c)) out.push(o);
+  return out.sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y));
+}
+// how much there is to cut on a foe: its supporters, its wards and shields, its haste
+const sevWorth = c => 3 * sevSupporters(c).length + ((c.mw > 0 || c.ward > 0 || c.shield > 0 || c.amT > 0) ? 2 : 0) + (c.rageT > 0 ? 1 : 0);
+// a foe's way along the road (moveCreep, wrapped below), or toward the exit when it has not moved yet
+function sevHeading(c) {
+  let dx = c._sevDx || 0, dz = c._sevDz || 0, l = Math.hypot(dx, dz);
+  if (l < 1e-4) { dx = 0; dz = 1; l = 1; }
+  return [dx / l, dz / l];
+}
+
+/* ---------------------------------------------------------------- Sever */
+function sevSeverFoe(t, st, c, k, dmg) {
+  if (!c || c.dead) return;
+  const C = st.caps || {}, now = G.time;
+  const broke = typeof ccsBreak === 'function' ? ccsBreak(t, c, true) : 0;
+  if (broke > 0 && C.sevThief && typeof gainMana === 'function') { gainMana(t, SEVK.THIEF * C.sevThief); ccEv('cap:sevThief'); }
+  c.rageT = 0; c.rageK = 0;   // (its haste)
+  const dur = C.sevUnmake ? 1e6 : (typeof byT === 'function' ? byT(SEVK.CUT, t) : 4) + SEVK.LINGER * (C.sevLinger || 0);
+  c.sevCutT = Math.max(c.sevCutT || 0, now + dur); c.sevBy = t;
+  c.nowardT = Math.max(c.nowardT || 0, Math.min(c.sevCutT, now + 60));
+  if (C.sevUnmake) ccEv('cap:sevUnmake');
+  // its ties drop at once (supportTick drops them within a moment anyway: LINK_WHO, below)
+  for (const o of G.creeps) if (!o.dead && o.def.link && (o.links || []).includes(c) && typeof linkOff === 'function') { linkOff(o, c, o.def.link); o.links = o.links.filter(q => q !== c); }
+  if (dmg && !c.dead) ccAb(t, st, c, SEVK.SEV_D, k, { type: 'arcane' });
+}
+const SEV_SEVER = {
+  name: 'Sever', short: 'Sever', mana: 70, cd: 10, by: { cut: SEVK.CUT },
+  auto: 'a foe in reach held up by supporters, or wearing a ward, shield or haste (otherwise the toughest)', none: 'no foes in reach',
+  text: (t, st, ab) => `A heavy crescent cuts a foe loose: ${xD(st, SEVK.SEV_D)}; its wards, shields and haste are stripped, and for ${byT(ab.by.cut, t)}s its supporters cannot help it and it can't be shielded or healed.`,
+  pick(t, st, ab, man) {
+    const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null;
+    let best = null, bw = 0; for (const c of L) { if (sevCut(c)) continue; const w = sevWorth(c); if (w > bw) { bw = w; best = c; } }
+    return best || abToughest(L.filter(c => !sevCut(c))) || (man ? abToughest(L) : null);
+  },
+  cast(t, st, c, ab) {
+    if (Array.isArray(c)) c = c[0]; if (!c) return;
+    const k = ccCast(t, ab), sups = sevSupporters(c);
+    if (typeof SEVFX !== 'undefined') SEVFX.severThreads(t, c, sups, SEVK.TEAR_T);
+    G.delayed.push({ t: SEVK.TEAR_T, fn: () => {
+      if (!abLive(t) || c.dead) return; const s = t.st || st, C = s.caps || {};
+      abRun('cc_sunder', () => {
+        if (typeof ccsSpend === 'function') ccsSpend(t, c);
+        // Chain Sever: its nearest supporter is cut loose too (its own first; with none, the nearest enemy caster that holds others up)
+        let o = null;
+        if (C.sevChain) {
+          const d = q => Math.hypot(q.x - c.x, q.y - c.y);
+          const own = sevSupporters(c).concat(sups).filter(q => !q.dead && d(q) <= SEVK.CHAIN_R), any = G.creeps.filter(q => !q.dead && q !== c && q.def.link && d(q) <= SEVK.CHAIN_R).sort((a, b) => d(a) - d(b));
+          o = [...new Set(own.concat(any))].slice(0, C.sevChain);
+        }
+        sevSeverFoe(t, s, c, k, true);
+        for (const q of o || []) { sevSeverFoe(t, s, q, k, false); ccEv('cap:sevChain'); if (typeof SEVFX !== 'undefined') SEVFX.severSnap(t, q, sevSupporters(q)); }
+      });
+      if (typeof SEVFX !== 'undefined') SEVFX.severSnap(t, c, sups);
+      sfx('shieldBreak', 0);
+    } });
+    sfx('ward', 1);
+  },
+};
+
+/* ---------------------------------------------------------------- Returning Crescent (reworked) */
+function sevCresCut(t, st, c, k) {
+  const W = (st.caps || {}).sevWard;
+  if (W && !c.dead) {   // Wardrender: shields and Spell Wards break, a share of the ward bar tears
+    if ((c.shield > 0 || c.amT > 0 || c.ward > 0) && typeof ccsBreak === 'function') { ccsBreak(t, c, false); ccEv('cap:sevWard'); }
+    if (c.mw > 0 && typeof epWardTear === 'function') { epWardTear(c, SEVK.WARD * W); ccEv('cap:sevWard'); }
+  }
+  SEVK.cres = 1;
+  try { ccAb(t, st, c, SEVK.RC_D, k, { type: 'arcane' }); } finally { SEVK.cres = 0; }
+  sevSeamTouch(t, st, c);
+}
+const SEV_CRES = {
+  mana: 60, cd: 6, by: { wide: SEVK.RC_W },
+  auto: 'a foe in reach (it flies to the farthest)', none: 'no foes in reach',
+  text: (t, st, ab) => `Throws a big crescent out to a foe and back: it cuts every foe near its path, on the way out and on the way back, for ${xD(st, SEVK.RC_D)} a cut.`,
+  pick(t, st, ab, man) {
+    const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null;
+    return L.reduce((b, c) => !b || abDist(t, c) > abDist(t, b) ? c : b, null);
+  },
+  cast(t, st, c, ab) {
+    const k = ccCast(t, ab), C = st.caps || {}, [hx, , hz] = ccxHand(t), dx = c.x - hx, dz = c.y - hz, d = Math.hypot(dx, dz) || 1;
+    const L = { x0: hx, z0: hz, x1: c.x + dx / d * .3, z1: c.y + dz / d * .3, px: -dz / d, pz: dx / d, w: byT(ab.by.wide, t) * Math.min(1.2, d * .4) + SEVK.ARC * (C.sevArc || 0), sd: 1 };
+    let nl = 0, nr = 0; for (const o of G.creeps) { if (o.dead) continue; const s = (o.x - hx) * L.px + (o.y - hz) * L.pz; if (s > 0) nl++; else nr++; } L.sd = nl >= nr ? 1 : -1;
+    const T = .42 + d * .05, z = { k: ab.id, L, at: G.time, T, until: G.time + 2 * T + .05, tick: 0, every: .03, ck: k, cut: [new Set(), new Set()], last: null, split: new Set(), _sfx: 1 };
+    abZone(t, z); t.ccxCresT = z.until;
+    ccxFx(ab.id, t, c, Cx => CCX_FX.crescent(Cx, t, z));
+    sfx('glaive', 0);
+  },
+  zone(t, st, z) {
+    const C = st.caps || {}, u = Math.min(2, (G.time - z.at) / z.T), pass = u <= 1 ? 0 : 1, [x, y] = ccxLoopAt(z.L, u), R = SEVK.RC_R + SEVK.ARC * (C.sevArc || 0);
+    for (const c of G.creeps) {
+      if (c.dead || c.ent || z.cut[pass].has(c) || !canTarget(t, st, c) || Math.hypot(c.x - x, c.y - y) > R + (c.def.r || .3) * .4) continue;
+      z.cut[pass].add(c); const both = pass === 1 && z.cut[0].has(c);
+      sevCresCut(t, st, c, z.ck);
+      ccxFx('cc_shards', t, c, Cx => CCX_FX.crescentCut(Cx, c, both)); sfx(c.mw > 0 || c.shield > 0 ? 'shieldBreak' : 'glaiveHit', 0);
+    }
+    // Splitting Edge: the crescent crossing one of his Rift Lines splits, its second half on the nearest other foe
+    if (z.last && C.sevSplit) for (const S of sevSeamsOf(t)) if (!z.split.has(S) && sevSegCross(S, z.last[0], z.last[1], x, y)) { z.split.add(S); sevSplitHit(t, st, x, y, null, SEVK.RC_D, z.ck, true); }
+    // Shattered Ground: a short seam where it turns for home
+    if (C.sevShatter && !z.shat && u >= 1) { z.shat = 1; const h = [z.L.x1 - z.L.x0, z.L.z1 - z.L.z0], l = Math.hypot(h[0], h[1]) || 1; sevSeam(t, st, x, y, h[0] / l, h[1] / l, SEVK.SH_LEN / 2, SEVK.SH_T, SEVK.SH_D, 1, true); }
+    z.last = [x, y];
+    if (u >= 2 && !z.caught) { z.caught = 1; ccxFx('cc_shards', t, null, Cx => CCX_FX.crescentCatch(Cx, t)); sfx('ward', 0); }
+  },
+};
+
+/* ---------------------------------------------------------------- Rift Line: the seams */
+const sevSeamsOf = t => SEVK.seams.filter(S => S.t === t && S.until > G.time);
+// a seam across the road at (x, z): (hx, hz) the way the foes walk (the seam lies across it), half its length
+function sevSeam(t, st, x, z, hx, hz, half, secs, mult, k, small) {
+  const S = { t, x, z, nx: hx, nz: hz, dx: -hz, dz: hx, half, born: G.time, until: G.time + secs, mult, k, small: !!small, side: new Map(), cuts: new Map(), deep: new Set() };
+  SEVK.seams.push(S); if (SEVK.seams.length > 24) SEVK.seams.shift();
+  if (typeof SEVFX !== 'undefined') SEVFX.seam(S);
+  if (small) ccEv('cap:sevShatter');
+  return S;
+}
+// does the segment (ax, az)-(bx, bz) cross seam S?
+function sevSegCross(S, ax, az, bx, bz) {
+  const sa = (ax - S.x) * S.nx + (az - S.z) * S.nz, sb = (bx - S.x) * S.nx + (bz - S.z) * S.nz;
+  if ((sa > 0) === (sb > 0)) return false;
+  const f = sa / (sa - sb), px = ax + (bx - ax) * f, pz = az + (bz - az) * f;
+  return Math.abs((px - S.x) * S.dx + (pz - S.z) * S.dz) <= S.half + .1;
+}
+// a cut along seam S on foe c: its damage (crossing), and Deep Cut on the second
+function sevSeamCut(S, c, hit) {
+  const t = S.t, st = t.st || effStats(t), C = st.caps || {};
+  if (hit) abRun('cc_nullfield', () => ccAb(t, st, c, SEVK.RL_D * S.mult, S.k, { type: 'arcane' }));
+  const n = (S.cuts.get(c) || 0) + 1; S.cuts.set(c, n);
+  if (n >= 2 && C.sevDeep && !S.deep.has(c) && !c.dead) {
+    S.deep.add(c); const amt = c.hp * SEVK.DEEP * C.sevDeep;
+    abRun('cc_nullfield', () => ccHit(t, st, c, amt, { type: 'arcane', noRx: true })); ccEv('cap:sevDeep');
+    if (typeof SEVFX !== 'undefined') SEVFX.mark(t, c, 'tear', true);
+  }
+}
+// his crescents striking a foe on one of his seams count as a cut along it (Deep Cut)
+function sevSeamTouch(t, st, c) {
+  for (const S of sevSeamsOf(t)) { const s = (c.x - S.x) * S.nx + (c.y - S.z) * S.nz, a = (c.x - S.x) * S.dx + (c.y - S.z) * S.dz; if (Math.abs(s) < .5 && Math.abs(a) <= S.half + .2) sevSeamCut(S, c, false); }
+}
+// Splitting Edge's second half: the nearest other foe to (x, z)
+function sevSplitHit(t, st, x, z, skip, m, k, spell) {
+  let best = null, bd = SEVK.SPLIT_R;
+  for (const c of G.creeps) { if (c.dead || c === skip || c.ent || !canTarget(t, st, c)) continue; const d = Math.hypot(c.x - x, c.y - z); if (d < bd) { bd = d; best = c; } }
+  if (!best) return;
+  ccEv('cap:sevSplit');
+  const n = (st.caps && st.caps.sevSplit) || 1, amt = spell ? null : st.dmg * SEVK.SPLIT * n * m;
+  G.delayed.push({ t: .08, fn: () => {
+    if (best.dead || G.state !== 'play') return;
+    SEVK.cres = 1;
+    try { if (spell) abRun('cc_shards', () => ccAb(t, st, best, m * SEVK.SPLIT * n, k, { type: 'arcane' })); else ccHit(t, st, best, amt, { type: 'arcane' }); } finally { SEVK.cres = 0; }
+    if (typeof SEVFX !== 'undefined') SEVFX.splitFx(t, x, z, best);
+  } });
+}
+function sevSeamTick() {
+  if (!SEVK.seams.length || G.state !== 'play') return;
+  const now = G.time;
+  SEVK.seams = SEVK.seams.filter(S => S.until > now && G.towers.includes(S.t));
+  for (const S of SEVK.seams) {
+    const st = S.t.st || effStats(S.t);
+    for (const c of G.creeps) {
+      if (c.dead || c.fly || c.ent || !canTarget(S.t, st, c)) { S.side.delete(c); continue; }
+      const a = (c.x - S.x) * S.dx + (c.y - S.z) * S.dz, s = (c.x - S.x) * S.nx + (c.y - S.z) * S.nz;
+      if (Math.abs(a) > S.half + (c.def.r || .25) || Math.abs(s) > 1.2) { S.side.delete(c); continue; }
+      const p = S.side.get(c); S.side.set(c, s);
+      if (p != null && (p > 0) !== (s > 0)) { sevSeamCut(S, c, true); if (typeof SEVFX !== 'undefined') SEVFX.seamSpark(S, c); }
+    }
+  }
+}
+const SEV_RIFT = {
+  name: 'Rift Line', short: 'Rift', mana: 80, cd: 12, by: { len: SEVK.RL_LEN, dur: SEVK.RL_T },
+  auto: 'foes in reach (ahead of the thickest knot of them)', none: 'no foes in reach',
+  text: (t, st, ab) => `Slashes a glowing seam across the road, ${byT(ab.by.len, t)} cells long, ahead of the thickest knot of foes in reach: for ${byT(ab.by.dur, t)}s it cuts every foe that crosses it for ${xD(st, SEVK.RL_D)}.`,
+  pick(t, st, ab, man) {
+    const L = abFoes(t, st, abReach(t, st, ab)).filter(c => !c.fly); if (!L.length) return null;
+    // the thickest knot: the foe with the most others within 1.6 cells; then the one of them furthest along the road
+    let best = null, bn = -1;
+    for (const c of L) { let n = 0; for (const o of G.creeps) if (!o.dead && !o.fly && o !== c && Math.hypot(o.x - c.x, o.y - c.y) <= 1.6) n++; if (n > bn || (n === bn && c.remain < best.remain)) { bn = n; best = c; } }
+    return best;
+  },
+  cast(t, st, c, ab) {
+    if (Array.isArray(c)) c = c[0]; if (!c) return;
+    const k = ccCast(t, ab), C = st.caps || {}, [hx, hz] = sevHeading(c);
+    const half = (byT(ab.by.len, t) + SEVK.WIDE * (C.sevWide || 0)) / 2, secs = byT(ab.by.dur, t) + SEVK.LAST * (C.sevLast || 0);
+    const x = c.x + hx * .45, z = c.y + hz * .45;
+    G.delayed.push({ t: .22, fn: () => {   // (his palm meets the road: the clip's frame 9)
+      if (!abLive(t)) return; const s = t.st || st;
+      sevSeam(t, s, x, z, hx, hz, half, secs, 1, k, false);
+      if (((s.caps || {}).sevLast || 0) >= 2) { sevSeam(t, s, x + hx * SEVK.TWIN, z + hz * SEVK.TWIN, hx, hz, half, secs, 1, k, false); ccEv('cap:sevTwin'); }
+      sfx('shieldBreak', 0);
+    } });
+    sfx('ward', 1);
+  },
+};
+
+/* ---------------------------------------------------------------- the spells, in place */
+(function () {
+  if (typeof ABIL === 'undefined' || !ABIL.cc_sunder || !ABIL.cc_shards || !ABIL.cc_nullfield) return;
+  Object.assign(ABIL.cc_sunder, SEV_SEVER);
+  Object.assign(ABIL.cc_shards, SEV_CRES);
+  const R = ABIL.cc_nullfield;
+  for (const k of ['ult', 'mana0', 'cd0', 'rowPre', 'zone']) delete R[k];
+  Object.assign(R, SEV_RIFT, { glyph: 'cracked', row: 2, rowPre: 2, depth: 1, depthK: 1.25 });   // (row III: forces_zy_spells.js SP_DEPTH, 1 + 0.25 a row below II)
+  if (typeof AB_PREF !== 'undefined') { AB_PREF.cc_sunder = 'warded'; delete AB_PREF.cc_shards; delete AB_PREF.cc_nullfield; }
+  if (typeof CAST_T !== 'undefined') Object.assign(CAST_T, { cc_sunder: .5, cc_shards: .6, cc_nullfield: .5 });
+  if (typeof SP_SHAPE !== 'undefined') Object.assign(SP_SHAPE, { cc_sunder: '', cc_shards: 'a h2', cc_nullfield: 'a' });
+  if (typeof SPEC_HELP !== 'undefined') {
+    SPEC_HELP.cc_sunder = { when: 'A foe in reach held up by supporters (war mages, priests, captains and the like), or wearing a ward, a shield or haste; otherwise the toughest.', aim: 'That foe: the crescent strikes it as his hands tear apart.' };
+    SPEC_HELP.cc_shards = { when: 'Any foe in reach.', aim: 'The farthest foe in reach: the crescent loops out to it and back.' };
+    SPEC_HELP.cc_nullfield = { when: 'Foes on the ground in reach.', aim: 'Just ahead of the thickest knot of foes in reach, across the way they walk.' };
+  }
+})();
+
+/* ---------------------------------------------------------------- the tree */
+(function () {
+  if (typeof FORCES === 'undefined' || !FORCES.conclave || !FORCES.conclave.talents) return;
+  const SLOT = typeof SPEC_SLOT !== 'undefined' ? SPEC_SLOT : 'venom', T = FORCES.conclave.talents[SLOT]; if (!T || T.list.length !== 16) { if (typeof console !== 'undefined') console.warn('severer tree: not the tree expected'); return; }
+  const U = 'the Arcane Severer', P = v => String(Math.round(v * 100)), N = v => String(+(+v).toFixed(2));
+  const M = (t, n) => Math.max(1, Math.min(n | 0 || 1, t.max));
+  const set = (old, name, o) => {
+    const t = T.list.find(q => (q.name === old || q.oldName === old) && !q.spell); if (!t) { if (typeof console !== 'undefined') console.warn('severer tree: no talent', old); return null; }
+    if (typeof ezClear === 'function') ezClear(t); else { t.cap = null; t.sp = null; t.mod = () => ({}); }
+    if (name !== t.name) { if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[name]) TAL_ART_ALIAS[name] = TAL_ART_ALIAS[t.name] || t.name; t.oldName = t.oldName || t.name; t.name = name; }
+    t.tag = o.tag; t.max = o.max || 1; if (o.icon) t.icon = o.icon;
+    if (o.cap) { t.cap = o.cap; t.capK = 1; }
+    if (o.sp) t.sp = o.sp;
+    t.pro = n => o.pro(M(t, n));
+    delete t.ezLadder; t.ez = null; t.ezAb = null; t.atkPlain = true;
+    return t;
+  };
+  const spCd = (abId, sec) => n => ({ ab: abId, cd: -sec * n / ABIL[abId].cd });
+  // ---- Spellbreaker ----
+  set('Quick Severing', 'Lingering Severance', { tag: 'Support', max: 2, cap: 'sevLinger', icon: 'rune', pro: n => `A foe struck by Sever stays cut off from its supporters ${N(SEVK.LINGER * n)} sec longer.` });
+  set('Keen Crescent', 'Keen Severance', { tag: 'Spell', max: 3, sp: spCd('cc_sunder', 1), icon: 'glaive2', pro: n => `Reduces the cooldown of Sever by ${N(1 * n)} sec.` });
+  set('Hunting Crescent', 'Chain Sever', { tag: 'Support', max: 2, cap: 'sevChain', icon: 'cracked', pro: n => `Sever also cuts loose the ${n > 1 ? `${n} nearest enemy supporters` : 'nearest enemy supporter'} within ${SEVK.CHAIN_R} cells of its foe, stripping them too.` });
+  set('Honed by Spells', 'Laid Bare', { tag: 'Damage', max: 2, cap: 'sevBare', icon: 'target', pro: n => `A foe cut off by Sever takes ${P(SEVK.BARE * n)}% more damage from ${U}'s crescents.` });
+  set('Ward Feedback', 'Spellthief', { tag: 'Mana', max: 2, cap: 'sevThief', icon: 'gem', pro: n => `Each time Sever breaks a ward or a shield, ${U} gains ${SEVK.THIEF * n} mana.` });
+  set('Sever Rhythm', 'Broken Words', { tag: 'Mana', max: 2, cap: 'sevHush', icon: 'disint', pro: n => `Enemy spells cast within ${U}'s reach fizzle, and each gives him ${SEVK.HUSH_MANA} mana (at most one every ${SEVK.HUSH_EVERY - n} sec).` });
+  set('Severing Flurry', 'Unmaking', { tag: 'Support', max: 1, cap: 'sevUnmake', icon: 'shieldx', pro: () => `Every foe ${U} strikes with Sever is cut off from all support for the rest of the wave.` });
+  // ---- Rift Blade ----
+  set('Homeward Edge', 'Long Arc', { tag: 'Spell', max: 2, cap: 'sevArc', icon: 'glaive2', pro: n => `Returning Crescent flies a wider loop and cuts foes ${N(SEVK.ARC * n)} cells further from its path.` });
+  set('Paired Crescents', 'Wardrender', { tag: 'Spell', max: 2, cap: 'sevWard', icon: 'shieldx', pro: n => `Returning Crescent's cuts break shields and Spell Wards, and tear ${P(SEVK.WARD * n)}% off a ward bar.` });
+  set('Glancing Crescent', 'Splitting Edge', { tag: 'Damage', max: 2, cap: 'sevSplit', icon: 'shards', pro: n => `Returning Crescent and ${U}'s strikes split in two crossing a Rift Line: the second half strikes the nearest other foe for ${P(SEVK.SPLIT * n)}% damage.` });
+  set('Splintering', 'Wide Rift', { tag: 'Spell', max: 2, cap: 'sevWide', icon: 'lens', pro: n => `Increases the length of Rift Line by ${N(SEVK.WIDE * n)} cells.` });
+  set('Lone Wolf', 'Lasting Rift', { tag: 'Spell', max: 2, cap: 'sevLast', icon: 'rune', pro: n => `Increases the duration of Rift Line by ${N(SEVK.LAST * n)} sec.${n >= 2 ? ` It also opens a second seam ${N(SEVK.TWIN)} cell further down the road.` : ''}` });
+  set('Wardbreaker', 'Deep Cut', { tag: 'Damage', max: 2, cap: 'sevDeep', icon: 'cracked', pro: n => `A foe cut twice by the same Rift Line (crossing it, or struck by a crescent while on it) loses ${P(SEVK.DEEP * n)}% of its current health.` });
+  set('Crescent Orbit', 'Shattered Ground', { tag: 'Spell', max: 1, cap: 'sevShatter', icon: 'vortex', pro: () => `${U[0].toUpperCase() + U.slice(1)}'s crescents leave a short Rift Line where they land, for ${N(SEVK.SH_T)} sec (${P(SEVK.SH_D)}% of a Rift Line's cut).` });
+  for (const t of T.list) if (t.spell === 'cc_nullfield' && t.name !== 'Rift Line') { if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS['Rift Line']) TAL_ART_ALIAS['Rift Line'] = TAL_ART_ALIAS[t.name] || t.name; t.oldName = t.name; t.name = 'Rift Line'; }
+  /* the layout (tools/check_talent_trees.js and check_talent_chains.js): rows I and VI on the middle columns; spell 2
+     (Returning Crescent) on row II, spell 3 (Rift Line) deeper on row III, each under its own talent and over its own
+     upgrade; no talent shapes a spell from above that spell's row; each row a mix of what its talents shape; five chains
+     of at most four, a link dropping past empty cells only:
+       row I    .            Keen Sev.     Broken Words  .
+       row II   Lingering    RET. CRESC.   .             .
+       row III  Chain Sever  Long Arc      RIFT LINE     .
+       row IV   Wardrender   Spellthief    Wide Rift     Lasting Rift
+       row V    Splitting    Laid Bare     .             Deep Cut
+       row VI   .            UNMAKING      SHATTERED G.  .
+     chains: Keen Severance > Returning Crescent > Long Arc | Broken Words > Rift Line > Wide Rift > Shattered Ground |
+     Spellthief > Laid Bare > Unmaking | Wardrender > Splitting Edge | Lasting Rift > Deep Cut */
+  const at = name => T.list.findIndex(q => q.name === name || q.spell === name);
+  const cells = new Array(16), put = (name, r, c) => { const i = at(name); if (i < 0) { if (typeof console !== 'undefined') console.warn('severer tree: no cell for', name); return; } cells[i] = [r, c]; };
+  put('Keen Severance', 0, 1); put('Broken Words', 0, 2);
+  put('Lingering Severance', 1, 0); put('cc_shards', 1, 1);
+  put('Chain Sever', 2, 0); put('Long Arc', 2, 1); put('cc_nullfield', 2, 2);
+  put('Wardrender', 3, 0); put('Spellthief', 3, 1); put('Wide Rift', 3, 2); put('Lasting Rift', 3, 3);
+  put('Splitting Edge', 4, 0); put('Laid Bare', 4, 1); put('Deep Cut', 4, 3);
+  put('Unmaking', 5, 1); put('Shattered Ground', 5, 2);
+  if (cells.some(c => !c)) return;
+  // (the spell talents are moved here on purpose: their rows set first, so the layout keeps them where they are put)
+  for (const t of T.list) if (t.spell) { const c = cells[T.list.indexOf(t)]; t.r = c[0]; t.c = c[1]; }
+  const ch = (...names) => names.map(at);
+  T._ezLaid = false;
+  if (typeof ezLayout === 'function') ezLayout('conclave', SLOT, cells, [ch('Keen Severance', 'cc_shards', 'Long Arc'), ch('Broken Words', 'cc_nullfield', 'Wide Rift', 'Shattered Ground'), ch('Spellthief', 'Laid Bare', 'Unmaking'), ch('Wardrender', 'Splitting Edge'), ch('Lasting Rift', 'Deep Cut')]);
+  T.name = 'Severance';
+  if (FORCES.conclave.talEmblem) FORCES.conclave.talEmblem[SLOT] = at('Unmaking');
+  if (FORCES.conclave.talFlavor) FORCES.conclave.talFlavor[SLOT] = ['Every bond is a thread. Every thread can be cut.', 'Your priest cannot hear you from over there.'];
+  T.paths = [{ name: 'Spellbreaker', cap: 'Unmaking' }, { name: 'Rift Blade', cap: 'Shattered Ground' }];
+})();
+
+/* ---------------------------------------------------------------- the rules */
+// a foe Sever has cut off: no formation ties take it (game.js LINK_WHO), no heal mends it, no shield takes (wardFoe: nowardT)
+if (typeof LINK_WHO !== 'undefined') for (const k in LINK_WHO) { const f = LINK_WHO[k]; LINK_WHO[k] = function (o, c) { return !(o && o.sevCutT > G.time) && f.apply(this, arguments); }; }
+if (typeof healFoe === 'function') {
+  const _sevHeal = healFoe;
+  healFoe = function (o, amt) { if (o && o.sevCutT > G.time) return 0; return _sevHeal.apply(this, arguments); };
+}
+// the way each foe walks (Rift Line lies across it)
+if (typeof moveCreep === 'function') {
+  const _sevMove = moveCreep;
+  moveCreep = function (c, d) {
+    const x = c.x, y = c.y, r = _sevMove.apply(this, arguments), dx = c.x - x, dz = c.y - y;
+    if (dx * dx + dz * dz > 1e-8) { c._sevDx = (c._sevDx || 0) * .6 + dx * .4 / Math.hypot(dx, dz); c._sevDz = (c._sevDz || 0) * .6 + dz * .4 / Math.hypot(dx, dz); }
+    return r;
+  };
+}
+// the seams tick with the units; Broken Words looks only while a Severer with it stands (SEVK.hush, refreshed each tick)
+if (typeof updateTowers === 'function') {
+  const _sevUT = updateTowers;
+  updateTowers = function (dt) { if (!SEVK.late) sevLate(); const r = _sevUT.apply(this, arguments); try { SEVK.hush = G.towers.some(o => sevIs(o) && sevCaps(o).sevHush); sevSeamTick(); } catch (e) { if (!SEVK.err) { SEVK.err = e.message; console.warn('severer seams:', e); } } return r; };
+}
+// Broken Words: an enemy spell about to be cast within his reach fizzles (its timer starts again; the Severer gains mana)
+const SEV_SPELLS = [['heal', 'abT'], ['ward', 'wdT'], ['silence', 'slT'], ['cleanse', 'clT'], ['raise', 'rsT'], ['raiseC', 'rcT'], ['warcry', 'wcT']];
+if (typeof creepCast === 'function') {
+  const _sevCast = creepCast;
+  creepCast = function (c, dt) {
+    const d = c && c.def;
+    if (d && SEVK.hush) for (const [f, key] of SEV_SPELLS) {
+      if (!d[f] || (c[key] || 0) - dt > 0) continue;
+      const t = G.towers.find(o => sevIs(o) && sevCaps(o).sevHush && !(o._sevHushT > G.time) && Math.hypot(o.x - c.x, o.y - c.y) <= ((o.st && o.st.range) || 2.5));
+      if (!t) break;
+      c[key] = d[f][0]; t._sevHushT = G.time + SEVK.HUSH_EVERY - (sevCaps(t).sevHush || 1);
+      if (typeof gainMana === 'function') gainMana(t, SEVK.HUSH_MANA);
+      ccEv('cap:sevHush');
+      if (typeof SEVFX !== 'undefined') SEVFX.fizzle(t, c); else if (typeof fxSpark === 'function') fxSpark(c.x, c.y, hitH(c) + .2, '#b48cff', 6);
+      break;
+    }
+    return _sevCast.apply(this, arguments);
+  };
+}
+// Laid Bare: his crescents (his strike, Returning Crescent, a split half) on a foe Sever has cut off
+if (typeof ccHit === 'function') {
+  const _sevHit = ccHit;
+  ccHit = function (t, st, c, amt, o) {
+    if (sevIs(t) && c && c.sevCutT > G.time && st && st.caps && st.caps.sevBare && (SEVK.cres || (typeof DTAG === 'undefined' || DTAG !== AB_TAG))) { amt *= 1 + SEVK.BARE * st.caps.sevBare; ccEv('cap:sevBare'); }
+    return _sevHit.call(this, t, st, c, amt, o);
+  };
+}
+// his strike: Splitting Edge where it crosses a Rift Line, Shattered Ground where it lands, Deep Cut on a seam
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.cc_sever) {
+  const _sevAtk = FORCE_ATTACK.cc_sever;
+  FORCE_ATTACK.cc_sever = function (t, st, tg, pow, echo) {
+    const r = _sevAtk.apply(this, arguments), C = (st && st.caps) || {};
+    if (echo || !tg || !(C.sevSplit || C.sevShatter || C.sevDeep)) return r;
+    const tip = typeof unitTip === 'function' ? unitTip(t) : null, x0 = tip ? tip[0] : t.x, z0 = tip ? tip[2] : t.y, dl = Math.min(.22, .04 + Math.hypot(tg.x - t.x, tg.y - t.y) / 18);
+    G.delayed.push({ t: dl + .01, fn: () => {
+      if (G.state !== 'play' || !G.towers.includes(t)) return; const s = t.st || st;
+      if (C.sevSplit) for (const S of sevSeamsOf(t)) if (sevSegCross(S, x0, z0, tg.x, tg.y)) { sevSplitHit(t, s, tg.x, tg.y, tg, pow, 1, false); break; }
+      if (!tg.dead) sevSeamTouch(t, s, tg);
+      if (C.sevShatter) { const dx = tg.x - x0, dz = tg.y - z0, l = Math.hypot(dx, dz) || 1; sevSeam(t, s, tg.x, tg.y, dx / l, dz / l, SEVK.SH_LEN / 2, SEVK.SH_T, SEVK.SH_D, 1, true); }
+    } });
+    return r;
+  };
+}
+/* Broken Words in a force run: an enemy caster's spell (enemypools.js epCastDone) finishing within his reach is
+   interrupted instead (epInterrupt: its cooldown half spent), and he gains mana. enemypools.js and ui.js load after this
+   file: hooked on the first tick; a new game leaves no seams behind (beginGame, ui.js) */
+SEVK.late = 0;
+function sevLate() {
+  SEVK.late = 1;
+  if (typeof epCastDone === 'function' && typeof epInterrupt === 'function') {
+    const _sevDone = epCastDone;
+    epCastDone = function (c) {
+      if (SEVK.hush && c && c.epC) {
+        const t = G.towers.find(o => sevIs(o) && sevCaps(o).sevHush && !(o._sevHushT > G.time) && Math.hypot(o.x - c.x, o.y - c.y) <= ((o.st && o.st.range) || 2.5));
+        if (t) {
+          epInterrupt(c, true); t._sevHushT = G.time + SEVK.HUSH_EVERY - (sevCaps(t).sevHush || 1);
+          if (typeof gainMana === 'function') gainMana(t, SEVK.HUSH_MANA);
+          ccEv('cap:sevHush'); if (typeof SEVFX !== 'undefined') SEVFX.fizzle(t, c);
+          return;
+        }
+      }
+      return _sevDone.apply(this, arguments);
+    };
+  }
+  if (typeof beginGame === 'function' && !beginGame._sev) {
+    const _sevBegin = beginGame;
+    beginGame = function () { SEVK.seams = []; return _sevBegin.apply(this, arguments); };
+    beginGame._sev = 1;
+  }
 }
 
 /* ================= SIMPLE PASSIVES: THE GROVE (26 Nov 2026) =================
@@ -98228,9 +98670,9 @@ const SPELL_BRIEFS = {
   ch_summons: 'Moves all Judgement within {r} cells onto one foe: {d}, plus {d2} per stack past full.',
   ch_verdict: 'Marks a foe for {dur}s and adds 2 Judgement. If it dies, its Judgement passes to foes within {r} cells; if it lives, its Judgement fills and bursts at {gavelPct} strength.',
   /* conclave */
-  cc_sunder: 'Breaks every ward and shield on a foe and hits it for {d}, plus 60% of the wards she broke since her last spell. For {open}s, spells ignore its ward.',
-  cc_shards: 'Throws its glaive out and back, cutting foes near its path both ways: {d} a cut. Each cut breaks shields and takes 25% off a ward.',
-  cc_nullfield: 'Hooks up to {n} foes and slows them, then tears: wards and shields break, {d}, and for {sev}s they can\'t be shielded and spells ignore their wards.',
+  cc_sunder: 'A heavy crescent cuts a foe loose: {d}; its wards, shields and haste are stripped, and for {cut}s its supporters cannot help it.',
+  cc_shards: 'Throws a big crescent out and back, cutting every foe near its path both ways: {d} a cut.',
+  cc_nullfield: 'Slashes a glowing seam across the road ahead of the foes: for {dur}s it cuts every foe that crosses it for {d}.',
   ch_thousandfold: ({ d, v }) => `Looses 24 seeking missiles over a ${+(1.8 + (v('area') || 0)).toFixed(2)}-cell area in 2s: ${d(1)} each; every 6th strikes twice as hard.`,
   ch_unravel: 'Foes within {rr} cells take {d} each, +50% for each of Burning, Slowed and Stunned on them.',
   ch_mirrorweave: 'Over 3s, {n} bolts of the six elements hit foes within {rr} cells in turn: {d} each.',
@@ -98370,9 +98812,9 @@ const SPELL_TARGETS = {
   cc_pyresigil: 'the cone over the most ground foes',
   cc_kindle: 'the densest group of ground foes',
   cc_flamewave: 'the ground foe nearest the gate',
-  cc_sunder: 'the most warded foe in range',
-  cc_shards: 'the farthest warded foe in range',
-  cc_nullfield: 'up to 3 foes, warded first',
+  cc_sunder: 'the foe held up by the most supporters, or a warded one',
+  cc_shards: 'the farthest foe in range',
+  cc_nullfield: 'the road ahead of the thickest knot of foes',
   ch_thousandfold: 'the densest group of foes',
   ch_unravel: 'the densest group of rune-marked foes',
   ch_mirrorweave: 'the densest group of foes',
@@ -101046,7 +101488,7 @@ function fcIconHTML(g) {
 }
 // the next boss whose loot the Loot button opens (force runs: renown.js rnLootOn), or 0
 const fcLootWave = () => { try { if (typeof rnLootOn !== 'function' || !rnLootOn() || typeof rnNextBoss !== 'function') return 0; const ws = fcWaves(); return ws.length ? rnNextBoss(ws[0]) : 0; } catch (e) { return 0; } };
-const fcLootBtn = n => n ? `<button type="button" class="fc-lt" data-loot="${n}" aria-haspopup="dialog" aria-label="${fcEsc(`Boss loot: ${rnBossName(rnBossType(n))}, wave ${n}`)}">${fcSvg('chest')}<span>Loot</span></button>` : '';
+const fcLootBtn = n => n ? `<button type="button" class="fc-lt" data-loot="${n}" aria-haspopup="dialog" aria-label="${fcEsc(`Boss loot: ${rnBossName(rnBossType(n))}, wave ${wvShow(n)}`)}">${fcSvg('chest')}<span>Loot</span></button>` : '';
 // (no Loot button: the owner, 17 Nov 2026, "dont show loot table"; fcLootBtn is kept unused)
 /* ---- the cadence (core.js CADENCE): a small chip a special kind due in the next few waves, its icon, name and wave; its card
    says the rule ("Flyers on every wave ending in 3 or 8") and the next waves it holds. A rule this march breaks (a region's
@@ -101059,7 +101501,7 @@ function fcCadOk() { const o = {}; for (const C of CADENCE) { let ok = false; tr
 const fcCadEnd = () => Math.min(MAX_WAVE, typeof G !== 'undefined' && G && G.region && G.region.w1 ? G.region.w1 : MAX_WAVE);
 const fcCadCur = () => typeof G !== 'undefined' && G && G.phase !== 'build' ? G.wave | 0 : 0;
 // "this wave" (the wave being fought, or in the build phase the one the horn calls), "next wave" (the one after it, while a wave is on), "wave 14"
-function fcCadWhen(at) { const cur = fcCadCur(), nx = cur || (typeof G !== 'undefined' && G ? G.wave | 0 : 0); return at === nx ? 'this wave' : cur && at === cur + 1 ? 'next wave' : 'wave ' + at; }
+function fcCadWhen(at) { const cur = fcCadCur(), nx = cur || (typeof G !== 'undefined' && G ? G.wave | 0 : 0); return at === nx ? 'this wave' : cur && at === cur + 1 ? 'next wave' : 'wave ' + wvShow(at); }
 // the cadence's kinds due from wave n0 on (within FC_CAD_AHEAD waves), soonest first: [{ C, at }]. While a wave is on, from that
 // wave (its own specials read "this wave"). None in a Hunt (its waves are the quarry's escort) or Act II; never past the battle's end
 function fcCadence(n0) {
@@ -101162,7 +101604,7 @@ function fcLootOpen(n, btn) {
 function fcLootFill() {
   let h = ''; try { h = rnLootBossHTML(fcLootFor); } catch (e) { console.error(e); h = ''; }
   if (!h) return false;
-  fcLootEl.setAttribute('aria-label', `Boss loot, wave ${fcLootFor}`);
+  fcLootEl.setAttribute('aria-label', `Boss loot, wave ${wvShow(fcLootFor)}`);
   fcLootEl.innerHTML = `<button type="button" class="fl-x" aria-label="Close">${typeof X_SVG !== 'undefined' ? X_SVG : '×'}</button><h4>Boss loot</h4>${h}`;
   return true;
 }
@@ -101509,204 +101951,94 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -101715,207 +102047,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -102026,7 +102226,7 @@ function slotsNow() {
   s[11] = canHorn || !canSend
     ? { key: canHorn ? 'horn' : 'horn:off', lbl: 'Wave', on: canHorn, pulse: canHorn && G.wave === 1 && G.towers.length > 2, name: 'Sound the horn', hk: 'Enter',
         act: () => { if (canHorn) callWave(); else toast(G.calm && typeof calmOn === 'function' && calmOn() && (G.endless || G.wave < MAX_WAVE) ? 'Calm pace: the next wave waits until this one is done.' : 'The last wave is already on the field.'); } }
-    : { key: 'horn', lbl: armed ? 'Sure?' : 'Next', on: true, warn: armed, name: `Send wave ${G.wave + 1} early`, hk: 'Enter', cost: '+' + sendBonus(G.wave + 1), act: sendEarly };
+    : { key: 'horn', lbl: armed ? 'Sure?' : 'Next', on: true, warn: armed, name: `Send wave ${wvShow(G.wave + 1)} early`, hk: 'Enter', cost: '+' + sendBonus(G.wave + 1), act: sendEarly };
   if (TW) { s[11] = twSendSlot(); if (TW.menu && !G.sel && !G.buildType) return twSlots(s); }   // Tower Wars: the horn is the shared clock's; this slot sends minions
   const sel = G.sel;
   if (sel && sel.kind === 'box') { boxPrune(); if (G.sel && G.sel.kind === 'box') s[10] = boxSellSlot(); return s; }
@@ -102175,7 +102375,7 @@ function tickCardCool(dt) {
 function sendEarly() {
   if (!canSendNext()) return;
   if (sendArm > performance.now()) { sendArm = 0; sendNextWave(); }
-  else { sendArm = performance.now() + 2500; sfx('click'); toast(`Tap again to send wave ${G.wave + 1} now for +${sendBonus(G.wave + 1)} gold.`); setTimeout(markDirty, 2600); }
+  else { sendArm = performance.now() + 2500; sfx('click'); toast(`Tap again to send wave ${wvShow(G.wave + 1)} now for +${sendBonus(G.wave + 1)} gold.`); setTimeout(markDirty, 2600); }
   markDirty();
 }
 function onCmd(k) {
@@ -102323,7 +102523,7 @@ function infoHTML() {
       + (d.wall ? '' : `<div class="st">${statLine(ty, 0, talentStats(ty, 0, talentRank(ty)), st)}</div>`) + (typeof druidBuildHTML === 'function' ? druidBuildHTML(ty) : '') + (d.wall ? '' : vsWaveHTML(ty)) + (d.wall ? '' : synSummaryHTML()) + (cap ? `<div class="tags" data-d="3">${cap}</div>` : '');
   }
   const w = describeWave(G.wave);
-  const fl = G.inFlight || [], head = G.phase === 'wave' ? (fl.length > 1 ? `Waves ${fl[0]}–${G.wave} are attacking` : `Wave ${G.wave} is attacking`) : `Next: wave ${G.wave}`;
+  const fl = G.inFlight || [], head = G.phase === 'wave' ? (fl.length > 1 ? `Waves ${wvShow(fl[0])}–${wvShow(G.wave)} are attacking` : `Wave ${wvShow(G.wave)} is attacking`) : `Next: wave ${wvShow(G.wave)}`;
   if (phoneUI() && !TW && !G.vs && waveChief(G.wave)) return chiefHTML(w, head);   // phones: the boss card lives here instead of over the field
   const DL = w.dungeon && w.leader && CREEPS[w.leader];   // the dungeon card: who leads it, the threat and its answer, then the detail if there's room
   return (DL ? `<h3>${w.dungeon.name}${w.boss ? ' <span class="boss">Boss</span>' : ''}</h3><p class="lead" data-d="3"><b>${DL.name}</b><span data-d="2">, ${DL.title}</span>${!TW && !G.vs && keyCarried(G.wave, w.leader) ? `<span class="trophy" data-d="2"> · carries a School Key</span>` : ''}</p>${affHTML(G.wave)}${problemHTML(w)}${w.rule && !oldRules() ? '' : `<p class="plan">${w.dungeon.plan}</p>`}<p class="mut" data-d="2">${DL.eco}</p>${DL.kit ? `<p class="spells" data-d="2">Casts ${DL.kit.map(k => `<b>${k.name}</b>`).join(' · ')}</p>` : ''}<p class="mut" data-d="1">${head} · with ${w.names}</p>`
@@ -102664,10 +102864,10 @@ function hud() {
   else { const iv = play && G.state === 'play' ? interestNow() : 0; setText('hInt', iv > 0 ? '+' + iv : ''); const tl = iv > 0 ? `Gold · ${Math.round(interestRate() * 100)}% interest when the wave is cleared: +${iv}` : (G.region ? 'Gold · no interest in a Homeland battle: your land sends supplies between battles' : 'Gold · hold 100 or more to earn interest when a wave is cleared'); const skn = play && G.state === 'play' ? streakN() : 0, tl2 = tl + (skn ? ` · Flawless streak ×${skn}: +${skn * 10}% gold from kills and wave bonuses` : ''); if (hudCache.goldT !== tl2) { hudCache.goldT = tl2; document.getElementById('rGold').title = tl2; } }
   setText('hLives', play ? String(Math.max(0, G.lives)) : '—');
   { const on = play && rallied(), lt = play && typeof lvTipTxt === 'function' ? lvTipTxt() : '', rk = on + ':' + lt; if (hudCache.rally !== rk) { hudCache.rally = rk; const el = document.getElementById('rLives'); el.classList.toggle('rally', on); el.title = (on ? (G.force ? 'Lives · Last Stand: you are below half your lives, so kills pay 25% more gold and your units deal 15% more damage' : 'Lives · your keep rallies: kills pay 25% more and towers hit 15% harder') : 'Lives') + (lt ? ' · ' + lt : ''); } }   // lvTipTxt: how lives come back (lives.js, force runs)
-  setText('hWave', play ? String(TW ? Math.max(1, TW.wave) : G.wave) : '—');
+  setText('hWave', play ? String(TW ? Math.max(1, TW.wave) : wvShow(G.wave)) : '—');
   { const sk = play && !TW && G.state === 'play' ? streakN() : 0; setText('hStk', sk ? '+' + sk * 10 + '%' : ''); if (hudCache.stkOn !== !!sk) { hudCache.stkOn = !!sk; document.getElementById('hStk').hidden = !sk; } }
   xpHud();   // the XP bar (force runs)
-  setText('hOf', TW ? '/' + (TW.coop && typeof CO_WAVES !== 'undefined' ? CO_WAVES.length : TW_LAST) : play && (G.endless || G.wave > MAX_WAVE) ? '' : '/' + MAX_WAVE);
+  setText('hOf', TW ? '/' + (TW.coop && typeof CO_WAVES !== 'undefined' ? CO_WAVES.length : TW_LAST) : play && (G.endless || G.wave > MAX_WAVE) ? '' : '/' + wvOf());
   let tm = '';
   if (play && G.state === 'play') {
     if (G.phase === 'build') tm = (G.wave === 1 || G.calm) && G.countdown <= 0 ? 'Ready' : Math.ceil(G.countdown) + 's';
@@ -116587,15 +116787,16 @@ const LB2 = (() => {
      idle       no foe in reach: at ease, a sword low in each hand
      ready      a foe in reach: his guard: the right blade cocked back over his shoulder, the left low before him, its point
                 at the foe
-     cutA/B/C   his blows (FORCE_ATTACK.so_slam; 24 frames, the blow on frame 8): the right blade's falling diagonal and its
-                backhand back up, the left's level sweep and its backhand, then both falling together and thrown open like
-                wings (the Twin Cut). Which one is the game's own word
-                where it gives it (t.tpCut: 0 right, 1 left, 2 both, set on every blow with t.soSlamAt: the dual-wield
-                kit), else they are taken in turn. Each is begun its own hit frame early so the blades are through the foe
-                on the game's blow, and is paced to the blows' own interval; the edge leads every cut (the bake turns each
-                sword in its fist to it)
-     cross      Cross-Cut (so_crush): both swords crossed high over his head, then drawn apart down and out like scissors,
-                0.58 s after the cast
+     cutA/B/C   his blows (FORCE_ATTACK.so_slam; 24 frames, the blow on frame 8), one blade at a time (27 Nov 2026, owner:
+                "should do a swing with one sword then the other, dont like attacking with both at the same time"): the
+                right blade's falling diagonal; the left's level sweep; and the Twin Cut, a quick one-two (the right
+                sweeps and lands on the blow, the left comes over five frames after it: cutC; cutD is its mirror, the left first). The blade that is not cutting
+                stays forward in his guard; each cut ends in a wrist roll back into it. Which one is the game's own word
+                where it gives it (t.tpCut: 0 right, 1 left, 2 the Twin Cut, set on every blow with t.soSlamAt: the
+                dual-wield kit), else they are taken in turn. Each is begun its own hit frame early so the blade is
+                through the foe on the game's blow, and is paced to the blows' own interval; the edge leads every cut
+     cross      Cross-Cut (so_crush): two cuts in a rhythm: the left blade's sweep (frame 8), then the right's long
+                falling diagonal on the game's blow, 0.58 s after the cast
      flurry5-7  Whirling Flurry (so_hallow), choreographed whole for the 5, 6 and 7 cuts the game counts (t.socFerv): the
                 first cut (0.15 s after the cast) throws his right blade out and pulls him into the whirl, arms wide, one
                 blade high and one low changing places with every cut (one every 0.3 s); he sheds the turn to face the foe
@@ -116613,9 +116814,22 @@ const LB2 = (() => {
    tier; he grows by UM_TIER.
    Checks: `python tools/make_tp2.py --check`. Notes: docs/model_pilot/templar2.md. */
 const TP2 = (() => {
-  const U = 'templar', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'cross', 'flurry5', 'flurry6', 'flurry7', 'heaven', 'heaven2', 'hit', 'death', 'leg'];
+  const U = 'templar', NAMES = ['idle', 'ready', 'cutA', 'cutB', 'cutC', 'cutD', 'cross', 'flurry5', 'flurry6', 'flurry7', 'heaven', 'heaven2', 'hit', 'death', 'leg'];
   const CUTS = ['cutA', 'cutB', 'cutC'], EASE = .2, BLOW = .3, SPD_CUT = 1.1, STOP = .04;   // (STOP: a cut's blow is held this long, the blade stopped in the foe: weight)
   const MV = { so_crush: 'cross', so_hammerfall: 'heaven' };
+  // FLOW (27 Nov 2026, owner: "looks too mechanical still, needs to look like fluid movement"): his blows were a still guard,
+  // a wind-up of 8 frames begun at full speed, the cut, a recovery at the clip's own pace, and the still guard again. Now
+  // (S.flow, on): the wind-up is begun earlier and slowly, and gathers speed into the cut (a: its last seconds at full speed;
+  // b: the seconds over which it eases from `slow` of it); the recovery and wrist roll are spread over the time to the next
+  // wind-up (no slower than `rec` of full speed), so one cut runs on into the next; each cut's pace differs a little from
+  // the last (`vary`); and he is eased into each clip over `ease` seconds, not snapped.
+  const FLOW = { a: .10, b: .10, slow: .35, rec: .42, vary: .12, ease: .32, rate: 20 };
+  const flowG = (cd, spd, v) => {   // (how far before the blow, in the clip's seconds, a wind-up is with cd seconds to go)
+    const x = Math.max(0, Math.min(1, (cd - FLOW.a) / FLOW.b)), I = cd <= FLOW.a ? 0 : FLOW.b * (x * x * x - x * x * x * x / 2) + Math.max(0, cd - FLOW.a - FLOW.b);
+    return spd * (cd - (1 - FLOW.slow * v) * I);
+  };
+  const flowW = (HIT, spd, v) => { const k = FLOW.slow * v; return Math.max(HIT / spd, (HIT / spd - (1 - k) * (FLOW.a + FLOW.b / 2)) / k); };   // (and how long the whole wind-up takes)
+  const flowV = n => 1 + FLOW.vary * Math.sin((n || 0) * 2.4);
   const FL_AT = .15, FL_IV = .3, OUT_AT = .3, BACK_AT = 1.35, STAR2 = .4, PARRY = .2;   // (the game's own times: the flurry's first cut and its interval; the sword leaves the hand and is back in it; the Second Star's sword that long after the first)
   const BASE_H = .05;
   const S = { on: true, err: null };
@@ -116727,6 +116941,17 @@ const TP2 = (() => {
 
   /* what he does now: { c: clip, s: seconds into it, rate (how fast the pose follows), mv (a new move is eased into) } */
   const hitOf = c => (CL[c] && CL[c].hit != null ? CL[c].hit : 8) / 30;
+  // which clip a cut of the game's is (0 right, 1 left, 2 the Twin Cut): the Twin Cut's first blade is the other to his last
+  // single cut's (t.tpSide, which a Twin Cut leaves as it was), so his blades always take turns: right, left, right-left, right ...
+  const twinOf = t => (t.tpSide ? 'cutC' : 'cutD');
+  const cutOf = (t, k) => (k === 2 ? twinOf(t) : CUTS[k]);
+  // the cut the game will make next, for its wind-up (FORCE_ATTACK.so_slam's own rule: the sides in turn, a Twin Cut when a
+  // talent's count comes due); it was taken as the next of right, left, Twin Cut, and wound up a Twin Cut the game did not make
+  const nextCut = t => {
+    let tw = false;
+    try { const st = t.st, C = (st && st.caps) || {}, every = C.tpRhythm >= 2 && tpMomFull(t, st) ? 2 : 3; tw = (t.tpCutN || 0) + 1 >= every && tpTwinOn(t, st); } catch (e) {}
+    return tw ? twinOf(t) : t.tpSide ? 'cutA' : 'cutB';
+  };
   function ctl(t, live) {
     if (!live) return { c: 'idle', s: typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle' };
     const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
@@ -116751,9 +116976,9 @@ const TP2 = (() => {
         if (c && sc < c.len) return own({ c: 'flurry' + nc, s: sc, rate: 40, mv: 'ab' + A.lastAt });
       }
     }
-    // Parry and Riposte (the dual-wield kit: t.tpParryAt at the blow he parries, the answering Twin Cut PARRY later): the crossing
-    // cut begun so that its blades are crossed before him on the parry and thrown open on the riposte
-    if (t.tpParryAt != null) { const u = now - t.tpParryAt; if (u >= 0 && u < PARRY) return { c: 'cutC', s: hitOf('cutC') - (PARRY - u), rate: 60, mv: 'parry' + t.tpParryAt }; }
+    // Parry and Riposte (the dual-wield kit: t.tpParryAt at the blow he parries, the answering Twin Cut PARRY later): the Twin
+    // Cut begun so that its first blade lands on the riposte
+    if (t.tpParryAt != null) { const u = now - t.tpParryAt; if (u >= 0 && u < PARRY) { const pc = twinOf(t); return { c: pc, s: hitOf(pc) - (PARRY - u), rate: 60, mv: 'parry' + t.tpParryAt }; } }
     // the blows: a new one counted (by the game's count, or by its own time for the blow where a talent adds one without a
     // count). Which cut: the game's word (t.tpCut) where it gives it, else taken in turn
     const slamAt = t.soSlamAt != null && t.soSlamAt <= now ? t.soSlamAt : null, word = t.tpCut != null && t.tpCut >= 0 && t.tpCut <= 2;
@@ -116761,17 +116986,23 @@ const TP2 = (() => {
       const at = slamAt != null ? slamAt : now - (t.shotT || 0);
       if (t._tpAt != null && at > t._tpAt && at - t._tpAt < 2) t._tpIv = at - t._tpAt;
       t._tpAt = at; t._tpShots = t.shots; t._tpSlam = slamAt; t._tpCutN = (t._tpCutN || 0) + 1;
-      t._tpLast = word ? CUTS[t.tpCut] : t.tpCut === 3 ? 'cross' : CUTS[t._tpCutN % 3];
+      t._tpLast = word ? cutOf(t, t.tpCut) : t.tpCut === 3 ? 'cross' : CUTS[t._tpCutN % 3];
     }
     const spd = t._tpIv ? Math.min(2.2, Math.max(1, CL.cutA.len / t._tpIv)) : SPD_CUT;
     const fight = G.phase === 'wave' && t.tg && !t.tg.dead, s = t._tpAt != null ? now - t._tpAt : t.shotT == null ? 9 : t.shotT;
-    const last = t._tpAt != null || t.shots ? t._tpLast : null, lh = last ? hitOf(last) : 0, inStrike = last && CL[last] && s >= 0 && s < (CL[last].len - lh) / spd + STOP;
+    const flow = S.flow !== false, last = t._tpAt != null || t.shots ? t._tpLast : null, lh = last ? hitOf(last) : 0;
+    const v0 = flowV(t._tpCutN), v1 = flowV((t._tpCutN || 0) + 1), RT = flow ? FLOW.rate : 40;
+    // the recovery's pace: the clip's own, or (flow) spread over the time until the next wind-up begins
+    let rs = spd;
+    if (flow && last && CL[last] && t._tpIv && last !== 'cross') { const avail = t._tpIv - flowW(hitOf('cutA'), spd, v1) - STOP - .04; rs = Math.max(FLOW.rec * spd, Math.min(spd, (CL[last].len - lh) / Math.max(.05, avail))) * (1 + (1 - v0) * .4); }
+    const inStrike = last && CL[last] && s >= 0 && s < (CL[last].len - lh) / rs + STOP;
     const sg = Math.max(0, s - STOP);   // (the time since the blow, less the held moment)
     if (fight) {
-      const nx = word ? CUTS[(t.tpCut + 1) % 3] : CUTS[((t._tpCutN || 0) + 1) % 3], cd = t.cd || 0, HIT = hitOf(nx);
-      if ((t.windup || 0) > 0 && cd < HIT / spd && !(inStrike && s < BLOW)) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx + t.shots };   // (begun: through the foe on the blow)
-      if (inStrike) return { c: last, s: lh + sg * spd, rate: 40, mv: last + t._tpAt };
-    } else if (inStrike) return { c: last, s: lh + sg * spd, rate: 40, mv: last + t._tpAt };
+      const nx = word ? nextCut(t) : CUTS[((t._tpCutN || 0) + 1) % 3], cd = t.cd || 0, HIT = hitOf(nx);
+      if (flow) { const g = flowG(cd, spd, v1); if (g < HIT && !(inStrike && s < BLOW)) return { c: nx, s: HIT - g, rate: RT, mv: 'pre' + nx + t.shots }; }   // (begun early and slowly: through the foe on the blow)
+      else if ((t.windup || 0) > 0 && cd < HIT / spd && !(inStrike && s < BLOW)) return { c: nx, s: HIT - cd * spd, rate: 40, mv: 'pre' + nx + t.shots };   // (begun: through the foe on the blow)
+      if (inStrike) return { c: last, s: lh + sg * rs, rate: RT, mv: last + t._tpAt };
+    } else if (inStrike) return { c: last, s: lh + sg * rs, rate: RT, mv: last + t._tpAt };
     const h = t._tpHitAt != null ? now - t._tpHitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._tpHitAt };
     if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready' };
     return { c: 'idle', s: ph, rate: 5, mv: 'idle' };
@@ -116802,8 +117033,9 @@ const TP2 = (() => {
     if (live) {
       const now = G.time, dt = t._tpT == null ? 1 : Math.max(0, Math.min(.1, now - t._tpT)); t._tpT = now;
       if (!t._tpP || t._tpP.q.length !== NB * 4) { t._tpP = newPose(); t._tpP.q.set(PT.q); t._tpP.t.set(PT.t); }
-      if (P.mv !== t._tpMv) { t._tpMv = P.mv; t._tpSw = now; }
-      const k = now - t._tpSw < EASE ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 ? 1 : 1 - Math.exp(-dt * P.rate * 3));
+      const flow = S.flow !== false, ez = flow ? FLOW.ease : EASE;
+      if (P.mv !== t._tpMv) { if (!flow || P.c !== t._tpMvC) t._tpSw = now; t._tpMv = P.mv; t._tpMvC = P.c; }   // (flow: a wind-up running on into its own cut is one move: no second easing-in at the blow)
+      const k = now - t._tpSw < ez ? 1 - Math.exp(-dt * Math.max(P.rate, 12)) : (P.rate >= 40 || (flow && P.rate === FLOW.rate) ? 1 : 1 - Math.exp(-dt * P.rate * 3));
       follow(t._tpP, PT, k); pose = t._tpP;
     }
     toBones(pose, OUT);
@@ -116838,7 +117070,7 @@ const TP2 = (() => {
        and added light does not show on white) with a white-hot core, a small flash where the blade met it, three sparks.
      The Blade Dancer's method (bladefollow.js), as the Oathbound's (obTrail). Nothing is built on the model. */
   const TR = { life: .19, body: [.74, .84, 1.0], rim: [1.4, 1.48, 1.6], hot: [1.6, 1.66, 1.75], cut: [1.0, .84, .42], bands: [0, .3, .6, .86, 1], opac: [0, .15, .4, .74, .6], from: .2, add: .55, gain: .85, slash: .17, off: 0, strips: 0, slashes: 0, err: null };
-  const SWING = { cutA: 1, cutB: 1, cutC: 1, cross: 1, flurry5: 1, flurry6: 1, flurry7: 1, leg: 1 };
+  const SWING = { cutA: 1, cutB: 1, cutC: 1, cutD: 1, cross: 1, flurry5: 1, flurry6: 1, flurry7: 1, leg: 1 };
   function trail(t, side, w, s) {
     if (TR.off) return;
     const now = G.time, b = side === 'R' ? BI.swordR : BI.swordL, g = side === 'R' ? MK.gripR : MK.gripL, tp = side === 'R' ? MK.tipR : MK.tipL, e = EDGE[side] || [0, 0, 0];
@@ -116885,9 +117117,9 @@ const TP2 = (() => {
     if (TR.off) return;
     const now = G.time, ok = typeof VX !== 'undefined' && VX && typeof VT !== 'undefined' && typeof vfxRb !== 'undefined' && typeof vfxReady === 'function' && vfxReady();
     // a new blow of the game's (ctl counts them into t._tpAt): a streak for each blade that cut
-    if (t._tpAt != null && t._tpSlAt !== t._tpAt && now - t._tpAt < .06 && now >= t._tpAt && t.tg && !t.tg.dead && CUTS.includes(t._tpLast)) {
+    if (t._tpAt != null && t._tpSlAt !== t._tpAt && now - t._tpAt < .06 && now >= t._tpAt && t.tg && !t.tg.dead && /^cut/.test(t._tpLast || '')) {
       t._tpSlAt = t._tpAt; const tg = t.tg, r = (tg.def && tg.def.r) || .2, top = (typeof hitH === 'function' ? hitH(tg) : .5) + .15; t._tpSl = [];
-      for (const side of t._tpLast === 'cutA' ? ['R'] : t._tpLast === 'cutB' ? ['L'] : ['R', 'L']) {
+      for (const side of t._tpLast === 'cutA' || t._tpLast === 'cutC' ? ['R'] : ['L']) {   // (the blade that lands on the game's blow: a Twin Cut's first)
         const H = t['_tpTr' + side]; if (!H || H.length < 2) continue;
         const a = H[0].p, b = H[Math.min(H.length - 1, 3)].p; let v = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], l = Math.hypot(v[0], v[1], v[2]); if (l < .01 * s) continue;
         const d = Math.hypot(tg.x - a[0], tg.y - a[2]) || 1, q = Math.min(d, r), cy = Math.max(.15, Math.min(a[1], top));
@@ -116970,7 +117202,7 @@ const TP2 = (() => {
       if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('tp2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
     }
   });
-  return { S, CL, TR, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
+  return { S, CL, TR, FLOW, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
 })();
 
 /* The Censer Bearers on a rig and clips made from scratch (the owner, 22 Nov 2026: "Silver Order - Templar and Censer
@@ -129352,7 +129584,7 @@ function rnLootBossHTML(n) {
   const rel = all.replace(wre, '').replace(hre, '').replace(/<span class="rn-icons wp-icons"><\/span>/g, '');
   const off = RN_LOOT.offer;
   const sec = (h, body, icons) => `<div class="rn-lp-s"><h5>${h}</h5>${body ? `<p>${body}</p>` : ''}${icons}</div>`;
-  return `<p class="rn-lp-t"><small>${k <= 0 ? 'Boss this wave' : k === 1 ? 'Boss next wave' : `Boss in ${k} waves`} · wave ${n}</small><b>${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<i>${rnEsc(rnTable(t).say)}</i></p>`
+  return `<p class="rn-lp-t"><small>${k <= 0 ? 'Boss this wave' : k === 1 ? 'Boss next wave' : `Boss in ${k} waves`} · wave ${wvShow(n)}</small><b>${rnEsc(rnBossName(t))}</b>${R.pledge[n] ? ' <em class="rn-pl">Pledged</em>' : ''}<i>${rnEsc(rnTable(t).say)}</i></p>`
     + sec('Loot', `When it falls it offers ${off} of these, free: take one.${wp.length ? ' Its weapons are made for units you field.' : ''}`, rnLootRows(t, n))
     + (hw.length ? sec('Hero weapon', 'Your commander\'s next weapon stage can be one of the choices.', `<span class="rn-icons">${hw.join('')}</span>`) : '')
     + (tomeW.includes(n) ? rnTomeLine() : '')
@@ -131209,6 +131441,66 @@ const RG_WAY = [0, .25, .45, .65];
 const RG_TIER_W = { 1: 2, 2: 9, 3: 18, 4: 28, 5: 36 };
 // a pip of the war's strength on a place (rgPipsAt): waves 2 later, foes 8% more health, reward 25% more; a patrol's reward by how many came before it
 const RG_STEP = { w: 2, hp: .08, pay: .25 };
+/* ---- Dynamic difficulty (owner, 28 Nov 2026: "seems silly to go up against waves out of order", then "i think it should be dynamic,
+   so each new location offers a genuine challenge, but the challenge is ratcheted up when you go up against a location with the
+   enemy army garrisoned, so there will be more enemies and harder ones interspersed with higher rewards"):
+   - a battle is RG_DYN.len waves, shown as waves 1 to 7, its boss on the last (rgApplyWaves moves it there);
+   - what they are drawn from (the run's waves, their foes, health and gold) follows the warband's progress, a curve: a step of
+     RG_DYN.step waves a battle won (rgWins), a step up or down when its level or its gear's item level is well ahead of or behind
+     that (RG_DYN.ahead waves), a step for most of the land held (RG_DYN.act), a step for a deep place (RG_DYN.tier). Nothing
+     measures the army itself, so holding back cannot game it. The first places keep their own gentle waves (no surprises), the
+     lair its last seven;
+   - an empty place is Normal (a deep one Hard); the war's presence ratchets it (RG_RATCHET): a garrison a step, a band a step,
+     the Main Host two, each with its squads in the waves (rgTroops) and more gold for the win. ---- */
+const RG_DYN = { len: 7, w1: 10, step: 5, lvlK: .9, ahead: 6, act: .6, max: 45, easyWin: .7 };
+/* Depth (owner, 28 Nov 2026: "Yes, add depth step"; the choice he wants: "a choice between going for something easier with less
+   reward and biding your time vs going up against something difficult because you feel powerful enough to take it on and get the
+   higher reward"): a place a road or two past your frontier (its roads from the nearest place you hold or your host stands on, less one) is a step harder
+   each (a star, RG_DYN.step waves later), at most RG_DEPTH.cap, and pays more for it: gold (pay), drop odds (loot). A place on
+   your frontier stays at the base, so an easier fight is always near. Any win above Normal pays Renown too (RG_DEPTH.rn a star).
+   Biding your time: a win at the base counts RG_DYN.easyWin of a step on the curve, so an easy fight still leaves the warband a
+   little ahead (its gear, gold and levels for seven waves), while the warlord musters and his armies march meanwhile. */
+const RG_DEPTH = { cap: 2, pay: .5, loot: .35, rn: 1 };
+function rgDepth(R, id) {
+  const n = rgNode(R, id); if (!n || n.kind === 'lair' || (n.tier || 1) <= RG_GENTLE.tier || rgMine(R, id)) return 0;
+  const d = {}, q = []; for (const m of rgDef(R).nodes) if (rgMine(R, m.id) || m.id === R.at) { d[m.id] = 0; q.push(m.id); }   // (where the host stands is a foothold: an easier fight is always near it)
+  while (q.length) { const c = q.shift(); for (const nb of rgNb(R, c)) if (d[nb] == null) { d[nb] = d[c] + 1; q.push(nb); } }
+  return clamp((d[id] == null ? 1 : d[id]) - 1, 0, RG_DEPTH.cap);
+}
+// the Renown a won battle pays for being harder than Normal
+const rgRnFor = (R, S) => S.kind === 'waylay' || S.kind === 'patrol' ? 0 : RG_DEPTH.rn * Math.max(0, rgDiff(R, S).k - 2);
+const RG_RATCHET = { gar: { k: 1, pay: .5 }, band: { k: 1, pay: .5 }, main: { k: 2, pay: 1 } };
+// battles won (a run from before they were counted: the places it holds)
+function rgWins(R) { if (R.wins != null) return R.wins | 0; return rgDef(R).nodes.filter(n => !n.start && R.st[n.id] && R.st[n.id].s === 'held').length; }
+// the run's wave the warband's progress stands at: w, and its parts
+function rgProgW(R) {
+  const B = R.band || {}, wins = rgWins(R), wW = RG_DYN.w1 - RG_DYN.len + 1 + RG_DYN.step * wins, cmp = w => w > wW + RG_DYN.ahead ? 1 : w < wW - RG_DYN.ahead ? -1 : 0;
+  const lv = B.raised && typeof xpLevelOf === 'function' ? xpLevelOf(B.xp || 0) : 0, lvA = lv > 1 ? cmp(lv / RG_DYN.lvlK) : 0;
+  const ils = (B.loot || []).concat(R.maze ? rgMazeItems(R.maze) : []).map(it => +(it && it.il) || 0).filter(x => x > 0).sort((a, b) => b - a).slice(0, 8);
+  const ilA = ils.length >= 3 ? cmp(ils.reduce((a, b) => a + b, 0) / ils.length) : 0;
+  const all = rgDef(R).nodes.filter(n => !n.start), held = all.filter(n => R.st[n.id] && R.st[n.id].s === 'held').length, actA = all.length && held / all.length >= RG_DYN.act ? 1 : 0;
+  const adj = clamp(lvA + ilA + actA, -1, 2);
+  return { wins, lv, lvA, ilA, actA, adj, w: Math.max(2, wW + RG_DYN.step * adj) };
+}
+// a place's waves [first, last] in the run's count (what they are drawn from)
+function rgWavesAt(R, n) {
+  if (n.kind === 'lair') return [MAX_WAVE - RG_DYN.len + 1, MAX_WAVE];
+  if ((n.tier || 1) <= RG_GENTLE.tier) { const a = n.w ? n.w[0] : RG_TIER_W[1]; return [a, a + RG_DYN.len - 1]; }
+  const w1 = clamp(Math.round((rgProgW(R).w + RG_DYN.len - 1 + RG_DYN.step * rgDepth(R, n.id)) / 5) * 5, RG_DYN.w1, RG_DYN.max);   // (a deep place: a step later a road past the frontier)
+  return [w1 - RG_DYN.len + 1, w1];
+}
+// what the war's presence at a place adds: the rating's steps, the reward's share, a line each
+function rgRatchet(P) {
+  const parts = [];
+  if (P.gar) parts.push({ who: 'gar', k: RG_RATCHET.gar.k, pay: RG_RATCHET.gar.pay });
+  for (const a of P.armies) { const X = a.main ? RG_RATCHET.main : RG_RATCHET.band; parts.push({ who: a.id, k: X.k, pay: X.pay }); }
+  return { parts, k: parts.reduce((s, p) => s + p.k, 0), payK: 1 + parts.reduce((s, p) => s + p.pay, 0) };
+}
+// the waves as the player sees them: 1 to 7 (the run's count stays inside: S.w0..S.w1)
+const rgWv = (S, w) => S && S.w0 ? w - S.w0 + 1 : w;
+const rgWvN = S => S.w1 - S.w0 + 1;
+function rgWaveShown(n) { const S = typeof G !== 'undefined' && G && !G.vs && G.region; return S && S.w0 ? n - S.w0 + 1 : n; }
+function rgWavesOf() { const S = typeof G !== 'undefined' && G && !G.vs && G.region; return S && S.w0 ? S.w1 - S.w0 + 1 : 0; }
 /* The first places (tier 1: Mossford, Fernwatch, the roads between them) are where a new player learns the map (owner, 20 Nov
    2026: "difficulty for fernwatch and mossford are too difficult"; the first ten waves are easy, with no surprises): no boss
    (its wave brings a few more of the rank and file), only the faction's melee and quick foes and at most one armoured foe a
@@ -131577,8 +131869,7 @@ function rgTroops(R, id, w0, w1, lord) {
     for (let i = 0; i < n; i++) out.push({ type: ks[i % ks.length], count: sq, w: late[i % late.length], hpK: RG_TROOPS.hpK, from: a.id });
     const cmd = typeof rgArmyCmd === 'function' ? rgArmyCmd(R, a) : null;
     if (cmd && CREEPS[cmd] && cmd !== lord) {
-      const bw = w => w % 5 === 0 && !(rgNode(R, id).kind === 'trouble' && rgNode(R, id).tier <= RG_GENTLE.tier);   // (a boss wave, as a force run has them: core.js bossWave, which reads Classic's rules on the map)
-      const cw = bw(w1) && w1 - 1 >= w0 ? w1 - 1 : w1;
+      const cw = (rgNode(R, id).tier || 1) > RG_GENTLE.tier && w1 - 1 >= w0 ? w1 - 1 : w1;   // (the boss is last: rgApplyWaves; a first place has none)
       out.push({ type: cmd, count: 1, w: cw, hpK: RG_TROOPS.cmdHp, from: a.id, cmd: true });
     }
   }
@@ -131599,14 +131890,20 @@ function rgTroopLines(R, S) {
     const L = by[k], sq = L.filter(t => !t.cmd), cm = L.find(t => t.cmd), a = k === 'gar' ? null : (R.war && R.war.armies.find(x => x.id === k));
     const kinds = [...new Set(sq.map(t => t.type))], from = sq.length ? Math.min(...sq.map(t => t.w)) : null, to = sq.length ? Math.max(...sq.map(t => t.w)) : null;
     const fly = kinds.some(t => CREEPS[t].fly), face = t => { const im = typeof rgFoeImg === 'function' ? rgFoeImg(t) : ''; return im ? `<img alt="" src="${im}" title="${rgEsc(CREEPS[t].name)}">` : ''; };
-    const words = `${sq.length} ${fly && kinds.every(t => CREEPS[t].fly) ? 'flyer ' : ''}squad${sq.length === 1 ? '' : 's'} (${kinds.map(t => CREEPS[t].name).join(', ')})${from ? (from === to ? ` on wave ${from}` : ` from wave ${from}`) : ''}${cm ? `; ${CREEPS[cm.type].name} on wave ${cm.w}` : ''}`;
+    const words = `${sq.length} ${fly && kinds.every(t => CREEPS[t].fly) ? 'flyer ' : ''}squad${sq.length === 1 ? '' : 's'} (${kinds.map(t => CREEPS[t].name).join(', ')})${from ? (from === to ? ` on wave ${rgWv(S, from)}` : ` from wave ${rgWv(S, from)}`) : ''}${cm ? `; ${CREEPS[cm.type].name} on wave ${rgWv(S, cm.w)}` : ''}`;
+    const X = (S.ratchet || []).find(p => p.who === k), step = X ? X.k : 0, gold = X ? X.gold : 0;
     const r = rgTroopsAdd({ w0: S.w0, w1: S.w1, troops: L }).r;
-    return { who: a ? a.name : 'Garrison', faces: kinds.concat(cm ? [cm.type] : []).map(face).join(''), words, mark: r >= .3 ? 'heavy' : r >= .12 ? 'some' : 'light', cmd: cm, army: a };
+    return { who: a ? a.name : 'Garrison', faces: kinds.concat(cm ? [cm.type] : []).map(face).join(''), words, mark: step >= 2 ? 'heavy' : step >= 1 ? 'some' : 'light', cmd: cm, army: a, step, gold, r };
   });
+}
+// a place past your frontier, in a line like the war's: its step and the gold it adds
+function rgDepthHTML(S) {
+  if (!S.depth) return '';
+  return `<div class="rg-troops"><p class="rg-trl ${S.depth >= 2 ? 'heavy' : 'some'}"><span><b>+ Deep in enemy land</b> <em class="rg-trm">+${'★'.repeat(S.depth)}</em>${S.depthGold ? ` <i class="rg-trg">+${S.depthGold} gold</i>` : ''}<small>${S.depth + 1} roads from your land and host: tougher waves, better drops</small></span></p></div>`;
 }
 function rgTroopsHTML(R, S) {
   const L = rgTroopLines(R, S); if (!L.length) return '';
-  return `<div class="rg-troops">${L.map(l => `<p class="rg-trl ${l.mark}"><span class="rg-trf">${l.faces}</span><span><b>+ ${rgEsc(l.who)}</b> <em class="rg-trm ${l.mark}">${{ heavy: '▲▲', some: '▲', light: '△' }[l.mark]}</em><small>${rgEsc(l.words)}</small></span></p>`).join('')}</div>`;
+  return `<div class="rg-troops">${L.map(l => `<p class="rg-trl ${l.mark}"><span class="rg-trf">${l.faces}</span><span><b>+ ${rgEsc(l.who)}</b> <em class="rg-trm ${l.mark}" title="${l.step ? `${l.step} star${l.step > 1 ? 's' : ''} harder` : ''}">${l.step ? '+' + '★'.repeat(l.step) : '△'}</em>${l.gold ? ` <i class="rg-trg">+${l.gold} gold</i>` : ''}<small>${rgEsc(l.words)}</small></span></p>`).join('')}</div>`;
 }
 // the plans an army could take, scored: the best wins (ties broken by the run's seed, so a run's war replays the same)
 function rgWarChoose(R, a) {
@@ -131883,14 +132180,14 @@ function rgPrizeHTML(R, id) {
   const P = rgPrizeAt(R, id); if (!P) return R.prize && R.prize[id] && R.prize[id].got ? `<p class="rg-prize got">Its prize is yours already.</p>` : '';
   const N = rgPrizeName(P), it = rgPrizeItem(P), col = (typeof RARITY !== 'undefined' && RARITY[it.rar] && RARITY[it.rar].col) || '#f0c060';
   let ic = ''; try { ic = typeof rgIcon === 'function' ? rgIcon(it, '') : ''; } catch (e) { ic = ''; }
-  return `<p class="rg-prize">${ic}<span><small>Prize · take the place and it is yours</small><b style="color:${col}">${rgEsc(N.name)}</b> <em>${rgEsc(N.what)}</em></span></p>`;
+  return `<p class="rg-prize" tabindex="0" data-rgpz="${rgEsc(R.force + '|' + id)}">${ic}<span><small>Prize · take the place and it is yours</small><b style="color:${col}">${rgEsc(N.name)}</b> <em>${rgEsc(N.what)}</em></span></p>`;
 }
 // how hard a place's battle is, in one word and stars (1 Easy .. 5 Deadly): its tier (a first place 1, the lair 5) and the war's
 // pips on it
 const RG_DIFF_W = ['', 'Easy', 'Normal', 'Hard', 'Deadly', 'Deadly'];
 function rgDiff(R, S) {
-  const n = rgNode(R, S.node), base = S.kind === 'waylay' ? (S.gentle ? 1 : 2) : n.kind === 'lair' ? 5 : S.gentle ? 1 : clamp(n.tier || 2, 2, 4);
-  const k = clamp(base + (S.g | 0) + (S.bump | 0), 1, 5);   // (S.g: a patrol's step; S.bump: what the war's troops add, rgTroopsAdd)
+  const n = rgNode(R, S.node), base = S.kind === 'waylay' ? (S.gentle ? 1 : 2) : n.kind === 'lair' ? 5 : S.gentle ? 1 : 2 + (S.depth | 0);   // (an empty place on your frontier: a genuine fight for the warband as it stands, rgWavesAt; deeper, a step a road)
+  const k = clamp(base + (S.g | 0) + (S.bump | 0), 1, 5);   // (S.g: a patrol's step; S.bump: the war's presence there, rgRatchet)
   return { k, word: RG_DIFF_W[k], stars: '★'.repeat(k) + '☆'.repeat(5 - k) };
 }
 // the war at a place, in a few plain words: its garrison, the armies there and near, a siege, cut off, an edge it gives
@@ -131915,13 +132212,14 @@ function rgDiffWhy(R, S) {
     const L = rgTroopLines(R, S);
     parts.push(L.length ? `Its own waves, plus: ${L.map(l => `${l.who}: ${l.words}`).join('; ')}` : 'No garrison and no army: as it first stood');
   }
+  if (S.depth) parts.push(`Deep in enemy land: +${S.depth}`);
   if (S.town) parts.push(`Defending your town: your maze stands ready, foes ×${S.town.hp}, +${S.town.line} lives on the line, +${S.town.gold} gold from its stores`);
   if (S.farm) parts.push(`Fought here lately: ${Math.round(S.farmK * 100)}% of the gold, XP and drops (it recovers after ${RG_WAR2.farm.recover} turns away)`);
   if (S.gentle) parts.push(S.marched ? 'A first place: no boss, gentle kinds of foe' : 'A first place: no boss, gentle foes');
-  if (S.behind) parts.push(`Your maze held to wave ${S.behind - 1}: foes as strong as wave ${S.behind}'s`);
+  if (S.behind) parts.push('Foes as strong as the waves your maze last held');
   else if (S.ease) parts.push(`A second-tier place: foes ×${RG_EASE.hp}${RG_EASE.line ? `, a line of ${RG_EASE.line}` : ''}${RG_EASE.first ? ', a gentle first wave' : ''}`);
   if (!parts.length) parts.push('As it first stood');
-  parts.push(b.length ? `Boss: ${b.map(([w, x]) => `${CREEPS[x].name} on wave ${w}`).join(', ')}` : 'No boss');
+  parts.push(b.length ? `Boss: ${b.map(([w, x]) => `${CREEPS[x].name} on wave ${rgWv(S, w)}`).join(', ')}` : 'No boss');
   return parts.join(' · ');
 }
 // the nearest place by roads that passes the test (breadth first from id)
@@ -131944,29 +132242,30 @@ const rgHelpersUp = R => R.helpers.filter(h => R.st[h.node].s !== 'held');
 function rgSpec(R, id, kind, road) {
   const D = rgDef(R);
   if (kind === 'waylay') {
-    const rd = R.roads[road], t = Math.min(rgNode(R, rd.a).tier, rgNode(R, rd.b).tier), w0 = RG_TIER_W[t] || 2, from = R.at, to = rd.a === from ? rd.b : rd.a;
+    const rd = R.roads[road], t = Math.min(rgNode(R, rd.a).tier, rgNode(R, rd.b).tier), w0 = t <= RG_GENTLE.tier ? RG_TIER_W[1] : rgProgW(R).w, from = R.at, to = rd.a === from ? rd.b : rd.a;
     const gentle = t <= RG_GENTLE.tier, ease = !gentle && t === RG_EASE.tier, B = rgBehind(R, w0);
     return { kind, node: to, from, to, road, name: `the road to ${rgNode(R, to).name}`, w0, w1: w0 + 1, map: rgField(rgNode(R, from).map ? rgNode(R, from) : rgNode(R, to)), fam: rd.fam, extra: [], hpK: (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k, gentle, ease, marched: B.maze, behind: B.from, g: 0, reward: Math.round((20 + 3 * w0) / 5) * 5, lord: null };
   }
   // (a start town has no battle of its own: its tier's waves when it must be defended)
-  const n = rgNode(R, id), st = R.st[id], nw = n.w || [RG_TIER_W[n.tier] || 2, (RG_TIER_W[n.tier] || 2) + 5], len = nw[1] - nw[0], patrol = kind === 'patrol';
+  const n = rgNode(R, id), st = R.st[id], nw = rgWavesAt(R, n), len = nw[1] - nw[0], patrol = kind === 'patrol';
   const P = patrol ? null : rgPipsAt(R, id), war = P && { gar: P.gar, raw: P.raw, armies: P.armies.map(a => ({ id: a.id, name: a.name, pips: a.pips, fam: a.fam })), edge: P.edge.map(([a, sid]) => [{ name: a.name }, sid]) };
   const g = patrol ? (st.p | 0) + 1 : 0, w0 = Math.min(50 - len, nw[0] + RG_STEP.w * g);   // (the war's pips no longer push the waves: they bring troops, below)
   const up = n.kind === 'lair' ? rgHelpersUp(R) : [];
   const fam = st.fam || (P && P.armies[0] ? P.armies[0].fam : null), fams = up.map(h => h.fam);
   const farm = rgFarmK(R, id), town = kind === 'defend' && n.kind === 'town', TD = RG_WAR2.town;
-  const pay0 = (40 + 10 * nw[0]) * farm.k, pay = Math.round(pay0 * (1 + RG_TROOPS.pay * (patrol ? 0 : P.gar)) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) / 5) * 5;
+  const pay0 = (40 + 10 * nw[0]) * farm.k, RK = patrol ? null : rgRatchet(P), depth = patrol ? 0 : rgDepth(R, id), pay = Math.round(pay0 * (patrol ? 1 : RK.payK + RG_DEPTH.pay * depth) * (patrol ? RG_PATROL_PAY[st.p | 0] || 0 : 1) / 5) * 5;
   const troops = patrol ? [] : rgTroops(R, id, w0, w0 + len, n.kind === 'lair' ? D.lord : null), tadd = rgTroopsAdd({ w0, w1: w0 + len, troops });
   const cmdPay = patrol ? {} : Object.fromEntries(P.armies.map(a => [a.id, Math.round(pay0 * RG_TROOPS.pay * a.pips / 5) * 5]));   // (paid for its commander slain)
   const gentle = (n.kind === 'trouble' || kind === 'defend') && n.tier <= RG_GENTLE.tier, ease = !gentle && n.kind !== 'lair' && n.tier === RG_EASE.tier, B = rgBehind(R, w0);
-  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam, extra: [...new Set(fams)].filter(f => f && f !== fam), war, troops, add: tadd, bump: tadd.bump, cmdPay, hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k * (town ? TD.hp : 1), gentle, ease, marched: B.maze, behind: B.from, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null, farm: farm.rep, farmK: farm.k,
+  return { kind, node: id, name: n.name, w0, w1: w0 + len, map: rgField(n), fam, extra: [...new Set(fams)].filter(f => f && f !== fam), war, troops, add: tadd, bump: RK ? RK.k : 0, depth, depthGold: Math.round(pay0 * RG_DEPTH.pay * depth / 5) * 5, ratchet: RK ? RK.parts.map(p => Object.assign({}, p, { gold: Math.round(pay0 * p.pay / 5) * 5 })) : [], pay0: Math.round(pay0), cmdPay, hpK: (1 + RG_STEP.hp * g) * (1 + .1 * up.length) * (gentle && !B.maze ? RG_GENTLE.hp : ease ? RG_EASE.hp : 1) * B.k * (town ? TD.hp : 1), gentle, ease, marched: B.maze, behind: B.from, g, reward: pay, lord: n.kind === 'lair' ? D.lord : null, farm: farm.rep, farmK: farm.k,
     town: town ? { hp: TD.hp, line: TD.line, gold: Math.round(TD.gold * rgEarned(w0) / 5) * 5 } : null, maze: town && R.maze && R.maze.rows && R.maze.rows.length ? 'keep' : undefined, prize: rgPrizeAt(R, id) && kind === 'trouble' ? Object.assign({}, rgPrizeAt(R, id)) : null };
 }
 // the bosses in a battle's waves (the standard march's; the lair's last is its lord)
 // the battle's bosses as its waves field them (rgFoesOf: a forest faction's own boss, not the run's wave-table one), [wave, type]
 const rgBossesOf = (R, S) => typeof rgFoesOf === 'function' ? rgFoesOf(R, S).bosses.map(b => [b.w, b.type]) : rgBosses(S);
-function rgBosses(S) { const out = []; if (S.gentle) return out;   // (a first place has no boss)
-  for (let w = S.w0; w <= S.w1; w++) { const b = w === 50 && S.lord ? S.lord : CAMP_BOSS0[w]; if (b && CREEPS[b]) out.push([w, b]); } return out; }
+function rgBosses(S) { const out = []; if (S.gentle || S.kind === 'waylay') return out;   // (a first place has no boss; a battle's comes last: rgApplyWaves)
+  let b = S.w1 === 50 && S.lord ? S.lord : null; for (let w = S.w1; !b && w <= Math.min(50, S.w1 + 5); w++) b = CAMP_BOSS0[w]; for (let w = S.w1; !b && w >= S.w0; w--) b = CAMP_BOSS0[w];
+  if (b && CREEPS[b]) out.push([S.w1, b]); return out; }
 // the unit kind that did the most damage this battle (it chose the kind a broken line wounded; unused since wounds went, 19 Nov 2026)
 function rgStrongest() {
   const by = {}, n = {};
@@ -131979,6 +132278,21 @@ function rgStrongest() {
 let RG_NEXT = null, RG_TOUCHED = false, RG_SWAP = null;
 function rgApplyWaves(S) {
   RG_SWAP = null;
+  // the boss last (dynamic difficulty): a boss inside the battle gives way to a few more of the rank and file, and the last of them
+  // (or the next one past the battle) comes on its last wave. A first place has none (rgGentleWave); the lair's last is its lord's
+  if (!S.gentle && S.kind !== 'waylay' && S.w1 <= WAVES.length) {
+    const tyOf = p => p.split('!')[0].split('*')[0], isB = p => !!(CREEPS[tyOf(p)] && CREEPS[tyOf(p)].boss);
+    let bg = null;
+    for (let n = S.w0; n <= S.w1; n++) {
+      const gs = WAVES[n - 1].split('+'), b = gs.filter(isB); if (!b.length) continue;
+      bg = b; if (n === S.w1) break;
+      const rank = gs.filter(p => !isB(p) && CREEPS[tyOf(p)] && !CREEPS[tyOf(p)].lead).sort((x, y) => (+y.split('!')[0].split('*')[1] || 0) - (+x.split('!')[0].split('*')[1] || 0))[0];
+      WAVES[n - 1] = gs.filter(p => !isB(p)).concat(rank ? [tyOf(rank) + '*' + RG_GENTLE.bossFill] : []).join('+');
+    }
+    for (let n = S.w1 + 1; !bg && n <= Math.min(WAVES.length, S.w1 + 5); n++) { const b = WAVES[n - 1].split('+').filter(isB); if (b.length) bg = b; }
+    const last = WAVES[S.w1 - 1].split('+');
+    if (bg && !last.some(isB)) WAVES[S.w1 - 1] = last.concat(bg).join('+');
+  }
   for (let n = S.w0; n <= Math.min(S.w1, WAVES.length); n++) {
     let groups = WAVES[n - 1].split('+');
     if (n === 50 && S.lord && S.lord !== 'abyss' && CREEPS[S.lord]) {
@@ -132032,7 +132346,7 @@ function rgStart(R, S) {
   // a maze behind it: Keep it or Rebuild (one pair of buttons), then the battle
   if (RG_MAZE.on && R.maze && R.maze.rows && R.maze.rows.length && S.maze == null) {
     const SG = rgStartGold(R, S);
-    showOverlay(`<h2 class="ttl">${rgEsc(S.name)}</h2><p class="sub">waves ${S.w0}-${S.w1}</p>
+    showOverlay(`<h2 class="ttl">${rgEsc(S.name)}</h2><p class="sub">${rgWvN(S)} waves</p>
       <button class="btn rg-go" id="rgKeep">Keep your maze</button><button class="btn ghost rg-sec" id="rgRedo">Rebuild: refund ${SG.paid} gold</button>`, 'rgmaze');
     $('#rgKeep').onclick = () => { sfx('click'); hideOverlay(); S.maze = 'keep'; rgStart(R, S); };
     $('#rgRedo').onclick = () => { sfx('click'); hideOverlay(); S.maze = 'redo'; rgStart(R, S); };
@@ -132060,7 +132374,7 @@ function rgStart(R, S) {
   R.battle = { kind: S.kind, node: S.node, name: S.name, runId: G.runId, w0: S.w0, w1: S.w1, gold0: S.gold0 }; R.pending = null; R.notice = '';
   rgPut(R);
   const F = S.fam && CAMP_FAMILIES[S.fam];
-  afterStart(S.kind === 'waylay' ? `Waylaid · ${rgNode(R, S.to).name}` : `${S.name} · waves ${S.w0}-${S.w1}`,
+  afterStart(S.kind === 'waylay' ? `Waylaid · ${rgNode(R, S.to).name}` : `${S.name} · ${rgWvN(S)} waves`,
     `${F ? F.name + '. ' : ''}${S.line} lives on the line. ${S.kind === 'waylay' ? 'Two waves: break through' : 'Plant a maze, then sound the horn'}`);
   saveNow();
 }
@@ -132086,8 +132400,10 @@ function rgEnd(won, retreat) {
   // trimmed to its cap, or a full maze's items crowded the bag's newest out (campBandFromRun)
   if (won && RG_MAZE.on) rgMazeSave(R, S.kind === 'waylay' ? 'the road' : node.name, S.w1);
   const prize = won && S.kind === 'trouble' ? rgPrizeAt(R, S.node) : null;
-  if (prize) { const it = Object.assign(rgPrizeItem(prize), { id: ++G.gearUid, isNew: true }); (G.loot = G.loot || []).push(it); prize.got = true; }
+  if (prize) { const it = Object.assign(rgPrizeItem(prize), { id: ++G.gearUid, isNew: true }); if (typeof ilStamp === 'function' && it.il == null) ilStamp(it, S.w1); (G.loot = G.loot || []).push(it); prize.got = true; }
   if (S.farmK != null && S.farmK < 1 && S.xp0 != null && G.xp > S.xp0) G.xp = S.xp0 + (G.xp - S.xp0) * S.farmK;   // (a place fought again soon: less XP too)
+  const rnHard = won ? rgRnFor(R, S) : 0;
+  if (rnHard && typeof rnS === 'function' && typeof rnOn === 'function' && rnOn()) { const S0 = rnS(), v0 = S0.v; S0.v = Math.min(RN.cap, S0.v + rnHard); if (S0.v > v0) out.push(`+${S0.v - v0} Renown for a hard fight`); }
   R.band = campBandFromRun(R.band, R.maze && R.maze.rows ? new Set(rgMazeItems(R.maze).map(it => it.id)) : null); rgRnOut(R.band);
   if (R.maze && R.band && R.band.wpn && Array.isArray(R.band.wpn.bag)) { const on = new Set(rgMazeWpns(R.maze).map(e => e[2].id)); R.band.wpn.bag = R.band.wpn.bag.filter(w => !on.has(w.id)); }
   const left = won || retreat ? Math.max(0, G.lives | 0) : 0, lost = Math.max(0, S.line - left);
@@ -132102,6 +132418,7 @@ function rgEnd(won, retreat) {
   if (!won && S.kind !== 'waylay') rgWarAttrition(R, S, out);
   if (won) {
     R.chest += S.reward; out.push(`+${S.reward} gold to the war chest`);
+    if (S.kind === 'trouble' || S.kind === 'defend') R.wins = Math.round((rgWins(R) + (rgDiff(R, S).k <= 2 ? RG_DYN.easyWin : 1)) * 100) / 100;   // (the curve's step: rgProgW; an easy win, less of one)
     if (RG_MAZE.on && R.maze) out.push(`Your maze and ${R.maze.gold} gold march on to the next battle`);
     if (S.kind === 'waylay') { R.at = S.to; out.push(`Broke through to ${node.name}`); }
     else if (S.kind === 'patrol') { R.st[S.node].p = (R.st[S.node].p | 0) + 1; out.push(`${node.name} patrolled (${R.st[S.node].p}/${RG_PATROLS})`); }
@@ -132142,11 +132459,11 @@ function rgEnd(won, retreat) {
   const grew = nx && (nx.w0 !== S.w0 || Math.abs((nx.hpK || 1) - (S.hpK || 1)) > 1e-9);
   const title = won ? (S.kind === 'waylay' ? 'Through the ambush' : R.done ? 'The Marches are settled' : `${node.name}: held`) : retreat ? 'The retreat is sounded' : S.kind === 'waylay' ? 'Thrown back' : 'The line breaks';
   setTimeout(() => {
-    showOverlay(`<h2 class="ttl ${won ? 'win' : 'lose'}">${rgEsc(title)}</h2><p class="sub">${rgEsc(S.name)} · waves ${S.w0}-${S.w1}</p>
+    showOverlay(`<h2 class="ttl ${won ? 'win' : 'lose'}">${rgEsc(title)}</h2><p class="sub">${rgEsc(S.name)} · ${rgWvN(S)} waves</p>
       <ul class="rg-out">${out.map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul>
       ${R.over ? `<p class="rg-over">${rgEsc(R.over)} The run is over.</p>` : ''}
-      ${retry && ck ? `<button class="btn rg-go" id="rgRetryCk">Retry from wave ${ck.wave}<small>Your maze and gold as they stood at wave ${ck.wave}.</small></button>` : ''}
-      ${retry ? `<button class="btn ${ck ? 'ghost rg-sec' : 'rg-go'}" id="rgRetry">${ck ? 'Restart the battle' : `Retry ${rgEsc(retry.name)}`}<small>From wave ${nx.w0} with full starting gold: build a new maze.${grew ? ' The war has changed it since.' : ''}</small></button>` : ''}
+      ${retry && ck ? `<button class="btn rg-go" id="rgRetryCk">Retry from wave ${rgWv(S, ck.wave)}<small>Your maze and gold as they stood at wave ${rgWv(S, ck.wave)}.</small></button>` : ''}
+      ${retry ? `<button class="btn ${ck ? 'ghost rg-sec' : 'rg-go'}" id="rgRetry">${ck ? 'Restart the battle' : `Retry ${rgEsc(retry.name)}`}<small>From wave 1 with full starting gold: build a new maze.${grew ? ' The war has changed it since.' : ''}</small></button>` : ''}
       <button class="btn${retry ? ' ghost rg-sec' : ' rg-go'}" id="rgBack">${R.over ? 'The run’s end' : R.done ? 'The muster calls' : 'Back to the Marches'}</button>`, 'rgend');
     $('#rgBack').onclick = () => { sfx('click'); rgOpen(); };
     if (retry) $('#rgRetry').onclick = () => { sfx('click'); hideOverlay(); RG_CKPT = null; rgRetry(R, retry); };
@@ -132196,7 +132513,7 @@ function rgRetryCk(R, B) {
   G.runId = newRunId(); ck.runId = G.runId; RG_CKPT = ck;   // (falling again before the next horn retries the same wave)
   R.battle = { kind: S.kind, node: S.node, name: S.name, runId: G.runId, w0: S.w0, w1: S.w1, gold0: S.gold0 }; R.pending = null; R.notice = '';
   rgPut(R);
-  afterStart(`Wave ${G.wave}`, `${S.name}: back to the horn of wave ${G.wave}. ${G.lives} lives on the line`);
+  afterStart(`Wave ${rgWv(S, G.wave)}`, `${S.name}: back to the horn of wave ${rgWv(S, G.wave)}. ${G.lives} lives on the line`);
   saveNow();
 }
 
@@ -132254,7 +132571,7 @@ function rgTown(R, k) {
 // how difficulty works, on the map and the start screen
 const RG_HOW = `<details class="rg-how"><summary>How difficulty works</summary><ul>
   <li>Each place shows how hard it is (Easy, Normal, Hard, Deadly) and why. The first places are Easy: no boss and gentle foes.</li>
-  <li>The warlord's strength is counted in <b>pips</b>. A place keeps its own waves; what he has there joins as soldiers you can see coming. Each <b>garrison</b> pip is a squad of its defenders in the first waves. Each pip of an <b>army</b> there is a squad of its own kinds in the later waves (a Storm Wing brings flyers), and its <b>commander</b> fights in person on the last: slay the commander to beat the army. The place card lists them, wave by wave. An empty place he holds is as it first stood.</li>
+  <li>Every battle is 7 waves, the boss last. An empty place is a fair fight for your warband as it stands, a step harder for each battle won. The warlord's strength is counted in <b>pips</b>: what he has there joins as soldiers you can see coming, a star harder and better paid. Each <b>garrison</b> pip is a squad of its defenders in the first waves. Each pip of an <b>army</b> there is a squad of its own kinds in the later waves (a Storm Wing brings flyers), and its <b>commander</b> fights in person before the boss: slay the commander to beat the army. The place card lists them, wave by wave. </li>
   <li>Every march or battle is a <b>turn</b>. After it, each army takes one road step: the arrow on the map shows where it goes next, its icon its plan (⚔ hunt you, ♜ besiege a town, ↺ retake a place, ⚑ guard, ✚ muster at the lair). Shopping, the forge, resting and re-specs take no turn.</li>
   <li>Beat an army and its pips are gone for good: a band is destroyed, the Main Host is broken and falls back. Lose a battle (away from the first places) and the Main Host comes hunting you.</li>
   <li>An army that reaches a town you hold <b>besieges</b> it: it falls in ${RG_WAR.siege} turns unless you march there and break the siege. Armies cannot march through your towns.</li>
@@ -132288,7 +132605,7 @@ function rgMapSVG(R) {
   const nodes = D.nodes.map(n => {
     const st = R.st[n.id] || { s: 'open', g: 0, p: 0, fam: null }, here = R.at === n.id, help = R.helpers.find(h => h.node === n.id && st.s !== 'held');
     const cls = `rg-n ${n.kind} ${st.s}${R.war && R.war.cut[n.id] ? ' cut' : ''}${R.war && R.war.siege[n.id] ? ' besieged' : ''}${here ? ' here' : ''}${rgSel === n.id ? ' sel' : ''}${nb.includes(n.id) ? ' near' : ''}`;
-    const sw = n.w && st.s !== 'held' ? rgSpec(R, n.id, 'trouble') : null, wv = sw ? `waves ${sw.w0}-${sw.w1}` : '';
+    const sw = n.w && st.s !== 'held' ? rgSpec(R, n.id, 'trouble') : null, sd = sw ? rgDiff(R, sw) : null, wv = sd ? `${'★'.repeat(sd.k)} · ${sw.reward}g${rgRnFor(R, sw) ? ` +${rgRnFor(R, sw)}R` : ''}` : '';   // (its rating, not the run's waves: dynamic difficulty)
     const stw = st.s === 'held' ? (n.kind === 'town' ? 'held town' : 'settled') : st.s === 'lost' ? 'lost' : n.kind === 'lair' ? 'the warlord' : 'contested';
     // state, in shape as well as colour: a filled diamond (held), a hollow one (contested), a struck one (lost), a star (the warlord)
     const badge = n.kind === 'lair' && st.s !== 'held' ? '<path class="rg-bd lair" d="M0,-7L2,-2L7,-2L3,1L5,7L0,3L-5,7L-3,1L-7,-2L-2,-2Z"/>'
@@ -132300,7 +132617,7 @@ function rgMapSVG(R) {
     return `<g class="${cls}" data-id="${n.id}" data-tip-at="above" transform="translate(${n.x} ${n.y})" role="button" tabindex="${rgSel === n.id ? 0 : -1}" aria-pressed="${rgSel === n.id}" aria-label="${rgEsc(n.name)}, ${stw}${wv ? ', ' + wv : ''}${gn ? `, garrison ${gn}` : ''}${sg ? `, besieged: falls in ${sg.left}` : ''}${cutf ? ', cut off' : ''}${here ? ', your host is here' : ''}">
       <circle class="rg-hit" r="34"/><circle class="rg-halo" r="29"/>${here ? '<circle class="rg-here-ring" r="31"/>' : ''}<circle class="rg-sh" r="23"/><circle class="rg-in" r="19"/>${g}
       <g class="rg-badge" transform="translate(17 -17)"><circle r="8"/>${badge}</g>${pips}${siege}${rgPrizeAt(R, n.id) ? '<g class="rg-prz" transform="translate(19 16)"><title>A prize here</title><circle r="9"/><path d="M0,-6L5,0L0,6L-5,0Z"/></g>' : ''}${help ? '<text class="rg-help" x="-30" y="-14">☗</text>' : ''}
-      ${here ? '<g class="rg-here-t" transform="translate(0 -44)"><rect x="-41" y="-8" width="82" height="15" rx="2"/><text y="3.5">YOU ARE HERE</text></g>' : ''}<text class="rg-nm" y="40">${rgEsc(n.name)}</text>${sg ? `<text class="rg-w sieged" y="56">Besieged · falls in ${sg.left}</text>` : wv ? `<text class="rg-w" y="56">${wv}</text>` : n.kind === 'town' && st.s === 'held' ? '<text class="rg-w held" y="56">Held town</text>' : ''}${cutf ? '<text class="rg-w cut" y="70">cut off</text>' : ''}</g>`;
+      ${here ? '<g class="rg-here-t" transform="translate(0 -44)"><rect x="-41" y="-8" width="82" height="15" rx="2"/><text y="3.5">YOU ARE HERE</text></g>' : ''}<text class="rg-nm" y="40">${rgEsc(n.name)}</text>${sg ? `<text class="rg-w sieged" y="56">Besieged · falls in ${sg.left}</text>` : wv ? `<text class="rg-w rg-wd${sd.k}" y="56">${wv}</text>` : n.kind === 'town' && st.s === 'held' ? '<text class="rg-w held" y="56">Held town</text>' : ''}${cutf ? '<text class="rg-w cut" y="70">cut off</text>' : ''}</g>`;
   }).join('');
   return `<svg class="rg-svg" viewBox="0 0 1000 620" role="group" aria-label="${rgEsc(D.name)}: the places and roads"><defs><clipPath id="rgClipC" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath><radialGradient id="rgHalo"><stop offset=".45" stop-color="#2a0505" stop-opacity=".85"/><stop offset=".75" stop-color="#5a0b08" stop-opacity=".35"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient><marker id="rgArr" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z"/></marker></defs>${roads}${nodes}${rgArmySVG(R)}</svg>`;
 }
@@ -132363,7 +132680,7 @@ function rgLegendHTML() {
     ${item(ic(20, 20, '<g class="rg-sg" transform="translate(10 10)"><circle r="9"/><text y="4">3</text></g>'), 'Siege: turns left')}
     ${item(ic(20, 20, '<g class="rg-ev" transform="translate(10 10)"><circle r="8.5"/><text y="4" style="font-size:10px">⌂</text></g>'), 'Road event')}
     <span class="lg-road">Road danger <b>/</b><b>//</b><b>///</b></span>
-    <span class="lg-plan">Plans: ⚔ hunt · ♜ siege · ↺ retake · ⚑ guard · ✚ muster. Hover (or tap) an army for its forces. A place keeps its own waves; garrison and army squads join them (▲ adds a lot, △ a little), the commander last.</span></div>`;
+    <span class="lg-plan">Plans: ⚔ hunt · ♜ siege · ↺ retake · ⚑ guard · ✚ muster. Hover (or tap) an army for its forces. +★ a garrison or an army there: harder, and more gold.</span></div>`;
 }
 // the warlord's intent in one line (owner, 27 Nov 2026: "need more of a sense of the threat"): what the Main Host is doing,
 // and the sharpest danger after it (a siege about to land, an army marching on the host)
@@ -132400,15 +132717,15 @@ function rgFoeName(R, S) {
 function rgBattleHead(R, S, noGold) {
   const D = rgDiff(R, S), b = rgBossesOf(R, S);
   return `<p class="rg-diff rg-d${D.k}"><span aria-hidden="true">${D.stars}</span> <b>${D.word}</b></p>
-    <p class="rg-what">${rgEsc(rgFoeName(R, S))} · waves ${S.w0}-${S.w1}${b.length ? '' : ' · no boss'}</p>${noGold ? '' : rgBattleGold(R, S)}`;
+    <p class="rg-what">${rgEsc(rgFoeName(R, S))} · ${rgWvN(S)} waves${b.length ? ', boss last' : ' · no boss'}</p>${noGold ? '' : rgBattleGold(R, S)}`;
 }
 // the reward and the start gold
 function rgBattleGold(R, S) {
   const grown = (S.kind === 'trouble' || S.kind === 'defend') && S.g ? Math.round(RG_STEP.pay * 100 * S.g) : 0, SG = rgStartGold(R, S);
   const start = SG.base + SG.gap + (R.supply | 0) + (S.town ? S.town.gold : 0), why = [];
-  if (SG.maze) why.push(`your maze's ${SG.base} gold`); if (SG.gap) why.push(`+${SG.gap} for ${S.w0 - 1 > SG.w + 1 ? `waves ${SG.w + 1}-${S.w0 - 1}` : `wave ${SG.w + 1}`}${S.w0 - 1 - SG.w > RG_GAP.free ? ` (${Math.round(RG_GAP.k * 100)}% past the first ${RG_GAP.free}, a leap ahead)` : ''}`);
+  if (SG.maze) why.push(`your maze's ${SG.base} gold`); if (SG.gap) why.push(`+${SG.gap} for the ground between${S.w0 - 1 - SG.w > RG_GAP.free ? ' (part of it: a leap ahead)' : ''}`);
   if (R.supply) why.push(`+${R.supply} supplies from your land`); if (S.town) why.push(`+${S.town.gold} from the town's stores`);
-  return `<p class="rg-reward"><span${grown ? ` title="+${grown}% for the warlord's ${rgPipW(S.g)} there"` : ''}>Reward <b>${S.reward}</b></span> · <span class="rg-gold"${why.length ? ` title="${rgEsc(why.join(', '))}"` : ''}>${SG.maze ? 'Maze + ' : 'Start '}<b>${start} gold</b></span></p>`;
+  return `<p class="rg-reward"><span${grown ? ` title="+${grown}% for the patrols before"` : ''}>Reward <b>${S.reward}</b>${(S.ratchet || []).length || S.depth ? ` <small class="rg-rup">+${(S.ratchet || []).reduce((s, p) => s + p.gold, 0) + (S.depthGold | 0)} for the risk</small>` : ''}${rgRnFor(R, S) ? ` <b class="rg-rrn">+${rgRnFor(R, S)} Renown</b>` : ''}</span> · <span class="rg-gold"${why.length ? ` title="${rgEsc(why.join(', '))}"` : ''}>${SG.maze ? 'Maze + ' : 'Start '}<b>${start} gold</b></span></p>`;
 }
 function rgBattleMore(R, S) {
   const F = S.fam && CAMP_FAMILIES[S.fam];
@@ -132445,7 +132762,7 @@ function rgNodeHTML(R, id) {
   const n = rgNode(R, id), st = R.st[id], here = R.at === id, i = rgRoadIx(R, R.at, id), P = rgPrimary(R, id);
   const state = st.s === 'held' ? (n.kind === 'town' ? 'Held town' : 'Settled') : st.s === 'lost' ? 'Lost to the enemy' : n.kind === 'town' ? 'Enemy-held town' : n.kind === 'lair' ? 'The warlord’s lair' : 'Trouble';
   const S = st.s !== 'held' ? rgSpec(R, id, 'trouble') : R.war && rgArmiesAt(R, id).length ? rgSpec(R, id, 'defend') : n.kind === 'trouble' && (st.p | 0) < RG_PATROLS ? rgSpec(R, id, 'patrol') : null;
-  const wl = rgWarLine(R, id), warl = (wl ? `<p class="rg-warl">${rgEsc(wl)}</p>` : '') + (S ? rgTroopsHTML(R, S) : '');
+  const wl = rgWarLine(R, id), warl = (wl ? `<p class="rg-warl">${rgEsc(wl)}</p>` : '') + (S ? rgDepthHTML(S) + rgTroopsHTML(R, S) : '');
   const btn = P.can ? `<button class="btn rg-go" id="rgAct">${rgEsc(P.label)}<small>${rgEsc(P.sub)}</small></button>` : `<p class="rg-note">${rgEsc(P.why)}</p>`;
   let more = `<p class="cm-say">${rgEsc(n.say)}</p>${here ? '<p class="rg-here">Your host is here.</p>' : ''}`;
   if (!here && i >= 0) { const r = R.roads[i]; more += `<p class="rg-road-card"><b>The road from ${rgEsc(rgNode(R, R.at).name)}:</b> danger ${r.d} of 3 · ${Math.round(RG_WAY[r.d] * 100)}% to be waylaid${r.d ? ` by ${rgEsc(CAMP_FAMILIES[r.fam].name)} (a 2-wave skirmish)` : ''}${r.ev && !r.evDone ? ` · <b>${RG_EVENTS[r.ev].name}</b> on the way (a choice)` : ''}.</p>`; }
@@ -132464,7 +132781,7 @@ function rgNodeHTML(R, id) {
   const prz = rgPrizeHTML(R, id);
   const ovw = E ? `<div class="rg-hd">${rgBattleHead(R, S, true)}</div>${warl}${prz}<div class="rg-gl">${rgBattleGold(R, S)}</div>${town}`
     : `${S ? rgBattleHead(R, S) : `<p class="rg-lede">${rgEsc(n.say)}</p>`}${warl}${prz}${town}`;
-  const enc = E ? `<p class="rg-scout"><span>Scouting report</span><b>Waves ${S.w0}-${S.w1}</b></p>${E.cards}${E.say}${prz}${E.loot}`
+  const enc = E ? `<p class="rg-scout"><span>Scouting report</span><b>${rgWvN(S)} waves</b></p>${E.cards}${E.say}${prz}${E.loot}`
     : `<div class="rg-empty"><b>${st.s === 'held' ? `${rgEsc(n.name)} is yours` : 'Nothing to scout'}</b><p>${st.s === 'held' ? (n.kind === 'town' ? 'No foes here: rest and re-spec, then march on.' : 'Its trouble is settled and patrolled out: no foes left here.') : 'No battle here.'}</p></div>`;
   const tab = (k, t) => `<button type="button" role="tab" class="rg-tab" id="rgTab-${k}" data-tab="${k}" aria-controls="rgPan-${k}" aria-selected="${rgTab === k}" tabindex="${rgTab === k ? 0 : -1}">${t}</button>`;
   return `<section class="cm-loc rg-card rg-place" data-place="${rgEsc(id)}">${hd}
@@ -132750,7 +133067,7 @@ const rgRnHeld = () => typeof rnS === 'function' && G && G.rn ? rnS().v | 0 : 0;
     let F = null; try { F = typeof ffAt === 'function' ? ffAt(n) : null; } catch (e) { F = null; }
     try { return F && typeof ffSpec === 'function' ? ffSpec(n, g, F) : g; } catch (e) { return g; }
   };
-  if (typeof ffBossWave === 'function') { const _fb = ffBossWave; ffBossWave = function (n) { const S = G && G.region; return S && (S.gentle || (S.ease && RG_EASE.first && n === S.w0)) ? false : _fb.apply(this, arguments); }; }   // (no boss banner, card or boss on a first place)
+  if (typeof ffBossWave === 'function') { const _fb = ffBossWave; ffBossWave = function (n) { const S = G && G.region; return S && (S.gentle || (S.ease && RG_EASE.first && n === S.w0)) ? false : S && !G.vs && S.kind !== 'waylay' && n >= S.w0 && n <= S.w1 ? n === S.w1 && !(n === 50 && S.lord) : _fb.apply(this, arguments); }; }   // (the boss last: rgApplyWaves)   // (no boss banner, card or boss on a first place)
   // the war's troops (S.troops) march in their waves, after everything else has shaped the wave (the place's own, a first place's gentle
   // roles): they are the army's own kinds whatever the place's faction
   const _wsT = waveSpec;
@@ -132959,7 +133276,8 @@ function rgLootOf(R, id) {
   const T = Object.assign({}, T0, { g, road: d, force: R.force });
   T.up = T0.sure >= 4 ? 0 : Math.min(.9, (T0.up || 0) + RG_LOOT_GROW.up * g);
   T.leg = T0.sure >= 4 ? 0 : Math.min(.6, (T0.leg || 0) + RG_LOOT_GROW.leg * g + RG_LOOT_ROAD * d);
-  const fk = R.war && typeof rgFarmK === 'function' ? rgFarmK(R, id).k : 1; T.up *= fk; T.leg *= fk;   // (a place fought again soon drops less: region.js RG_WAR2.farm)
+  const fk = R.war && typeof rgFarmK === 'function' ? rgFarmK(R, id).k : 1; T.up *= fk; T.leg *= fk;
+  const dk = typeof rgDepth === 'function' ? 1 + RG_DEPTH.loot * rgDepth(R, id) : 1; if (T0.sure < 4) { T.up = Math.min(.9, T.up * dk); T.leg = Math.min(.6, T.leg * dk); } T.depth = dk > 1;   // (deep in enemy land: better odds, region.js RG_DEPTH)   // (a place fought again soon drops less: region.js RG_WAR2.farm)
   const ty = rgKitType(T0); if (ty) { T.kit = ty; const K = rgKitFor(R.force, ty), low = K.bases.filter(b => (GEAR_BASES[b].rar | 0) <= T0.sure); T.kitBases = low.length ? low : K.bases; T.kitHigh = K.bases.filter(b => !T.kitBases.includes(b)); T.kitLeg = K.leg; if (!T.kitHigh.length) T.up = 0; }   // (an easy place pays its kit's lesser pieces; its upgrade, a higher one)
   return T;
 }
@@ -133115,7 +133433,14 @@ function rgIconCard(el) {
   let h = ''; try { if (swap) applyForce(force); const it = rgKeyItem(k), p = rgPaint(it); h = (p ? `<img class="rg-ica" alt="" src="${p}">` : '') + itemCardHTML(it); } finally { if (swap) applyForce(was); }
   return (RG_CARDS[v] = h);
 }
-if (typeof itipBind === 'function' && typeof document !== 'undefined') { itipBind(document, '.rg-ii[data-rgi]', rgIconCard, { tap: () => null }); itipBind(document, '.lrow[data-rgi]', rgIconCard, { tap: () => null }); }
+// a place's prize, its card as the force's own, at the level it is won at (the battle's last wave) (owner, 28 Nov 2026: the prize row "doesnt show on hover what it is")
+function rgPrizeCard(el) {
+  const v = el.dataset.rgpz || '', i = v.indexOf('|'), force = v.slice(0, i), id = v.slice(i + 1), R = force && rgGet(force), P = R && rgPrizeAt(R, id); if (!P || typeof itemCardHTML !== 'function') return '';
+  const was = typeof FORCE_NOW !== 'undefined' ? FORCE_NOW : null, swap = was !== force && typeof applyForce === 'function' && typeof FORCES !== 'undefined' && !!FORCES[force];
+  let h = ''; try { if (swap) applyForce(force); const it = rgPrizeItem(P), p = rgPaint(it); if (typeof ilStamp === 'function' && it.il == null) { try { ilStamp(it, rgSpec(R, id, 'trouble').w1); } catch (e) {} } h = (p ? `<img class="rg-ica" alt="" src="${p}">` : '') + itemCardHTML(it); } finally { if (swap) applyForce(was); }
+  return h;
+}
+if (typeof itipBind === 'function' && typeof document !== 'undefined') { itipBind(document, '.rg-prize[data-rgpz]', rgPrizeCard, { tap: () => null }); itipBind(document, '.rg-ii[data-rgi]', rgIconCard, { tap: () => null }); itipBind(document, '.lrow[data-rgi]', rgIconCard, { tap: () => null }); }
 // one item of a kind, made by the run's drop code
 function rgLootItem(kind, rar, w) {
   if (kind === 'leg') return rollGear(w, true, 4);
@@ -133377,7 +133702,7 @@ function rgBossWords(R, S, b) {
 function rgFoesHTML(R, S) {
   const F = rgFoesOf(R, S); if (!F.troops.length && !F.bosses.length) return '';
   const boss = F.bosses.map(b => { const d = CREEPS[b.type], r = d.brule;
-    return `<div class="rg-fb">${rgFoeIcon(b.type, true, rgBossWords(R, S, b))}<span><b>${rgEsc(d.name)}</b><small>${r && r.name ? rgEsc(r.name) : d.title ? rgEsc(d.title) : 'boss'} · wave ${b.w}</small>${rgBossTag(R, S, b.type, b.w)}</span></div>`; }).join('');
+    return `<div class="rg-fb">${rgFoeIcon(b.type, true, rgBossWords(R, S, b))}<span><b>${rgEsc(d.name)}</b><small>${r && r.name ? rgEsc(r.name) : d.title ? rgEsc(d.title) : 'boss'} · wave ${rgWv(S, b.w)}</small>${rgBossTag(R, S, b.type, b.w)}</span></div>`; }).join('');
   return `<div class="rg-foes" aria-label="The foes you will meet">${boss}<span class="rg-fts">${F.troops.map(t => rgFoeIcon(t.type)).join('')}</span></div>`;
 }
 // the map's hover card for a place: its foes (named), its boss and its loot table
@@ -133388,7 +133713,7 @@ function rgPlaceTip(el) {
   if (!S) return `<div class="rg-tc"><h4>${rgEsc(n.name)}</h4><p>${n.kind === 'town' ? 'A held town: rest and re-spec there.' : 'Settled: nothing left to fight.'}</p></div>`;
   // (the war on it: its garrison, the armies there or near, how hard; owner, 27 Nov 2026: "need more of a sense of the threat")
   const D = rgDiff(R, S), wl = typeof rgWarLine === 'function' ? rgWarLine(R, id) : '', here = typeof rgArmiesAt === 'function' && R.war ? rgArmiesAt(R, id) : [];
-  return `<div class="rg-tc rg-tp"><h4>${rgEsc(n.name)} <small>waves ${S.w0}-${S.w1}</small></h4><p class="rg-tw">${rgEsc(rgFoeName(R, S))}</p><p class="rg-adf rg-d${D.k}"><span aria-hidden="true">${D.stars}</span> <b>${D.word}</b></p>${wl ? `<p class="rg-awl">${rgEsc(wl)}</p>` : ''}${here.map(a => { const c = rgArmyCmd(R, a), im = rgFoeImg(c); return `<p class="rg-ahere">${im ? `<img alt="" src="${im}">` : ''}<span><b>${rgEsc(a.name)}</b> ${'◆'.repeat(a.pips)}<small>Led by ${rgEsc(CREEPS[c] ? CREEPS[c].name : '')} · ${rgArmyMix(R, a).map(([t, k]) => `${rgEsc(CREEPS[t].name)} ×${k}`).join(', ')}</small></span></p>`; }).join('')}</div>`;
+  return `<div class="rg-tc rg-tp"><h4>${rgEsc(n.name)} <small>${rgWvN(S)} waves</small></h4><p class="rg-tw">${rgEsc(rgFoeName(R, S))}</p><p class="rg-adf rg-d${D.k}"><span aria-hidden="true">${D.stars}</span> <b>${D.word}</b></p>${wl ? `<p class="rg-awl">${rgEsc(wl)}</p>` : ''}${here.map(a => { const c = rgArmyCmd(R, a), im = rgFoeImg(c); return `<p class="rg-ahere">${im ? `<img alt="" src="${im}">` : ''}<span><b>${rgEsc(a.name)}</b> ${'◆'.repeat(a.pips)}<small>Led by ${rgEsc(CREEPS[c] ? CREEPS[c].name : '')} · ${rgArmyMix(R, a).map(([t, k]) => `${rgEsc(CREEPS[t].name)} ×${k}`).join(', ')}</small></span></p>`; }).join('')}</div>`;
 }
 /* ---- the warlord's armies, as the foes they are (owner, 27 Nov 2026: "add commander portraits to show enemies on the campaign
    map should be able to hover over them to see what other forces are there as well. need more of a sense of the threat").
@@ -133460,7 +133785,7 @@ function rgEncParts(R, S) {
   // tapped, gives the full text (rgFoeCard: what it does, the answers, a boss's affixes)
   const card = (type, boss, line, x) => { const d = CREEPS[type];
     return `<div class="rg-ec${boss ? ' boss' : ''}" data-rgf="${rgEsc(type)}"${x ? ` data-rgx="${rgEsc(x)}"` : ''}>${rgFoeIcon(type, true, x)}<span><b>${rgEsc(d.name)}</b>${line ? `<small>${rgEsc(line)}</small>` : ''}</span></div>`; };
-  const bosses = F.bosses.map(b => card(b.type, true, `Boss · wave ${b.w}: ${rgBossLine(b.type)}`, rgBossWords(R, S, b))).join('');
+  const bosses = F.bosses.map(b => card(b.type, true, `Boss · wave ${rgWv(S, b.w)}: ${rgBossLine(b.type)}`, rgBossWords(R, S, b))).join('');
   const troops = F.troops.map(t => card(t.type, false, rgFoeShort(t.type))).join('');
   const fly = F.troops.filter(t => CREEPS[t.type].fly).map(t => CREEPS[t.type].name);
   const say = [
@@ -144385,10 +144710,12 @@ const GW2 = (() => {
 const SEV2 = (() => {
   const U = 'cc_severer', NAMES = ['idle', 'ready', 'sever', 'sunder', 'crescent', 'rend', 'hit', 'death'];
   const EASE = .2, BLOW = .3, SPD_CUT = 1;
-  const MV = { cc_sunder: 'sunder', cc_shards: 'crescent', cc_nullfield: 'rend' };
+  const MV = { cc_sunder: 'rend', cc_shards: 'crescent', cc_nullfield: 'sunder' };   // (the new kit, 27 Nov 2026: Sever is the hook and the tear; Rift Line the palm driven to the road)
   // (an instant cast: the clip starts this many frames before its release, so the hand is on its way as the spell lands;
   // Rend the Veil starts on its hook, so its tear falls on the game's tear 0.6 s on)
-  const LEAD = { sunder: 3, crescent: 3, rend: 0 };
+  // (an instant cast starts the clip this many frames before its release, so the wind-up shows: Sundering Glyph's palm
+  // meets the road as its blow lands, 0.22 s on; Rend the Veil from its wind-up's end, as a timed cast's, its tear 0.6 s on)
+  const LEAD = { sunder: 7, crescent: 4, rend: 2 };
   const BASE_H = .045;
   const ORB = { r: .14, core: .04, a: .40, ca: .60, col: '#b48cff', ccol: '#e8f4ff' };   // the orb on his palm (his heights)
   const S = { on: true, err: null };
@@ -144558,6 +144885,7 @@ const SEV2 = (() => {
       t._svPalmL = w(BI.handL, MK.palmL); t._svPalmR = w(BI.handR, MK.palmR);
       t.tipW = t._svPalmR; t.tipYaw = yaw; t.tipAt = G.time;   // (his right palm: unitTip, sfxMuzzle, ccxHand)
       if (!t.wounded) try { orb(t, P, s); } catch (e) {}
+      if (typeof SEVFX !== 'undefined') try { SEVFX.frame(t, P, s); } catch (e) { if (!S.err) S.err = 'fx: ' + e.message; }   // (his own light: unitmodels_severer2_fx.js)
     }
     return true;
   }
@@ -144605,6 +144933,437 @@ const SEV2 = (() => {
   });
   return { S, ORB, CL, load, hot, ctl, draw, ready, anchors, get R() { return R; }, get mesh() { return MESH_; } };
 })();
+
+/* The Arcane Severer's own light (owner, 27 Nov 2026: his animations and ability effects were "a bit underwhelming"; make him
+   read as a powerful arcane duellist. The standing rules: Dota-quality, organic forms, never so bright that foes or the
+   map are hidden). Drawn only while the sculpted body draws him (SEV2.anchors); the code-built body keeps the old light.
+   His palette: violet-white light with bronze glints, as his robe's violet and his mantle's bronze.
+   - The gather: before each blow or cast, a few motes of light drawn in to his palm and a small glow growing on it (both
+     palms for Rend the Veil).
+   - The sweep: while his hand cuts, a thin ribbon of light behind his palm, bright at the hand, gone in a sixth of a
+     second (the Oathbound's swing trail, for an open hand).
+   - His strike: a crescent ribbon flying flat from his palm to the foe, its leading edge white-hot, two fainter echoes
+     behind it; on the foe a flash, a short pointed slash across it, a few violet and bronze sparks, and a faint shimmer
+     lingering a moment.
+   - Sundering Glyph: a tall crescent blade falling onto the foe; then a flash, a standing sever line through the foe, a
+     ring of violet light with bronze ticks spreading on the road under it, and the shimmer.
+   - Returning Crescent: a spinning crescent with a hot outer edge and two echoes, a ribbon along its loop; each cut a slash
+     mark; caught, a flash on his palm.
+   - Rend the Veil: threads of light from both palms to each hooked foe, a spark running down each; at the tear, a jagged
+     rip opens in the air over each foe (a dark seam between two bright edges) and closes, and the shimmer.
+   SEVFX.off: no new light (the before shots). */
+const SEVFX = (() => {
+  const PAL = { body: '#8a4cf2', deep: '#5a2cb8', edge: '#cdb2ff', hot: '#fbf6ff', bronze: '#e8a848', dark: '#160a26' };
+  // how much of each layer is added to the scene: the violet bodies are laid over it (added violet on the sunlit grass reads
+  // green-white), the white-hot cores and edges partly added so they glow
+  const AB = .15, AH = .6;
+  const K = { gain: 1, trail: .16, gather: .9 };
+  const S = { off: false, cuts: 0, marks: 0, tears: 0, glyphs: 0, loops: 0, frames: 0 };
+  const c3 = (h, k) => vfxC(h, k || 1);
+  const live = () => !S.off && typeof VX !== 'undefined' && VX && typeof vfxReady === 'function' && vfxReady();
+  const mine = t => !S.off && t && typeof SEV2 !== 'undefined' && SEV2.anchors(t);
+  const sm = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+  const foeH = c => typeof ccxFoeH === 'function' ? ccxFoeH(c) : (typeof hitH === 'function' ? hitH(c) : .5);
+  // his size in the world (his feet to the top of his head), against the tier III size these lengths were set at
+  const zk = () => typeof SEV2 !== 'undefined' && SEV2.S.headY ? Math.max(.6, Math.min(1.6, (SEV2.S.headY - (SEV2.S.lift || 0)) / 1.45)) : 1;
+  const rnd = (i, k) => { const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return v - Math.floor(v); };
+
+  /* ---------------------------------------------------------------- on his hands, every frame he is drawn */
+  // the clips' windows (frames at 30 a second): when a palm gathers light, and when it cuts the air
+  const GATHER = { sever: [[1, 7, 'R']], sunder: [[0, 9, 'RL']], crescent: [[0, 7, 'R']], rend: [[0, 6, 'RL']] };
+  const RELEASE = { sunder: [[9, 'R']], crescent: [[7, 'R']], rend: [[6, 'RL'], [22, 'RL']] };   // (a flash on the palm as each spell leaves it)
+  const SWEEP = { sever: [[5, 13, 'R']], sunder: [[7, 12, 'R']], crescent: [[5, 12, 'R']], rend: [[4, 8, 'RL'], [20, 27, 'RL']] };
+  function frame(t, P, s) {
+    if (!live() || t.wounded) return;
+    S.frames++;
+    const now = G.time, f = P.s * 30, z = zk(), H = t._sxH || (t._sxH = { R: [], L: [] });
+    const palm = { R: t._svPalmR, L: t._svPalmL };
+    // the gather: motes drawn in to the palm, a glow growing on it
+    for (const [a, b, sd] of GATHER[P.c] || []) {
+      if (f < a || f > b + 1) continue;
+      const k = sm(a, b, f) * (f > b ? Math.max(0, 1 - (f - b)) : 1), held = t.ab && t.ab.cast ? 1 : 0;
+      for (const side of sd) gather(palm[side], Math.max(k, held * .85), now, z, side === 'L' ? 7 : 0, P.c !== 'sever');
+    }
+    for (const [fr, sd] of RELEASE[P.c] || []) {
+      if (f < fr || f > fr + 2) continue; const key = P.c + fr + ':' + (t.ab && t.ab.lastAt);
+      if (t._sxRel === key) continue; t._sxRel = key;
+      for (const side of sd) { const p = palm[side]; if (!p) continue; sfxAdd({ k: 'vflash', x: p[0], z: p[2], h: p[1], s: .42 * z, life: .2, col: c3(PAL.edge), a: .85 * sfxZk() }); if (typeof vfxBurst === 'function') vfxBurst({ x: p[0], y: p[1], z: p[2], shape: 'sphere', r: .05, sp: [1, 2.4], up: [.2, 1], life: [.25, .45], size: [.03, .05], c0: c3(PAL.edge), drag: 1.2, grav: 4, layer: VT.SHARD, spin: 12, add: 0 }, 5); if (typeof fxSpark === 'function') fxSpark(p[0], p[2], p[1], PAL.edge, 3); }
+    }
+    // the sweep: a ribbon of light behind the palm while it cuts
+    const W = SWEEP[P.c] || [];
+    for (const side of 'RL') {
+      const L = H[side], on = W.some(([a, b, sd]) => sd.includes(side) && f >= a && f <= b), p = palm[side];
+      if (!p) continue;
+      if (on) { if (!L.length || now - L[0].at > 1e-4) L.unshift({ at: now, p: p.slice() }); }
+      while (L.length && (now - L[L.length - 1].at > K.trail || L.length > 24)) L.pop();
+      if (L.length && now - L[0].at > .2) L.length = 0;
+      if (L.length >= 3) sweep(L, now, z);
+    }
+  }
+  function gather(p, k, now, z, ph, big) {
+    if (!p || k <= .02) return;
+    const g = K.gather * k, n = Math.round((vfxLite() ? 4 : 8) * (big ? 1.5 : 1)), RR = big ? .34 : .2, ms = big ? .03 : .022;
+    vfxSprite(VX, p[0], p[1], p[2], (big ? .15 : .11) * z * (.5 + .5 * k), (big ? .15 : .11) * z * (.5 + .5 * k), now * 2, c3(PAL.body), .45 * g, VT.GLOW, AB);
+    vfxSprite(VX, p[0], p[1], p[2], .035 * z * k, .035 * z * k, 0, c3(PAL.hot, 1.2), .8 * g, VT.GLOW, AH);
+    for (let i = 0; i < n; i++) {   // (each mote spirals in from about a hand's breadth out, and is gone at the palm)
+      const u = (now * 2.2 + i / n + ph * .13) % 1, a = (i * 2.4 + ph) + u * (big ? 4 : 2.2), el = (rnd(i, ph) - .5) * 1.6, r = RR * z * (1 - u);   // (a swirl: each mote turns round the palm as it falls in)
+      const x = p[0] + Math.cos(a) * Math.cos(el) * r, y = p[1] + Math.sin(el) * r * .7 + .02 * z, w = p[2] + Math.sin(a) * Math.cos(el) * r;
+      vfxSprite(VX, x, y, w, ms * z, ms * z, a, c3(i % 3 === 2 ? PAL.bronze : PAL.edge, 1.2), .85 * g * Math.sin(Math.PI * u), VT.STAR, AH);
+    }
+    if (!big) return;
+    // a spell's gather: two short streams of violet light swirling in round the hand, tightening as they near it
+    for (let j = 0; j < 2; j++) {
+      const a0 = now * 7 + j * Math.PI + ph, M = 9;
+      for (let pass = 0; pass < 2; pass++) {
+        vfxRb.begin(VX, VT.SOLID, pass ? AH : AB, 0);
+        for (let m = 0; m <= M; m++) { const v = m / M, a = a0 - v * 2.4, r = RR * z * (.25 + .75 * v), tl = Math.sin(Math.PI * v);
+          vfxRb.pt(p[0] + Math.cos(a) * r, p[1] + (v - .3) * .12 * z, p[2] + Math.sin(a) * r, (pass ? .012 : .04) * z * (.3 + .7 * (1 - v)), pass ? c3(PAL.hot, 1.25) : c3(PAL.body), (pass ? .8 : .7) * g * tl, v); }
+        vfxRb.end();
+      }
+    }
+  }
+  function sweep(L, now, z) {
+    const n = L.length, tail = (q, w) => Math.pow(1 - Math.min(1, (now - q.at) / K.trail), w);
+    for (let pass = 0; pass < 2; pass++) {
+      vfxRb.begin(VX, VT.SOLID, pass ? AH : AB, 0);
+      for (let k = 0; k < n; k++) { const q = L[k], e = tail(q, pass ? .6 : 1); vfxRb.pt(q.p[0], q.p[1], q.p[2], (pass ? .026 : .11) * z * (.25 + .75 * e), pass ? c3(PAL.hot, 1.3) : c3(PAL.body), (pass ? .95 : .75) * e * K.gain, k / (n - 1)); }
+      vfxRb.end();
+    }
+  }
+
+  /* ---------------------------------------------------------------- the crescent ribbon (his strike; the Returning Crescent) */
+  // a crescent arc about (x, y, z): its middle leads along (ux, uz), its tips swept back; R its half span; ga how bright
+  // a crescent blade lying flat about (x, y, z): its outer edge leads along (ux, uz), white-hot; a soft violet body behind
+  // it thinning to the tips; R its outer radius; ga how bright (second pass, 27 Nov 2026: the ribbon read as a sliver)
+  function arc(x, y, z, ux, uz, R, ga, tilt, hotK) {
+    const N = vfxLite() ? 10 : 16, A = 1.35, W = R * .62, px = -uz, pz = ux, hk = hotK == null ? 1 : hotK;
+    const B = [[0, c3(PAL.hot, 1.4), .95 * hk, AH], [.16, c3(PAL.edge, 1.15), .92, AH * .6], [.55, c3(PAL.body), .85, AB], [1, c3(PAL.deep), .25, AB]];
+    if (!VX.room((N + 1) * B.length, N * 6 * (B.length - 1))) return;
+    vfxSprite(VX, x, y, z, R * 1.15, R * 1.15, 0, c3(PAL.body), .2 * ga, VT.GLOW, AB);   // (a soft violet glow under it: some body on the grass)
+    let prev = -1;
+    for (let k = 0; k <= N; k++) {
+      const a = -A + 2 * A * k / N, ca = Math.cos(a), sa = Math.sin(a), dx = ux * ca + px * sa, dz = uz * ca + pz * sa;
+      const th = W * Math.pow(Math.cos(a / A * Math.PI / 2), .8), ox = x + dx * R - ux * R * .55, oz = z + dz * R - uz * R * .55, oy = y + (tilt || 0) * sa * R;
+      let first = -1;
+      for (const [f, col, al, ad] of B) {
+        const i = VX.vert(ox - dx * th * f, oy, oz - dz * th * f, .5, .5, col[0], col[1], col[2], Math.min(1, al * ga), VT.SOLID, ad, 0);
+        if (first < 0) first = i;
+      }
+      if (prev >= 0) for (let b = 0; b < B.length - 1; b++) VX.tri2(prev + b, first + b, first + b + 1, prev + b + 1);
+      prev = first;
+    }
+  }
+  // his strike, cast: a crescent flies from his palm to the foe over T seconds (the game's own delay to the blow)
+  function strike(t, tg, T) {
+    if (!mine(t) || !live() || !tg) return false;
+    const p = t.tipW || [t.x, 1, t.y];
+    sfxAdd({ k: 'sev_cut', spin: -.6, foe: tg, x0: p[0], h0: p[1], z0: p[2], T: Math.max(.06, T), life: Math.max(.06, T) + .05, z: zk() });
+    S.cuts++; return true;
+  }
+  function drawCut(q) {
+    const c = q.foe; if (c && !c.dead) { q.x1 = c.x; q.h1 = foeH(c) + .04; q.z1 = c.y; } if (q.x1 == null) return;
+    const u = Math.min(1, q.age / q.T), z = q.z, dx = q.x1 - q.x0, dz = q.z1 - q.z0, l = Math.hypot(dx, dz) || 1, ux = dx / l, uz = dz / l;
+    const R = .36 * z * (.75 + .25 * Math.min(1, u * 3)), sp0 = q.spin || 0;
+    for (let e = 2; e >= 0; e--) {   // (two fainter echoes behind it)
+      const v = u - e * .14; if (v < 0) continue; const ev = v * v * (3 - 2 * v) * .25 + v * .75;
+      const sa = sp0 + (q.age - e * .04) * 11, rx = ux * Math.cos(sa) - uz * Math.sin(sa), rz = uz * Math.cos(sa) + ux * Math.sin(sa);   // (spinning as it flies)
+      arc(q.x0 + dx * ev, q.h0 + (q.h1 - q.h0) * ev, q.z0 + dz * ev, rx, rz, R * (1 - e * .15), [1, .45, .2][e], .12, e ? .5 : 1);
+    }
+  }
+
+  /* ---------------------------------------------------------------- marks on the foe */
+  // kind: 'cut' a slash across (his strike, a crescent's cut); 'sever' a standing line (Sundering Glyph); 'tear' the rip
+  function mark(t, c, kind, big) {
+    if (!c || !live()) return false;
+    const p = t && t.tipW ? t.tipW : [t ? t.x : c.x, 1, t ? t.y : c.y], dx = c.x - p[0], dz = c.y - p[2], l = Math.hypot(dx, dz) || 1;
+    const q = sfxAdd({ k: 'sev_mark', foe: c, kind, big: big ? 1 : 0, ux: dx / l, uz: dz / l, flip: Math.random() < .5 ? 1 : -1, seed: Math.random() * 100, z: zk(),
+      x: c.x, h: foeH(c), zz: c.y, r: (c.def && c.def.r) || .25, life: kind === 'tear' ? 1.2 : kind === 'sever' ? 1.1 : .8 });
+    const h = q.h, n = big ? 4 : 2;
+    if (typeof fxSpark === 'function') { fxSpark(c.x, c.y, h, PAL.edge, n + 1); fxSpark(c.x, c.y, h, PAL.bronze, n); }
+    // a small burst of violet shards, thrown on along the cut
+    if (typeof vfxBurst === 'function') vfxBurst({ x: c.x, y: h, z: c.y, shape: 'sphere', r: .08, sp: [1.4, 3.2], up: [.4, 1.6], vx: q.ux * 1.4, vz: q.uz * 1.4, life: [.3, .55], size: [.04, .065], c0: c3(PAL.edge), drag: .8, grav: 8, layer: VT.SHARD, spin: 14, add: 0 }, kind === 'cut' ? (big ? 7 : 5) : 9);
+    S.marks++; return true;
+  }
+  function drawMark(q) {
+    const c = q.foe; if (c && !c.dead) { q.x = c.x; q.h = foeH(c); q.zz = c.y; }
+    // (drawn on the foe's near side, toward the eye: inside a big foe's body it was hidden)
+    const V = RD.view, nr = q.r * .9 + .06, a = q.age, X = q.x + V[2] * nr, Y = q.h + V[6] * nr, Z = q.zz + V[10] * nr, R = RD.right, z = q.z * Math.max(1, Math.min(1.8, Math.sqrt(q.r / .25)));   // (bigger on a big foe)
+    // the flash, at once and brief
+    if (a < .12) { const f = 1 - a / .12, s = (.16 + .2 * (1 - f)) * z * (q.big ? 1.3 : 1); vfxSprite(VX, X, Y, Z, s, s, q.seed, c3(PAL.hot, 1.3), .8 * f * sfxZk(), VT.GLOW, AH); vfxSprite(VX, X, Y, Z, s * 1.8, s * 1.8, 0, c3(PAL.body), .35 * f, VT.GLOW, AB); }
+    if (q.kind === 'cut') {   // a pointed slash across the foe, drawn out fast along the cut, then fading
+      const D = .3, e = a / D;
+      if (e < 1) {
+        const len = Math.max(.5, q.r * 3) * z * (q.big ? 1.25 : 1), head = Math.min(1, e * 4), tl = Math.max(0, e * 1.6 - .55), fade = Math.pow(1 - e, 1.3), px = -q.uz, pz = q.ux, N = 7;
+        for (let pass = 0; pass < 2; pass++) {
+          vfxRb.begin(VX, pass ? VT.GLOW : VT.SOLID, pass ? AH : 0, 0);
+          for (let k = 0; k <= N; k++) { const u = tl + (head - tl) * k / N, v = (u - .5) * len, sh = Math.sin(Math.PI * k / N);
+            const bw = len * .2 * (1 - 4 * (u - .5) * (u - .5)) - len * .1;   // (curved: a crescent's arc, its belly toward the cut's way)
+            vfxRb.pt(X + px * v + q.ux * bw, Y + v * .32 * q.flip, Z + pz * v + q.uz * bw, .16 * z * (pass ? .3 : 1) * (.15 + .85 * sh), pass ? c3(PAL.hot, 1.3) : c3(PAL.body, 1.05), fade * (pass ? .95 : .9), k / N); }
+          vfxRb.end();
+        }
+      }
+    } else if (q.kind === 'sever') {   // the glyph cracking open on the road under it, a tall rending tear through it
+      ground(q, a, z, 1);
+      tearAt(X, Y, Z, z * 1.15, sm(0, .1, a) * (1 - sm(.45, .8, a)), q.seed, 1, R);
+    } else if (q.kind === 'tear') {   // a jagged rip in the air over the foe, and a smaller glyph under it
+      ground(q, a, z, .7);
+      tearAt(X, Y, Z, z, sm(0, .12, a) * (1 - sm(.4, .7, a)), q.seed, q.big, R);
+    }
+    // the shimmer: a few small motes lingering over the foe, rising and twinkling out
+    const s0 = q.kind === 'cut' ? .12 : .25, d = q.life - s0;
+    if (a > s0 && !vfxLite()) {
+      const n = q.kind === 'cut' ? 4 : 6;
+      for (let i = 0; i < n; i++) {
+        const u = (a - s0) / d - rnd(i, q.seed) * .25; if (u <= 0 || u >= 1) continue;
+        const an = rnd(i + 7, q.seed) * TAU, rr = (.08 + .14 * rnd(i + 3, q.seed)) * z, tw = .55 + .45 * Math.sin(a * 22 + i * 2.3);
+        vfxSprite(VX, X + Math.cos(an) * rr, Y + (-.15 + .45 * u + .2 * rnd(i, q.seed + 1)) * z, Z + Math.sin(an) * rr, .018 * z, .018 * z, a * 3 + i, c3(i % 3 === 0 ? PAL.bronze : PAL.edge, 1.2), .7 * tw * Math.sin(Math.PI * u), VT.STAR, AH);
+      }
+    }
+  }
+
+  // a rip in the air: opens, a dark seam between two bright edges, and closes (open 0..1)
+  function tearAt(X, Y, Z, z, open, seed, big, R) {
+    if (open <= .01) return;
+    const N = 9, top = Y + .6 * z, bot = Math.max(.05, Y - .5 * z), wid = .12 * z * open * (big ? 1.2 : 1);
+    const P = []; for (let k = 0; k <= N; k++) { const v = k / N, j = (k === 0 || k === N) ? 0 : (rnd(k, seed) - .5) * .12 * z; P.push([X + R[0] * j, top + (bot - top) * v, Z + R[2] * j, Math.sin(Math.PI * v)]); }
+    vfxSprite(VX, X, Y, Z, .32 * z * open, .5 * z * open, 0, c3(PAL.body), .3 * open, VT.GLOW, AB);
+    vfxRb.begin(VX, VT.SOLID, 0, 0);
+    for (let k = 0; k <= N; k++) { const p = P[k]; vfxRb.pt(p[0], p[1], p[2], wid * 1.4 * p[3] + .002, c3(PAL.dark), .85 * open, k / N); }
+    vfxRb.end();
+    for (const sd of [-1, 1]) {
+      vfxRb.begin(VX, VT.SOLID, AH, 0);
+      for (let k = 0; k <= N; k++) { const p = P[k], o = sd * wid * .8 * p[3]; vfxRb.pt(p[0] + R[0] * o, p[1], p[2] + R[2] * o, .032 * z * (.3 + .7 * p[3]), k % 3 ? c3(PAL.edge, 1.25) : c3(PAL.hot, 1.35), .95 * open, k / N); }
+      vfxRb.end();
+    }
+  }
+  // a glyph on the road under the foe: a ring with bronze ticks drawn round, a violet sigil inside it, and bright cracks
+  // opening out from its middle; about the Chronomancer's clock ring in strength (k: its size)
+  function ground(q, a, z, k) {
+    const g = Math.min(1, a / .1) * Math.pow(Math.max(0, 1 - a / q.life), 1.1); if (g <= .01) return;
+    const X = q.x, Z = q.zz, r = ((.3 + .25 * sm(0, .35, a)) * z + q.r * .7) * k, lite = vfxLite(), draw = sm(0, .3, a);
+    vfxFan(VX, X, .046, Z, r - .05 * z, r, -Math.PI / 2, -Math.PI / 2 + TAU * Math.max(.02, draw), lite ? 24 : 48, c3(PAL.body), .55 * g, VT.FAN, AB, 0, 3);
+    vfxFan(VX, X, .047, Z, r * .62 - .025 * z, r * .62, 0, TAU, lite ? 18 : 32, c3(PAL.edge), .4 * g, VT.FAN, AH, 0, 2);
+    for (let i = 0; i < 12; i++) { const b = i / 12 * TAU - a * .4; if (i / 12 > draw) continue; vfxFlat(VX, X + Math.cos(b) * (r - .025 * z), Z + Math.sin(b) * (r - .025 * z), .05, i % 3 ? .022 * z : .04 * z, .012 * z, b, c3(PAL.bronze, 1.2), .9 * g, VT.SOLID, AH); }
+    vfxFlat(VX, X, Z, .045, r * .6, r * .6, q.seed - a * .6, c3(PAL.deep), .45 * g, VT.GLYPH, AB);
+    const cr = sm(0, .25, a) * r * 1.05;   // (the cracks: opening out from its middle)
+    if (cr > .01) vfxFlat(VX, X, Z, .049, cr, cr, q.seed * 2, c3(PAL.hot, 1.2), .75 * g * (1 - sm(.5, 1, a / q.life)), VT.CRACK, AH);
+  }
+
+  /* ---------------------------------------------------------------- Sundering Glyph: the falling blade */
+  function sunder(t, c) {
+    if (!mine(t) || !live() || !c) return false;
+    sfxAdd({ k: 'sev_fall', foe: c, life: .26, z: zk(), x: c.x, h: foeH(c), zz: c.y, flip: Math.random() < .5 ? 1 : -1 });
+    S.glyphs++; return true;
+  }
+  function drawFall(q) {
+    const c = q.foe; if (c && !c.dead) { q.x = c.x; q.h = foeH(c); q.zz = c.y; }
+    // (on the foe's near side, toward the eye: inside a big foe's body it was hidden)
+    const V = RD.view, nr = ((c && c.def && c.def.r) || .25) * .9 + .06, QX = q.x + V[2] * nr, QH = q.h + V[6] * nr, QZ = q.zz + V[10] * nr;
+    const u = Math.min(1, q.age / .22), e = u * u, z = q.z * Math.max(1, Math.min(1.6, Math.sqrt(((c && c.def && c.def.r) || .25) / .25))), R = RD.right, Rr = .36 * z, cy = QH + (1.05 - .95 * e) * z;
+    // a tall crescent standing face-on to the eye, its belly leading down onto the foe
+    const N = 10, at = (v, out) => { const sw = Rr * .55 * (1 - v * v); return [QX + R[0] * v * Rr, cy - sw - out, QZ + R[2] * v * Rr]; };
+    const ga = Math.min(1, q.age / .06);
+    for (let pass = 0; pass < 2; pass++) {
+      vfxRb.begin(VX, VT.SOLID, pass ? AH : AB, 0);
+      for (let k = 0; k <= N; k++) { const v = -1 + 2 * k / N, p = at(v * (pass ? .92 : 1), pass ? Rr * .14 : 0), sh = Math.pow(1 - v * v, pass ? .8 : .55);
+        vfxRb.pt(p[0], p[1], p[2], (pass ? .13 : .5) * Rr * sh + .003, pass ? c3(PAL.hot, 1.35) : c3(PAL.body), (pass ? .95 : .85) * ga * sh, k / N); }
+      vfxRb.end();
+    }
+    vfxRb.begin(VX, VT.GLOW, AB, 0);   // (its fall: a short streak above it)
+    vfxRb.pt(QX, cy + .45 * z * e, QZ, .01 * z, c3(PAL.body), 0, 0); vfxRb.pt(QX, cy, QZ, .1 * z, c3(PAL.edge), .45 * ga, 1); vfxRb.end();
+  }
+
+  /* ---------------------------------------------------------------- Returning Crescent: the spinning crescent along its loop */
+  function drawLoop(q) {
+    const Z = q.zone, el = G.time - Z.at, T2 = 2 * Z.T; if (el < 0 || el > T2 + .2 || typeof ccxLoopAt !== 'function') return;
+    const u = Math.min(2, el / Z.T), z = q.z, hAt = uu => .55 + .15 * Math.sin(Math.PI * uu / 2), R = .36 * z;
+    vfxRb.begin(VX, VT.SOLID, AB, 0);   // (a ribbon along the loop behind it)
+    for (let k = 0; k <= 8; k++) { const uu = Math.max(0, u - k * .05), w = ccxLoopAt(Z.L, uu); vfxRb.pt(w[0], hAt(uu), w[1], .16 * z * (1 - k / 9), k ? c3(PAL.body) : c3(PAL.hot, 1.2), .7 * (1 - k / 9), k / 8); }
+    vfxRb.end();
+    for (let e = 2; e >= 0; e--) {   // (the crescent and two echoes, turning flat as it flies)
+      const uu = Math.max(0, u - e * .07), p = ccxLoopAt(Z.L, uu), rot = -(el - e * .03) * 24, ga = [1, .4, .18][e];
+      const ux = Math.cos(rot), uz = Math.sin(rot);
+      arc(p[0], hAt(uu), p[1], ux, uz, R * (1 - e * .12), ga, .15, e ? .4 : 1);
+      if (!e && !vfxLite()) for (const sd of [-1, 1]) { const tx = p[0] - uz * sd * R * .95 - ux * R * .25, tz = p[1] + ux * sd * R * .95 - uz * R * .25; vfxSprite(VX, tx, hAt(uu), tz, .035 * z, .035 * z, rot, c3(PAL.bronze, 1.3), .8, VT.STAR, AH); }
+    }
+  }
+
+  /* ---------------------------------------------------------------- Rend the Veil: the threads */
+  function drawThreads(q) {
+    const t = q.t; if (!t || !G.towers.includes(t)) return;
+    const an = typeof SEV2 !== 'undefined' ? SEV2.anchors(t) : null, z = q.z;
+    const rip = q.age >= q.rip, rk = rip ? Math.min(1, (q.age - q.rip) / .16) : 0, e = Math.min(1, q.age / .1) * (rip ? 1 - rk : 1); if (e <= .01) return;
+    for (let j = 0; j < q.F.length; j++) {
+      const c = q.F[j]; if (!c || (c.dead && !rip)) continue;
+      const h0 = (an && (j % 2 ? an.palmL : an.palmR)) || t.tipW || [t.x, 1, t.y], x1 = c.x, y1 = foeH(c), z1 = c.y;
+      const reach = rip ? 1 - rk : Math.min(1, q.age / .14), tr = .025 * z * Math.sin(q.age * 55 + j * 2) * (rip ? 0 : 1);
+      for (let pass = 0; pass < 2; pass++) {
+        vfxRb.begin(VX, VT.SOLID, pass ? AH : AB, 0);
+        for (let k = 0; k <= 8; k++) { const f = k / 8 * reach, sag = Math.sin(Math.PI * f) * (tr + .05 * z); vfxRb.pt(h0[0] + (x1 - h0[0]) * f, h0[1] + (y1 - h0[1]) * f + sag, h0[2] + (z1 - h0[2]) * f, (pass ? .016 : .06) * z, pass ? c3(PAL.hot, 1.25) : c3(PAL.body), (pass ? .95 : .75) * e, f); }
+        vfxRb.end();
+      }
+      if (!rip && !c.dead) {   // (a ring on the road under the hooked foe, tightening as the threads are drawn in)
+        const cr = (c.def && c.def.r) || .25, rr = (cr + .32 * z) * (1 - .25 * Math.min(1, q.age / q.rip)), lite = vfxLite();
+        vfxFan(VX, c.x, .046, c.y, rr - .055 * z, rr, 0, TAU, lite ? 20 : 40, c3(PAL.deep), .65 * e, VT.FAN, AB, q.age, 3);
+        for (let i = 0; i < 6; i++) { const b = i / 6 * TAU + q.age * 1.5; vfxFlat(VX, c.x + Math.cos(b) * (rr - .02 * z), c.y + Math.sin(b) * (rr - .02 * z), .05, .035 * z, .012 * z, b, c3(PAL.bronze, 1.2), .85 * e, VT.SOLID, AH); }
+      }
+      if (!rip) {   // (a bronze spark running down each thread to its foe, and a knot of light where it holds)
+        const f = (q.age * 2.4 + j * .37) % 1, sag = Math.sin(Math.PI * f) * (tr + .05 * z);
+        vfxSprite(VX, h0[0] + (x1 - h0[0]) * f, h0[1] + (y1 - h0[1]) * f + sag, h0[2] + (z1 - h0[2]) * f, .03 * z, .03 * z, q.age * 9, c3(PAL.bronze, 1.3), .9 * e, VT.STAR, AH);
+        vfxSprite(VX, x1, y1, z1, .1 * z, .1 * z, q.age * 5 + j, c3(PAL.body), .45 * e, VT.GLOW, AB);
+        vfxSprite(VX, x1, y1, z1, .05 * z, .05 * z, q.age * 7 + j, c3(PAL.hot, 1.2), .8 * e, VT.STAR, AH);
+      }
+    }
+  }
+
+  /* ---------------------------------------------------------------- Sever: the links, taut, then snapped (the new kit,
+     27 Nov 2026: "a visible snapping of glowing threads between the foe and its supporters") */
+  function severThreads(t, c, sups, T) {
+    if (!live() || !c) return;
+    sfxAdd({ k: 'sev_links', t, c, sups: (sups || []).slice(0, 6), rip: T, z: zk(), seed: Math.random() * 100, life: T + .45 });
+  }
+  function severSnap(t, c, sups) {
+    if (!live() || !c) return;
+    mark(t, c, 'cut', true);
+    sfxAdd({ k: 'sev_heavy', foe: c, t, z: zk(), x: c.x, h: foeH(c), zz: c.y, life: .3 });
+    for (const o of sups || []) if (!o.dead && typeof fxSpark === 'function') { fxSpark(o.x, o.y, foeH(o), PAL.edge, 3); fxSpark(o.x, o.y, foeH(o), PAL.bronze, 2); }
+    S.snaps = (S.snaps || 0) + 1;
+  }
+  // a thread from a to b, trembling (tr), drawn up to reach; split: its two halves pulled back toward their ends
+  function thread(a, b, z, e, tr, reach, ph) {
+    for (let pass = 0; pass < 2; pass++) {
+      vfxRb.begin(VX, VT.SOLID, pass ? AH : AB, 0);
+      for (let k = 0; k <= 8; k++) { const f = k / 8 * reach, sag = Math.sin(Math.PI * f) * tr; vfxRb.pt(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f + sag, a[2] + (b[2] - a[2]) * f, (pass ? .014 : .05) * z, pass ? c3(PAL.hot, 1.25) : c3(PAL.body), (pass ? .9 : .7) * e, f); }
+      vfxRb.end();
+    }
+    if (!vfxLite()) { const f = (ph % 1) * reach; vfxSprite(VX, a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f + Math.sin(Math.PI * f) * tr, a[2] + (b[2] - a[2]) * f, .028 * z, .028 * z, ph * 9, c3(PAL.bronze, 1.3), .9 * e, VT.STAR, AH); }
+  }
+  function drawLinks(q) {
+    const c = q.c, z = q.z, a = q.age; if (!c) return;
+    const P = o => [o.x, foeH(o) + .05, o.y], pc = P(c), rip = a >= q.rip;
+    const an = typeof SEV2 !== 'undefined' ? SEV2.anchors(q.t) : null;
+    if (!rip) {
+      const e = Math.min(1, a / .12), tr = .02 * z * Math.sin(a * 50);
+      // his hold on the foe: a thread from each palm
+      if (an) for (const p of [an.palmR, an.palmL]) if (p) thread(p, pc, z * .8, e * .8, tr, Math.min(1, a / .15), a * 2.2);
+      // the foe's own links: from each supporter, taut and trembling, brighter as the tear nears
+      const k = .7 + .3 * Math.min(1, a / q.rip);
+      for (let j = 0; j < q.sups.length; j++) { const o = q.sups[j]; if (o.dead) continue; thread(P(o), pc, z, e * k, tr * (j % 2 ? -1 : 1), Math.min(1, a / .2), a * 1.8 + j * .3); }
+      vfxSprite(VX, pc[0], pc[1], pc[2], .14 * z, .14 * z, a * 4, c3(PAL.body), .4 * e, VT.GLOW, AB);
+      return;
+    }
+    // snapped: each link breaks at its middle, both halves whipping back to their ends and fading
+    const u = Math.min(1, (a - q.rip) / .3), e = 1 - u; if (e <= .01) return;
+    for (let j = 0; j < q.sups.length; j++) {
+      const o = q.sups[j], po = P(o), m = [(po[0] + pc[0]) / 2, (po[1] + pc[1]) / 2 + .08 * z, (po[2] + pc[2]) / 2], back = .5 * (1 - u * .9);
+      thread(po, m, z, e, .05 * z * u * (j % 2 ? -1 : 1), back * 2, 0);
+      thread(pc, m, z, e, -.05 * z * u * (j % 2 ? -1 : 1), back * 2, 0);
+      if (u < .4) vfxSprite(VX, m[0], m[1], m[2], .1 * z * (1 - u), .1 * z * (1 - u), 0, c3(PAL.hot, 1.3), .9 * (1 - u / .4), VT.GLOW, AH);
+    }
+  }
+  // the heavy crescent: a wide blade sweeping through the foe as his hands tear apart
+  function drawHeavy(q) {
+    const c = q.foe; if (c && !c.dead) { q.x = c.x; q.h = foeH(c); q.zz = c.y; }
+    const u = Math.min(1, q.age / .16), e = q.age < .16 ? 1 : Math.max(0, 1 - (q.age - .16) / .14), R = RD.right, rr = (c && c.def && c.def.r) || .3;
+    const V = RD.view, nr = rr * .9 + .06, X = q.x + V[2] * nr, Y = q.h + V[6] * nr, Z = q.zz + V[10] * nr, w = .55 * q.z + rr;
+    arc(X + R[0] * w * (u - .5) * 1.2, Y + .1 * q.z, Z + R[2] * w * (u - .5) * 1.2, R[0], R[2], w * .7, e, .25, 1);
+  }
+
+  /* ---------------------------------------------------------------- Rift Line: the seam on the road */
+  function seam(Sm) {
+    if (!live()) return;
+    sfxAdd({ k: 'sev_seam', S: Sm, z: zk(), seed: Math.random() * 100, life: Sm.until - G.time + .4 });
+  }
+  function seamSpark(Sm, c) {
+    if (!live() || !c) return;
+    const a = (c.x - Sm.x) * Sm.dx + (c.y - Sm.z) * Sm.dz, x = Sm.x + Sm.dx * a, z = Sm.z + Sm.dz * a;
+    if (typeof fxSpark === 'function') { fxSpark(x, z, .1, PAL.edge, 4); fxSpark(x, z, .1, PAL.bronze, 3); }
+    mark(Sm.t, c, 'cut', false);
+    (Sm.hits || (Sm.hits = [])).push({ at: G.time, a });
+  }
+  function drawSeam(q) {
+    const Sm = q.S, z = q.z, now = G.time; if (!Sm) return;
+    const left = Sm.until - now, e = Math.min(1, (now - Sm.born) / .08) * Math.min(1, Math.max(0, left + .4) / .4); if (e <= .01) return;
+    const zip = Math.min(1, (now - Sm.born) / .15), N = Sm.small ? 6 : 12, half = Sm.half, w = Sm.small ? .7 : 1, pulse = .85 + .15 * Math.sin(now * 9 + q.seed);
+    const pts = [];
+    for (let k = 0; k <= N; k++) { const v = -1 + 2 * k / N * zip, j = (k === 0 || k === N) ? 0 : (rnd(k, q.seed) - .5) * .07 * z; pts.push([Sm.x + Sm.dx * v * half + Sm.nx * j, Sm.z + Sm.dz * v * half + Sm.nz * j, Math.sin(Math.PI * k / N)]); }
+    // a wide soft violet glow along it, a thin dark seam, its two bright violet-white edges and a white-hot line down its
+    // middle (flat on the road), and a low curtain of violet light standing over it: a tripwire the eye finds at once
+    // (the hub, 27 Nov 2026: "reads as a thin dark wavy line; make it glow violet-white")
+    vfxRb.begin(VX, VT.GLOW, AB, 0, 1);
+    for (let k = 0; k <= N; k++) { const p = pts[k]; vfxRb.pt(p[0], .05, p[1], .6 * z * w * (.4 + .6 * p[2]), c3(PAL.body), .55 * e * pulse, k / N); }
+    vfxRb.end();
+    vfxRb.begin(VX, VT.SOLID, 0, 0, 1);
+    for (let k = 0; k <= N; k++) { const p = pts[k]; vfxRb.pt(p[0], .052, p[1], .03 * z * w * (.3 + .7 * p[2]) + .003, c3(PAL.dark), .5 * e, k / N); }
+    vfxRb.end();
+    for (const sd of [-1, 1]) {
+      vfxRb.begin(VX, VT.SOLID, AH, 0, 1);
+      for (let k = 0; k <= N; k++) { const p = pts[k], o = sd * .04 * z * w * (.3 + .7 * p[2]); vfxRb.pt(p[0] + Sm.nx * o, .054, p[1] + Sm.nz * o, .034 * z * w, k % 3 ? c3(PAL.edge, 1.3) : c3(PAL.hot, 1.4), e * pulse, k / N); }
+      vfxRb.end();
+    }
+    vfxRb.begin(VX, VT.GLOW, AH, 0, 1);
+    for (let k = 0; k <= N; k++) { const p = pts[k]; vfxRb.pt(p[0], .056, p[1], .05 * z * w * (.3 + .7 * p[2]), c3(PAL.hot, 1.4), .8 * e * pulse, k / N); }
+    vfxRb.end();
+    if (!vfxLite()) {   // (the curtain: facing the eye, fading upward)
+      vfxRb.begin(VX, VT.GLOW, AB, 0);
+      for (let k = 0; k <= N; k++) { const p = pts[k]; vfxRb.pt(p[0], .14 * z, p[1], .22 * z * w * p[2] + .01, c3(PAL.edge), .3 * e * pulse * p[2], k / N); }
+      vfxRb.end();
+    }
+    // bronze motes rising off it now and then; a flare where a foe has just been cut crossing it
+    if (!vfxLite()) for (let i = 0; i < (Sm.small ? 2 : 4); i++) { const u = (now * .9 + i / 4 + q.seed) % 1, v = (rnd(i, q.seed) * 2 - 1) * half * zip; vfxSprite(VX, Sm.x + Sm.dx * v, .06 + u * .35 * z, Sm.z + Sm.dz * v, .02 * z, .02 * z, u * 6, c3(i % 2 ? PAL.bronze : PAL.edge, 1.2), .8 * e * Math.sin(Math.PI * u), VT.STAR, AH); }
+    for (const h of Sm.hits || []) { const u = (now - h.at) / .3; if (u < 0 || u > 1) continue; const x = Sm.x + Sm.dx * h.a, zz = Sm.z + Sm.dz * h.a; vfxSprite(VX, x, .12, zz, .14 * z * (1 - u * .5), .2 * z, 0, c3(PAL.hot, 1.3), .8 * (1 - u), VT.GLOW, AH); }
+  }
+
+  /* ---------------------------------------------------------------- Broken Words; Splitting Edge */
+  function fizzle(t, c) {
+    if (!live() || !c) return;
+    const h = foeH(c) + .2;
+    sfxAdd({ k: 'vflash', x: c.x, z: c.y, h, s: .3 * zk(), life: .18, col: c3(PAL.edge), a: .7 * sfxZk() });
+    if (typeof fxSpark === 'function') { fxSpark(c.x, c.y, h, PAL.body, 5); fxSpark(c.x, c.y, h, PAL.bronze, 2); }
+    if (typeof vfxBurst === 'function') vfxBurst({ x: c.x, y: h, z: c.y, shape: 'sphere', r: .06, sp: [.6, 1.6], up: [.2, .9], life: [.3, .5], size: [.03, .05], c0: c3(PAL.edge), drag: 1.5, grav: 2, layer: VT.SHARD, spin: 10, add: 0 }, 4);
+    S.fizz = (S.fizz || 0) + 1;
+  }
+  function splitFx(t, x, z, c) {
+    if (!live() || !c) return;
+    sfxAdd({ k: 'sev_cut', spin: .4, foe: c, x0: x, h0: .55, z0: z, T: .08, life: .13, z: zk() * .75 });
+    mark(t, c, 'cut', false);
+  }
+
+  /* ---------------------------------------------------------------- hooks */
+  if (typeof SFX_DRAW !== 'undefined') Object.assign(SFX_DRAW, { sev_cut: drawCut, sev_mark: drawMark, sev_fall: drawFall, sev_loop: drawLoop, sev_threads: drawThreads, sev_links: drawLinks, sev_heavy: drawHeavy, sev_seam: drawSeam });
+  // the Conclave's own moments for his spells, his where the sculpted body draws him (forces_zxc_conclave_cool.js CCX_FX)
+  if (typeof CCX_FX !== 'undefined') {
+    const F0 = Object.assign({}, CCX_FX);
+    CCX_FX.crescent = (C, t, z) => { if (!mine(t)) return F0.crescent(C, t, z); sfxAdd({ k: 'sev_loop', zone: z, z: zk(), life: 2 * z.T + .3 }); S.loops++; };
+    CCX_FX.crescentCut = (C, c, both) => { if (!mine(C.t)) return F0.crescentCut(C, c, both); mark(C.t, c, 'cut', both); };
+    CCX_FX.crescentCatch = (C, t) => {
+      if (!mine(t)) return F0.crescentCatch(C, t);
+      const m = t.tipW; if (!m) return; const z = zk();
+      sfxAdd({ k: 'vflash', x: m[0], z: m[2], h: m[1], s: .22 * z, life: .14, col: c3(PAL.edge), a: .7 * sfxZk() });
+      if (typeof fxSpark === 'function') { fxSpark(m[0], m[2], m[1], PAL.edge, 2); fxSpark(m[0], m[2], m[1], PAL.bronze, 2); }
+    };
+    CCX_FX.rendHook = (C, t, F) => { if (!mine(t)) return F0.rendHook(C, t, F); sfxAdd({ k: 'sev_threads', t, F: F.slice(), rip: .6, z: zk(), life: .85 }); };
+    CCX_FX.rendRip = (C, t, F) => { if (!mine(t)) return F0.rendRip(C, t, F); for (const c of F) { mark(t, c, 'tear', F.length < 2); S.tears++; } };
+  }
+  // Sundering Glyph's generic recipe (a ring and glyph in the old teal over him, a shock on the foe) is left out: his own
+  // falling blade and sever mark stand in for it
+  if (typeof sfxRun === 'function') {
+    const run0 = sfxRun;
+    sfxRun = function (C, pre) { if (C && C.id === 'cc_sunder' && mine(C.t)) return; return run0.apply(this, arguments); };
+  }
+  // the shared shot burst (view.js towerPowerFx: a flash and sparks in his slot's colour, green, at his head on every shot)
+  // is left out: his gather, sweep and crescent show the shot
+  if (typeof towerPowerFx === 'function') {
+    const pw0 = towerPowerFx;
+    towerPowerFx = function (t, tier) { if (mine(t)) { t.fxShot = t.shots; return; } return pw0.apply(this, arguments); };
+  }
+  return { S, PAL, K, frame, strike, mark, sunder, severThreads, severSnap, seam, seamSpark, fizzle, splitFx };
+})();
+// the hooks the Conclave's code calls (forces_zs_conclave.js): true when his own light was drawn in place of the old
+function sevFxStrike(t, tg, T) { try { return SEVFX.strike(t, tg, T); } catch (e) { return false; } }
+function sevFxImpact(t, tg) { try { return !!(typeof SEV2 !== 'undefined' && SEV2.anchors(t) && SEVFX.mark(t, tg, 'cut', false)); } catch (e) { return false; } }
+function sevFxSunder(t, c) { try { return SEVFX.sunder(t, c); } catch (e) { return false; } }
+function sevFxSunderHit(t, c) { try { return !!(typeof SEV2 !== 'undefined' && SEV2.anchors(t) && SEVFX.mark(t, c, 'sever', true)); } catch (e) { return false; } }
 
 /* Morrow, the Grey Justicar (ch_morrow, the Silver Order's mounted Champion) on the owner's sculpted model (25 Nov 2026:
    "Morrow the Grey Justicar": a bare-headed old knight in a fur mantle and a long cream cloak on a dark horse in a steel
