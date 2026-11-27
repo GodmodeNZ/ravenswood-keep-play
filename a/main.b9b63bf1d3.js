@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cd4baae7@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '5ee2e6f0@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -47805,7 +47805,7 @@ const WPN_CLASS = {
     ['pennonlance', 'Pennon Lance', 1.1, .1, 'a light lance with a long blue pennon'],
     ['thunderlance', 'Thunder Lance', .9, .16, 'a heavy lance with a copper point that crackles'],
     ['skylance', 'Sky Lance', .96, .14, 'a white lance with feathered wings at the guard']] },
-  daggers: { icon: 'swords', hue: '#8aa04a', size: 'a blade about a forearm\'s length, one in each hand', bases: [   // (one blade a weapon since 24 Nov 2026: the Blade Dancers dual wield, an off hand of its own: forces_..._dualwield.js)
+  daggers: { icon: 'knives', hue: '#8aa04a', size: 'a blade about a forearm\'s length, one in each hand', bases: [   // (one blade a weapon since 24 Nov 2026: the Blade Dancers dual wield, an off hand of its own: forces_..._dualwield.js)
     ['twinknives', 'Long Knife', 1, .12, 'a plain long knife with a leather grip'],
     ['leafdaggers', 'Leaf Dagger', 1.12, .1, 'a leaf-shaped dagger of green-tinted steel'],
     ['crescents', 'Crescent Blade', .94, .14, 'a curved crescent blade with a middle grip'],
@@ -48097,7 +48097,7 @@ const WPN_ISSUED = {
   ch_huri: ['Huri\'s Bone Spear', '#efe4c8', 'a spear of carved bone'],
   // the Wardbound
   wb_oathbound: ['Oathbound Rune Greatsword', '#8a8a9a', 'a greatsword with glowing runes down the blade'], wb_maskedwarden: ['Warden\'s Gold Glaive', '#c0a05a', 'a three-bladed glaive with gold inlay'],
-  wb_frostbrand: ['Gatewatch Halberd', '#7aa0c0', 'a frost-rimed halberd'], wb_oathknife: ['Nightblade\'s Pair', '#8a5a60', 'two long knives with gold runes down the blades'], wb_runecarver: ['Runecarver\'s Tome', '#8a5a3a', 'a stone-paged rune book and a stylus'],
+  wb_frostbrand: ['Gatewatch Halberd', '#7aa0c0', 'a frost-rimed halberd'], wb_oathknife: ['Nightblade\'s Oath Knife', '#8a5a60', 'a long black knife, gold runes down the blade (one in each hand: she dual wields)'], wb_runecarver: ['Runecarver\'s Tome', '#8a5a3a', 'a stone-paged rune book and a stylus'],
   wb_stormward: ['Sable Rune Lance', '#5a8ac0', 'a lance wound with gold rune wire'], wb_anvilguard: ['Stoneguard\'s Hammer', '#8a8a9a', 'a dark steel war hammer'],
   wb_siegewarden: ['Graveshot Ballista', '#8a7a5a', 'a field ballista'], wb_vowkeeper: ['Chaplain\'s Blade', '#7a6a8a', 'a short blade with a censer chain'],
   ch_varic: ['Varic\'s Warden Blade', '#c8963a', 'a dark sword with a gold rune on the cross'], ch_aedric: ['Aedric\'s Sun Lance', '#f0c860', 'a white lance with a gold point'],
@@ -48126,6 +48126,13 @@ const WPN_STYLE = {
   'stormborn:hammer': { hue: '#8a7a6a', names: { warhammer: ['Stone Hammer', 'a stone head lashed to a haft'], maul: ['Earth Maul', 'a great maul of river stone'], mallet: ['River-Stone Mallet', 'a short mallet of smooth stone'], greathammer: ['Mountain Hammer', 'a great hammer shaped like a peak'] } },
   'wardbound:hammer': { hue: '#8a8a9a', names: { warhammer: ['Warden\'s Hammer', 'a dark steel war hammer'], maul: ['Anvil Maul', 'a maul whose head is a small anvil'], mallet: ['Rune Mallet', 'a short hammer with a gold rune'], greathammer: ['Great Anvil Hammer', 'a great hammer of black iron'] } },
   'silver:tome': { hue: '#8a6a5a', names: { codex: ['Writ of Judgement', 'a sealed writ on an iron rod'], grimoire: ['Book of Censure', 'a black-bound book with an iron lock'], ledger: ['Ledger of Heresies', 'a tall ledger in a chained cover'], scrollcase: ['Writ Case', 'a brass case of sealed writs'] } },
+  // the Nightblades' knives (owner, 27 Nov 2026: "nightblades should dual wield"): one knife a weapon, a pair in her hands. ownArt: a base
+  // shows only a painting made for this make ('w-style_wardbound_<base>'), else the class's knife glyph in her colours, never the
+  // Grove's leaf daggers or sabres (wpArtKey, weaponart.js)
+  'grove:daggers': { hue: '#8aa04a', names: { twinknives: ['Long Knife', 'a plain long knife with a leather grip'], leafdaggers: ['Leaf Dagger', 'a leaf-shaped dagger of green-tinted steel'],
+    crescents: ['Crescent Blade', 'a curved crescent blade with a middle grip'], sabres: ['Wind Sabre', 'a long thin curved sabre'] } },   // (the Blade Dancers': the bases' own names)
+  'wardbound:daggers': { hue: '#8a5a60', ownArt: 1, names: { twinknives: ['Sable Knife', 'a long black knife with a plain gold guard'], leafdaggers: ['Oath Dagger', 'a slim dagger with a gold rune on the blade'],
+    crescents: ['Hooked Knife', 'a dark knife whose point curls back in a hook'], sabres: ['Rune Stiletto', 'a long thin stiletto etched with gold runes'] } },
   'wardbound:tome': { hue: '#8a5a3a', names: { codex: ['Rune Codex', 'a stone-paged rune book'], grimoire: ['Black Grimoire', 'a black rune book with a gold clasp'], ledger: ['Ledger of Runes', 'a tall book of carved rune plates'], scrollcase: ['Road-Scribe\'s Case', 'a scroll case of road maps and runes'] } },
 };
 const wpnForceNow = () => (typeof G !== 'undefined' && G && G.force) || (typeof FORCE_NOW !== 'undefined' && FORCE_NOW) || null;
@@ -57177,6 +57184,8 @@ if (typeof TAL_FORCE_RE !== 'undefined') TAL_FORCE_RE.conclave = /\b(Arcane Char
    somehow". The units drawn and written with a weapon in each hand (DUAL_UNIT):
      - Templars of the Ford (templar): a sword in each fist (unitmodels_templar2.js, the dual-wield kit, forces_silver_a.js)
      - Blade Dancers (bladedancer): a blade in each hand (unitmodels_bladedancer2.js bladeR / bladeL)
+     - Nightblades (wb_oathknife, the Wardbound's assassin, 27 Nov 2026): a knife in each fist (unitmodels_oathknife2.js); the
+       Wardbound make their daggers as knives (WPN_STYLE['wardbound:daggers'])
      - Brannoc Goldvein, the Under-King (ch_brannoc, a Champion): a rune hammer in each fist (unitmodels_brannoc2.js);
        his right hand keeps his iconic hero weapon (forces_zzzzzzzzzzzzzzzz_heroweapons.js), his left takes a hammer
        from the rack.
@@ -57197,7 +57206,7 @@ if (typeof TAL_FORCE_RE !== 'undefined') TAL_FORCE_RE.conclave = /\b(Arcane Char
    dual-wield army. Old saves load with every off hand empty.
    Models: WEAPON_MDL holds no weapon models yet, so every unit draws its own two weapons whatever is equipped (as the main
    hand does); dualModel(t) gives the off-hand's model key once the owner's models are registered. */
-const DUAL_UNIT = { templar: 'sword', bladedancer: 'daggers', ch_brannoc: 'hammer' };
+const DUAL_UNIT = { templar: 'sword', bladedancer: 'daggers', ch_brannoc: 'hammer', wb_oathknife: 'daggers' };   // (the Nightblades: owner, 27 Nov 2026, "nightblades should dual wield")
 const DUAL_OFF = .5;   // the off hand's share of its weapon's gain (damage, Spell Damage) and of its on-hit effect's rate
 const DUAL_RULE = 'Two weapons: the main hand sets the damage and the speed; the off hand adds half of what it would add in the main hand, and its on-hit effect fires half as often. Its legendary rule and runes work; anything held in both hands counts once.';
 
@@ -95125,6 +95134,13 @@ const TI = (() => {
     line([[-s * .32, s * .32], [s * .32, s * .32]], 6, C.gold); line([[0, s * .36], [0, s * .62]], 6, C.wood); fill(circ(0, s * .7, s * .08), C.gold, { ow: 3 });
     X.restore();
   }
+  // a knife: a slim leaf blade, a short guard, a long grip and a pommel (a pair of them: 'knives', the daggers' class)
+  function knifeG(cx, cy, s, rot, col = C.steel) {
+    X.save(); X.translate(cx, cy); X.rotate(rot);
+    fill(poly([[0, -s], [s * .13, -s * .55], [s * .09, s * .12], [-s * .09, s * .12], [-s * .13, -s * .55]]), col, { ow: 4 });
+    line([[-s * .2, s * .14], [s * .2, s * .14]], 5, C.gold); line([[0, s * .18], [0, s * .52]], 6, '#3a2a22'); fill(circ(0, s * .58, s * .07), C.gold, { ow: 3 });
+    X.restore();
+  }
   function hammerG(cx, cy, s, rot) { X.save(); X.translate(cx, cy); X.rotate(rot); line([[0, -s * .2], [0, s * .9]], 7, C.wood); fill(poly([[-s * .55, -s * .75], [s * .55, -s * .75], [s * .55, -s * .2], [-s * .55, -s * .2]]), C.steel); X.restore(); }
   // a three-bladed moon glaive: each blade swept round from the hub, broad on its leading edge, to a point
   function glaiveG(cx, cy, s, rot = 0, col = C.steel) {
@@ -95263,6 +95279,7 @@ const TI = (() => {
     halo: () => { glow(50, 50, 46, '#ffe08a', .6); X.save(); X.translate(50, 46); X.scale(1, .38); arcL(0, 0, 34, 0, 6.29, 9, C.holy); X.restore(); rays(50, 46, 40, 48, 8, 3, C.holy); },
     shieldx: () => { fill(shieldP(50, 50, 40), '#e8e0c8'); line([[50, 22], [50, 82]], 8, C.gold); line([[30, 44], [70, 44]], 8, C.gold); },
     swords: () => { sword(50, 50, 40, .7, C.holy); sword(50, 50, 40, -.7, C.holy); },
+    knives: () => { knifeG(35, 54, 42, -.42); knifeG(65, 54, 42, .42); },   // a pair of knives, points up and apart
     ascend: () => { glow(50, 50, 46, '#ffe08a', .5); wing(44, 76, 46, -1, '#fff6e0'); wing(56, 76, 46, 1, '#fff6e0'); line([[50, 86], [50, 30]], 7, C.gold); fill(poly([[50, 10], [64, 32], [36, 32]]), C.gold, { ow: 4 }); },
     sunburst: () => { glow(50, 50, 50, '#ffe08a', .8); rays(50, 50, 16, 48, 16, 4, C.holy); fill(star(50, 50, 22, 12, 8), C.white); },
     shield: () => { glow(50, 50, 48, '#ffe08a', .5); fill(shieldP(50, 50, 40), C.gold); fill(shieldP(50, 50, 26), '#3a5ab0', { ow: 3 }); fill(star(50, 48, 12, 5, 4), C.holy, { ow: 3 }); },
@@ -137191,6 +137208,7 @@ function wpArtKey(w, base) {
     if (!base.leg && typeof wpnStyle === 'function' && typeof wpnForceNow === 'function') {
       const S = wpnStyle(base.cls), f = wpnForceNow(), k = S && S.names[base.id] && f ? 'w-style_' + f + '_' + base.id : null;
       if (k && wpArtHas(k)) return k;
+      if (k && S.ownArt) return k;   // (a make that never borrows another force's painting: its glyph until it has its own)
     }
     return 'w-' + base.mdl;
   }
