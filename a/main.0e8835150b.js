@@ -1,4 +1,4 @@
-const BUILD_TAG = '0178474b@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '3b5824e3@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -94017,7 +94017,7 @@ function item(mesh, m, o) {
   it.mesh = mesh; it.m.set(m); it.shadow = o && o.shadow === false ? false : true; it.alpha = o && o.alpha != null ? o.alpha : null; it.ground = !!(o && o.ground); it.unit = UNIT_ON || inIcon ? (UNIT_OWN ? 2 : 1) : 0;   // (icons, the gear sheet and the hero picker show units lit as they are in the field; 2: one of ours, a force's unit: the units' shading, gl.js uOwn)
   if (o && o.tint) it.tint.set(o.tint); else it.tint.set(ONE_TINT);
   // a unit's cloth trailing its moves: [x, z], the world offset a unit of sway (set by the caller: forces_zz_life.js lfSec)
-  it.sec = null; it.bones = null;   // (bones: a rigged model's pose, set by its caller: unitmodels.js)
+  it.sec = null; it.bones = null; it.clX = null;   // (clX: a unit's own throw of its cloth, unitmodels_cloth.js; bones: a rigged model's pose, set by its caller: unitmodels.js)
   return it;
 }
 // a rigged model's pose for this frame, copied into the draw item's own buffer (kept with the pooled item, so no new array a
@@ -110915,14 +110915,22 @@ if (typeof pauseMenu === 'function') {
      game adds the spin (her whole body turned about her feet) and the twirl (the sword turned in her fist about her forearm,
      its two blades trading ends):
        rest           out of the fight: tall, the sword upright at her side, held at its middle like a staff
-       ready          a foe near: the slash's guard, the sword up over her shoulder; now and then a twirl at her side
+       ready          a foe near: the slash's guard, the sword up over her shoulder; now and then a twirl at her side (two
+                      turns of the sword, her body turning with it and back)
        the strike     two cuts by turns (t.shots), each landing on the shot (the blade crossing her front then):
                       A  the forehand: drawn back behind her right over the wind-up, cut level across her front with blade B,
-                         and on round in a full pirouette, the trailing blade sweeping round after it
+                         and on round in a full pirouette, the trailing blade sweeping round after it, the sword whirled a
+                         full turn in her fist with it
                       B  the backhand: the sword windmilled over in her fist (the other blade now leading) as she draws it
-                         to her left, cut back across her front with blade A, the windmill carried on through
+                         to her left, cut back across her front with blade A, the windmill carried on through as she
+                         pirouettes back the other way
+                      In both she coils back against the cut over the wind-up (her body turned back, her shoulders further:
+                      the twist down her spine) and unwinds into it, the shoulders leading; each coil carries on the way the
+                      last follow-through turned, so the cuts flow one into the next. Her turn throws the robe and mantle
+                      (it.clX, unitmodels_cloth.js).
        a flash-step   (Riftstep, a cut beyond arm's reach, each hop of Rift Chain: t.ccBlink) out low in a lunge, the sword
-                      ahead, then a quick cut, the blades swapping ends each step
+                      ahead (whirled a turn in her fist), then a quick cut and a spin round on the way back, the blades
+                      swapping ends each step
        Severing Arc   down into a deep crouch and one low sweep with a pirouette and a quarter round, through the arc
        Unbound Blade  the sword raised over her head and spun there, a wheel of blade-light, then brought down in the
                       forehand cut and its pirouette
@@ -110930,8 +110938,11 @@ if (typeof pauseMenu === 'function') {
    - The blades glow as in her concept art (owner: "make it look like the concept art"), over the asset's own look (owner: "it
      looks flat"): FS_STY lights the painted blade (its bevel and etching) and adds its light (ext -3 red, -2 pink, mvBladeMark on
      the sword's model), the pale runes burning a paler tint, a shimmer running along them; a bloom halo round each (a wide soft beam, a hot line at its heart, a glow at each point), a gentle pulse,
-     violet mist and embers drifting off them (more on a swing: mvMist), ribbons of light behind them while they move fast
-     (SFX_DRAW.mv_trail); all brighter in her spells and while Unbound Blade lasts. The grip and guard are lit as usual.
+     violet mist and embers drifting off them (more on a swing: mvMist); all brighter in her spells and while Unbound Blade
+     lasts. The grip and guard are lit as usual.
+   - The swirl (MVS, mvSwirl; owner: "more swirling pink/red in her movements"): crimson and pink ribbons off the blades that
+     curl round her as she spins, pink and red wisps spiralling up round her in a strike and a flash-step, a crisp crescent of
+     the cutting blade's colour across the foe on a blow. Kept short-lived and thin (the owner's rule: foes and the map stay seen).
    - She stands on the code-built body's rune-slate (its base), and its blink (chargeAt) moves her out and back. Drawn from
      umDraw (forces.js drawForceUnit: the Champions take the Grove's layered path). */
 const MV_UNIT = 'ch_maren';
@@ -110945,6 +110956,20 @@ const MV_CUT = { A: { wind: 2, cut: 13.8, end: 38, dir: 1 }, B: { wind: 30, cut:
 const MV_SEV = { T: .85, crouch: .1, sweep: .42, from: 4, to: 26, spin: 2.5 * Math.PI };   // (Severing Arc: the 'low' clip's frames)
 const MV_UNB = { T: 1.1, up: .42, slam: .3, spinR: 26 };
 const MV_GLOW = .15;   // (it.sec: the blades' glow over the emissive group's own; kept low so the magenta does not clip to white)
+/* the swirl (owner, 28 Nov 2026: "improve marens animations and vfx, would like more swirling pink/red in her movements"):
+   coil and twist (radians) her body turns into a cut by; the guard's twirl (twT s, twSway her body's turn with it); the
+   ribbons off the blades (rib s on the blade, str s the streamer off each point, curl how far an old ribbon spirals on round
+   her a second, rise how far up a second, in her heights; ribIn where on the blade the sheet starts); the wisps round her (wisp a second at full, wispMax at once); the crescent on a blow (slash s); gain all of
+   it; off: none (sim/mv_game.js takes its before shots with it). clK: how far her turn throws the robe and mantle.
+   Smoothness (owner: "should look super smooth and fluid"): xf s a new move cross-fades in over (a move's own xf where
+   it says); ramp s a new move's blend takes to come up to its own rate;
+   folMax s the longest follow-through (it runs on into the next wind-up up to that); spinW, twW, twistW how quickly a
+   jump between one move's spin, twirl or twist and the next's dies away (a damped spring, its speed carried over);
+   clrW, clrWin the same for the sword's turn out of her body (clrWin while it cuts in); dashW how closely her drawn place
+   follows the flash-step's dash. */
+const MVS = { xf: .26, dashW: 26, ramp: .22, folMax: .95, spinW: 13, twW: 16, twistW: 15, clrW: 26, clrWin: 42, coil: .6, twist: .34, twT: .95, twSway: .32, rib: .2, str: .4, curl: 1.6, rise: .35, ribIn: .42, wisp: 26, wispMax: 16, slash: .2, gain: 1, clK: .0045, off: 0, n: 0 };
+// each blade's colours for the swirl: blade A crimson, blade B pink (over 1: light added on the bloom)
+const MVS_COL = [{ body: [.95, .04, .3], rim: [1.3, .2, .48], hot: [1.5, .78, .9], add: .25 }, { body: [1, .24, .78], rim: [1.25, .45, 1.05], hot: [1.4, .78, 1.25], add: .55 }];   // (add: how much is added to the scene; crimson added over sunlit grass reads orange, so it is mostly laid over)
 const mvE = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
 function mvClip(M, clip, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[clip]; return c[0] + Math.max(0, Math.min(c[1] - 1, f)); }
 if (typeof castAbility === 'function') {
@@ -110971,37 +110996,50 @@ function mvCtl(t, live, M) {
   const id = t._mvId, cu = t._mvAt != null ? now - t._mvAt : 99;
   if (id === 'ch_severing' && cu >= 0 && cu < MV_SEV.T) {
     const S = MV_SEV;
-    if (cu < S.crouch) return { f: mvClip(M, 'low', S.from), rate: 40, glow: 1, spin: 0, tw: 0, act: 1 };
+    if (cu < S.crouch) return { f: mvClip(M, 'low', S.from), rate: 40, xf: .12, glow: 1, spin: 0, tw: 0, act: 1, key: 'sv' + t._mvAt };
     mvSnd(t, t._mvAt, 'spin', 1); mvSnd(t, t._mvAt, 'heavy', .8, .06);
     const u = mvE((cu - S.crouch) / S.sweep);
-    return { f: mvClip(M, 'low', S.from + (S.to - S.from) * u), rate: 60, glow: 1.6 - .8 * u, spin: S.spin * u, tw: 0, act: 1, trail: u < 1 };
+    return { f: mvClip(M, 'low', S.from + (S.to - S.from) * u), rate: 60, xf: .12, glow: 1.6 - .8 * u, spin: S.spin * u, tw: 0, act: 1, trail: u < 1, key: 'sv' + t._mvAt };
   }
   if (id === 'ch_unbound' && cu >= 0 && cu < MV_UNB.T) {
     const U = MV_UNB;
     if (cu < U.up) mvSnd(t, t._mvAt, 'spin', .75);
     else { mvSnd(t, t._mvAt + .1, 'heavy', 1); mvSnd(t, t._mvAt + .1, 'spin', .8, .04); }
-    if (cu < U.up) return { f: A.overhead[0], rate: 14, glow: .6 + .8 * mvE(cu / U.up), spin: 0, tw: cu * U.spinR * Math.min(1, cu / .12), act: 1, trail: cu > .1 };
+    if (cu < U.up) return { f: A.overhead[0], rate: 14, glow: .6 + .8 * mvE(cu / U.up), spin: 0, tw: cu * U.spinR * Math.min(1, cu / .12), act: 1, trail: cu > .1, key: 'ub' + t._mvAt };
     const u = mvE((cu - U.up) / U.slam), C = MV_CUT.A;
-    if (cu < U.up + U.slam) return { f: mvClip(M, 'slash', C.wind + 6 + (C.end - C.wind - 6) * u), rate: 50, glow: 1.4 - .6 * u, spin: TAU * u, tw: 0, act: 1, trail: true };
+    if (cu < U.up + U.slam) return { f: mvClip(M, 'slash', C.wind + 6 + (C.end - C.wind - 6) * u), rate: 50, xf: .1, glow: 1.4 - .6 * u, spin: TAU * u, tw: 0, act: 1, trail: true, key: 'us' + t._mvAt };
   }
-  // a flash-step (ccBlinkTo: out to the foe and back): out low in the lunge, then a quick cut; the blades swap ends each step
+  // a flash-step (ccBlinkTo: out to the foe and back): out low in the lunge, then a quick cut; the blades swap ends each
+  // step, turned half round in her fist through the lunge (the swap kept after: t._mvTb, the twirl every move adds to)
   const B = t.ccBlink, bu = B && B.at != null ? (now - B.at) / Math.max(.15, B.T || .3) : 9;
-  if (bu >= 0 && bu < 1.15) {
-    if (t._mvBlAt !== B.at) { t._mvBlAt = B.at; t._mvBlN = (t._mvBlN | 0) + 1; mvSnd(t, B.at, 'blink', .9); }
-    const tw = t._mvBlN % 2 ? 0 : Math.PI, C = MV_CUT.A;
-    const rc = B.cut && typeof CC_RIFTCUT !== 'undefined' ? now - B.at : 9;
-    if (rc < CC_RIFTCUT.slash) return { f: mvClip(M, 'slash', 9 + 7 * mvE(rc / CC_RIFTCUT.slash)), rate: 400, glow: 1 + unb, spin: 0, tw, act: 1, trail: true };   /* the rift cut: a quick diagonal flick of the clip's cut before she steps in */
-    if (bu < .3) return { f: A.lunge[0], rate: 45, glow: .9 + unb, spin: 0, tw, act: 1, trail: true };
-    return { f: mvClip(M, 'slash', 10 + 18 * mvE((bu - .3) / .6)), rate: 45, glow: .7 + unb, spin: 0, tw, act: 1, trail: bu < .9 };
-  }
-  // the strike: the wind-up to the cut on the shot, the follow-through fitted into the time before the next wind-up
   const s = t.shotT == null ? 9 : t.shotT, w = t.windup || 0, sh = t.shots | 0;
+  if (bu >= 0 && (bu < 1.15 || bu < 1.35 && !(w > 0 && t.tg))) {
+    if (t._mvBlAt !== B.at) { t._mvBlAt = B.at; t._mvBlN = (t._mvBlN | 0) + 1; t._mvTb0 = t._mvTb || 0; t._mvTb = t._mvTb0 + Math.PI; mvSnd(t, B.at, 'blink', .9); }
+    const tw = t._mvTb0 + Math.PI * mvE(bu / .32) - t._mvTb, key = 'bl' + B.at;   // (relative to the new swap, which the pose adds)
+    // (on the way back she spins round once with the cut, the blades sweeping a ring round her, the turn spread from the
+    // lunge's end to her guard so it never strobes: owner, "more swirling pink/red in her movements", then "super smooth")
+    const sp = TAU * mvE((bu - .25) / 1.1), tws = .3 * Math.sin(Math.PI * Math.max(0, Math.min(1, (bu - .3) / .7)));
+    const rc = B.cut && typeof CC_RIFTCUT !== 'undefined' ? now - B.at : 9;
+    if (rc < CC_RIFTCUT.slash) return { f: mvClip(M, 'slash', 9 + 7 * mvE(rc / CC_RIFTCUT.slash)), rate: 60, xf: .16, glow: 1 + unb, spin: 0, tw, act: 1, trail: true, key: key + 'c' };   /* the rift cut: a quick diagonal flick of the clip's cut before she steps in */
+    if (bu < .3) return { f: A.lunge[0], rate: 40, xf: .12, glow: .9 + unb, spin: sp, tw, act: 1, trail: true, wisp: 1, twist: -.25 * Math.sin(Math.PI * bu / .3), key: key + 'l' };
+    const ub = mvE((bu - .3) / .6);
+    return { f: mvClip(M, 'slash', 10 + 18 * ub), rate: 30, xf: .16, glow: .7 + unb, spin: sp, tw, act: 1, trail: bu < 1.1, wisp: bu < .8 ? 1 : 0, twist: tws, key: key + 'r' };   // (lunge, cut and way back each cross-fade into the next)
+  }
+  // the strike: the wind-up to the cut on the shot, the follow-through running on to the next wind-up
   if (w > 0 && t.tg) {
     const k = (sh + 1) % 2 ? 'A' : 'B', C = MV_CUT[k], e = mvE(w);
+    const iv = Math.max(.2, (t.st && t.st.rate) || 1.2), wl = Math.min(.6, iv * .6), fol = Math.max(.18, Math.min(MVS.folMax, iv - wl - .01));
+    const m = Math.min(2.8, 2 * Math.abs(C.end - C.cut) / fol * wl / Math.abs(C.cut - C.wind)), ec = (m - 2) * w * w * w + (3 - m) * w * w;
     if (w > .8) mvSnd(t, sh + 1, 'cut', 1);   // (its peak about .1s in: on the hit)
-    return { f: mvClip(M, 'slash', C.wind + (C.cut - C.wind) * e), rate: w > .85 ? 400 : w < .12 ? 14 : 70, glow: .2 + unb, spin: 0, tw: k === 'B' ? Math.PI * e : 0, act: 1, trail: k === 'B' && w > .2 };
+    /* her body turns into the cut: over the wind-up she coils back against it (her whole body turned back from the foe,
+       her shoulders further than her hips) and unwinds into it at the end, the shoulders leading; the coil carries on the
+       way the last cut's follow-through was turning, so one cut flows into the next (A pirouettes one way, B the other) */
+    const sg = k === 'A' ? 1 : -1, coil = mvE(Math.min(1, w / .72)) * (1 - mvE((w - .72) / .28));
+    return { f: mvClip(M, 'slash', C.wind + (C.cut - C.wind) * ec), rate: 70, xf: MVS.xf, glow: .2 + unb, spin: -sg * MVS.coil * coil, tw: k === 'B' ? Math.PI * e : 0, act: 1, trail: w > .2, twist: sg * MVS.twist * (.45 * mvE((w - .8) / .2) - coil), wisp: w > .6 ? .5 : 0, key: 'c' + (sh + 1) };
   }
-  const iv = Math.max(.2, (t.st && t.st.rate) || 1.2), wl = Math.min(.6, iv * .6), fol = Math.max(.18, Math.min(.62, iv - wl - .04));
+  // (the follow-through fills the time to the next wind-up, so the blade flows from one cut into the next and never stops
+  // dead; a pirouette too quick to read as a turn, under .35 s, is left out)
+  const iv = Math.max(.2, (t.st && t.st.rate) || 1.2), wl = Math.min(.6, iv * .6), fol = Math.max(.18, Math.min(MVS.folMax, iv - wl - .01)), pir = fol >= .35 ? TAU : 0;
   // (a strike that flash-stepped made its cut in the step: when the step ended, .37 s in, the ordinary follow-through took
   // over three-quarters of the way through its pirouette, her whole body thrown 260 degrees round in one frame. After a
   // step she goes back to her guard)
@@ -111009,33 +111047,71 @@ function mvCtl(t, live, M) {
   if (s < fol && sh > 0 && !stepped) {
     const k = sh % 2 ? 'A' : 'B', C = MV_CUT[k], u = s / fol, e = mvE(u);
     if (k === 'A' && s > .06) mvSnd(t, sh, 'spin', .7);   // (the pirouette)
-    return { f: mvClip(M, 'slash', C.cut + (C.end - C.cut) * (k === 'A' ? u : e)), rate: s < .08 ? 400 : 60, glow: .45 * (1 - u) + unb, spin: k === 'A' ? TAU * e : 0, tw: k === 'B' ? Math.PI * (1 + e) : 0, act: 1, trail: u < .85 };
+    /* the follow-through: the forehand carries on round in a full pirouette, the sword whirled a full turn in her fist with it;
+       the backhand's windmill carries on as she pirouettes back the other way; the shoulders ahead, settling as she comes round */
+    const sg = k === 'A' ? 1 : -1;
+    const uo = 1 - (1 - u) * (1 - u);   // (the clip goes on from the cut at the wind-up's own speed, easing out as it ends)
+    return { f: mvClip(M, 'slash', C.cut + (C.end - C.cut) * uo), rate: 70, xf: MVS.xf, glow: .45 * (1 - u) + unb, spin: sg * pir * e, tw: k === 'B' ? Math.PI * (1 + e) : pir * mvE(Math.min(1, u * 1.15)), act: 1, trail: u < .9, twist: sg * MVS.twist * .45 * (1 - e), wisp: u < .7 ? 1 : 0, key: 'c' + sh };
   }
   const engaged = t.tg || (t.engaged || 0) > 0 || s < 1.2;
   if (engaged) t._mvIdleAt = now;
-  if (now - (t._mvIdleAt == null ? -9 : t._mvIdleAt) > .8) return { f: A.rest[0], rate: 3.5, glow: unb, spin: 0, tw: 0, act: 0, rest: 1 };
-  // the guard; every few seconds a twirl at her side (one full turn of the sword in her fist)
-  const ph = (now + (t.anim || 0) * 7) % 4.6, fl = ph < .7 ? mvE(ph / .7) : 0;
+  if (now - (t._mvIdleAt == null ? -9 : t._mvIdleAt) > .8) return { f: A.rest[0], rate: 3.5, xf: .6, glow: unb, spin: 0, tw: 0, act: 0, rest: 1, key: 'rest' };
+  // the guard; every few seconds a twirl at her side (two turns of the sword in her fist, her body turning with it and back)
+  const ph = (now + (t.anim || 0) * 7) % 4.6, fl = ph < MVS.twT ? mvE(ph / MVS.twT) : 0, sw = ph < MVS.twT ? Math.sin(Math.PI * ph / MVS.twT) : 0;
   if (ph > .1 && ph < .3) mvSnd(t, Math.floor((now + (t.anim || 0) * 7) / 4.6), 'twirl', .8);   // (the twirl, softly)
-  return { f: mvClip(M, 'slash', MV_CUT.A.wind), rate: 9, glow: unb, spin: 0, tw: TAU * fl, act: 0, trail: fl > .1 && fl < .9 };
+  return { f: mvClip(M, 'slash', MV_CUT.A.wind), rate: 9, xf: .35, glow: unb, spin: MVS.twSway * sw, tw: 2 * TAU * fl, act: sw > .02 ? 1 : 0, trail: fl > .05 && fl < .95, fx: .55, twist: -.6 * MVS.twSway * sw, key: 'guard' };
 }
 const _mvT = new Float32Array(SKIN_MAX * 12);
 // the shortest way round from a to b (radians)
 const mvWrap = d => d - TAU * Math.round(d / TAU);
+// inertial blending of an angle: the move's own value, plus what was left of the jump when the move (key) changed, which a
+// critically damped spring takes away, starting at the speed the angle had
+function mvInert(t, n, tg, key, w, dt) {
+  const S = t['_mvI' + n] || (t['_mvI' + n] = { cur: tg, off: 0, v: 0, key, vc: 0, tg0: tg, fresh: 0 });
+  const vt = dt > 0 ? mvWrap(tg - S.tg0) / dt : 0; S.tg0 = tg;
+  if (S.key !== key) { S.key = key; S.off = mvWrap(S.cur - tg); S.v = S.vc; S.fresh = 1; }
+  else if (S.fresh) { S.v -= vt; S.fresh = 0; }   // (a move's second frame: its own speed, now known, taken out of the carried one)
+  for (let left = dt; left > 1e-6; left -= 1 / 120) { const e = Math.min(left, 1 / 120), a = -w * w * S.off - 2 * w * S.v; S.v += a * e; S.off += S.v * e; }
+  const out = tg + S.off; S.vc = dt > 0 ? mvWrap(out - S.cur) / dt : 0; S.cur = out;
+  return out;
+}
+// a critically damped follower (its speed kept, so it never starts or stops with a jolt)
+function mvSpring(t, n, tg, w, dt) {
+  const S = t['_mvS' + n] || (t['_mvS' + n] = { x: tg, v: 0 });
+  for (let left = dt; left > 1e-6; left -= 1 / 120) { const e = Math.min(left, 1 / 120), a = w * w * (tg - S.x) - 2 * w * S.v; S.v += a * e; S.x += S.v * e; }
+  return S.x;
+}
 // the pose: the frame, followed from her last pose at the move's rate; the twirl; a breath through the chest
 function mvPose(M, t, P, live) {
   const R = M.R, nb = R.anim.nb, bx = R.bix, o = R.out;
   if (!live) { umMixFrame(R, P.f, o); umShowBreath(R, o); return o; }
   umMixFrame(R, P.f, _mvT);
   const now = G.time, dt = t._mvTm == null ? 1 : Math.max(0, Math.min(.1, now - t._mvTm)); t._mvTm = now;
-  if (!t._mvO || t._mvO.length !== nb * 12) { t._mvO = new Float32Array(nb * 12); t._mvO.set(_mvT.subarray(0, nb * 12)); }
-  const k = P.rate ? 1 - Math.exp(-dt * P.rate) : 1;
-  umBlendPose(R, t._mvO, _mvT, k, t._mvO);
+  if (!t._mvO || t._mvO.length !== nb * 12) { t._mvO = new Float32Array(nb * 12); t._mvO.set(_mvT.subarray(0, nb * 12)); t._mvO1 = new Float32Array(nb * 12); t._mvO1.set(_mvT.subarray(0, nb * 12)); }
+  // (a new move cross-fades in: from the pose she was in when it began to its own, eased over its xf seconds, and its
+  // blend comes up from its entry rate to its own; where moves chain the fade is long enough that she flows from one into
+  // the next: owner, "super smooth and fluid")
+  const key = P.key || '?';
+  if (t._mvKey !== key) { t._mvKey = key; t._mvKeyAt = now; t._mvX = t._mvX && t._mvX.length === nb * 12 ? t._mvX : new Float32Array(nb * 12); t._mvX.set(t._mvO); }
+  const xf = P.xf == null ? MVS.xf : P.xf, xa = xf > 0 ? mvE((now - t._mvKeyAt) / xf) : 1;
+  if (xa < 1 && t._mvX) umBlendPose(R, t._mvX, _mvT, xa, _mvT);
+  const rin = P.rin == null ? P.rate || 0 : P.rin, rate = P.rate ? rin + (P.rate - rin) * mvE((now - t._mvKeyAt) / MVS.ramp) : 0;
+  // (two blends in a row, each twice as quick: a second-order follow, so a move's new target never jerks the pose, its
+  // speed changes smoothly; and the baked frames' corners, 30 a second joined straight, are rounded off at any frame rate)
+  const k = rate ? 1 - Math.exp(-dt * rate * 2) : 1;
+  umBlendPose(R, t._mvO1, _mvT, k, t._mvO1);
+  umBlendPose(R, t._mvO, t._mvO1, k, t._mvO);
   o.set(t._mvO);
-  // the spin and the twirl follow their move's own value while it drives them (no lag), and ease home the short way after
-  const ease = (cur, tg, r) => cur == null ? tg : cur + mvWrap(tg - cur) * (1 - Math.exp(-dt * r));
-  t._mvSp = P.act && P.spin ? P.spin : ease(t._mvSp, 0, 10);
-  t._mvTw = P.tw && (P.act || P.trail) ? P.tw : ease(t._mvTw, P.tw || 0, 16);
+  // the spin and the twirl follow their move's own value, and where one move hands to the next the jump between them dies
+  // away through a damped spring, carrying on at the speed it had (inertial blending: no snap, no dead stop)
+  t._mvSp = mvInert(t, 'sp', P.spin || 0, key, MVS.spinW, dt);
+  t._mvTw = mvInert(t, 'tw', (t._mvTb || 0) + (P.tw || 0), key, MVS.twW, dt);
+  // her turn's speed (the robe and mantle trail it: mvDraw's it.clX)
+  const sv = dt > 0 && t._mvSp0 != null ? mvWrap(t._mvSp - t._mvSp0) / dt : 0; t._mvSp0 = t._mvSp;
+  t._mvSv = (t._mvSv || 0) + (Math.max(-20, Math.min(20, sv)) - (t._mvSv || 0)) * (1 - Math.exp(-dt * 7));
+  // the twist into the cut: the upper body turned on the hips, shared down the spine so no one joint kinks
+  t._mvTi = mvSpring(t, 'ti', P.twist || 0, MVS.twistW, dt);
+  if (Math.abs(t._mvTi) > 1e-3) for (const [b, f] of [['Spine', .4], ['Spine1', .35], ['Spine2', .25]]) umTurn(o, R.sub[b], UMX.ry(t._mvTi * f), umXf(o, bx[b], R.B[bx[b]].h));
   if (Math.abs(mvWrap(t._mvTw)) > 1e-3) {
     const fa = umXf(o, bx.RightForeArm, R.B[bx.RightForeArm].h), hd = umXf(o, bx.RightHand, R.B[bx.RightHand].h), ax = UMX.sub(hd, fa);
     umTurn(o, R.sub.Sword, UMX.rot(ax[0], ax[1], ax[2], t._mvTw), umXf(o, bx.Sword, R.mk.gripR));
@@ -111086,10 +111162,22 @@ function mvClear(M, t, o, dt) {
     bp = 1e9;
     for (const [a, b] of MV_TRY) { const p = mvPenOf(caps, at(turnOf(a, b))) + .004 * (Math.abs(a - ca) + Math.abs(b - cb)) + .001 * (Math.abs(a) + Math.abs(b)); if (p < bp) { bp = p; best = [a, b]; } }
   }
-  const pc = (ca || cb) ? mvPenOf(caps, at(turnOf(ca, cb))) : pen0;   // (the held correction cutting in: catch up at once)
-  const k = pc > .01 ? 1 : 1 - Math.exp(-(dt || 0) * 28);
-  t._mvCa = ca + (best[0] - ca) * k; t._mvCb = cb + (best[1] - cb) * k;
-  if (Math.abs(t._mvCa) < 1e-3 && Math.abs(t._mvCb) < 1e-3) { t._mvCa = t._mvCb = 0; return; }
+  const pc = (ca || cb) ? mvPenOf(caps, at(turnOf(ca, cb))) : pen0;   // (the held correction cutting in: catch up quickly)
+  // (a damped spring toward it, its speed kept: the clear angles are steps apart, and taken at a rate they flicked the
+  // blade a step a frame; its target smoothed first; owner: "super smooth and fluid")
+  const kb = 1 - Math.exp(-(dt || 0) * (pc > .01 ? 45 : 24)); t._mvBa = (t._mvBa || 0) + (best[0] - (t._mvBa || 0)) * kb; t._mvBb = (t._mvBb || 0) + (best[1] - (t._mvBb || 0)) * kb;
+  t._mvCa = mvSpring(t, 'ca', t._mvBa, pc > .01 ? MVS.clrWin : MVS.clrW, dt || 0); t._mvCb = mvSpring(t, 'cb', t._mvBb, pc > .01 ? MVS.clrWin : MVS.clrW, dt || 0);
+  // (the spring lags: where its angle still cuts in, it is stepped toward the clearer of the best angle and none, only as
+  // far as clears her; the smallest step, so a catch-up is a nudge and not a snap)
+  const penAt = (a, b) => mvPenOf(caps, at(turnOf(a, b))), pn = penAt(t._mvCa, t._mvCb);
+  if (pn > .009) {
+    const p0 = penAt(0, 0), pb = penAt(best[0], best[1]), tg = p0 <= pb ? [0, 0] : best, ok = Math.max(.008, Math.min(p0, pb) + .002);
+    for (const l of [.1, .2, .3, .45, .6, .8, 1]) {
+      const a = t._mvCa + (tg[0] - t._mvCa) * l, b = t._mvCb + (tg[1] - t._mvCb) * l;
+      if (l === 1 || penAt(a, b) <= ok) { t._mvCa = t._mvSca.x = a; t._mvCb = t._mvScb.x = b; t._mvSca.v *= .5; t._mvScb.v *= .5; break; }
+    }
+  }
+  if (Math.abs(t._mvCa) < 1e-3 && Math.abs(t._mvCb) < 1e-3 && Math.abs(t._mvSca.v) < 1e-2 && Math.abs(t._mvScb.v) < 1e-2) { t._mvCa = t._mvCb = t._mvBa = t._mvBb = 0; t._mvSca.x = t._mvScb.x = 0; return; }
   umTurn(o, R.sub.Sword, turnOf(t._mvCa, t._mvCb), g);
 }
 // both blades' tips and bases (model space)
@@ -111128,9 +111216,15 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   if (base) { M4.trs(_mvA, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _mvA, opts); }
   const s = Math.max(.3, full.max[1]) / M.h * M.S.k * (1 + .025 * Math.max(0, tr - 2));
   const on = Math.hypot(x - t.x, z - t.y) < .05, lift = base && on ? MV_BASE_H * K : 0;
+  // (the flash-step's dash, out to the foe and back, starts and stops at full speed: her drawn place follows it through a
+  // damped spring, so she sets off and arrives smoothly; owner: "super smooth and fluid")
+  if (live && !(typeof inGp !== 'undefined' && inGp)) { const dtd = t._mvDt == null ? 0 : Math.max(0, Math.min(.1, G.time - t._mvDt)); t._mvDt = G.time; if (dtd > 0 || t._mvSox == null) { x = t.x + mvSpring(t, 'ox', x - t.x, MVS.dashW, dtd); z = t.y + mvSpring(t, 'oz', z - t.y, MVS.dashW, dtd); } else { x = t.x + t._mvSox.x; z = t.y + t._mvSoz.x; } }
   const P = mvCtl(t, live, M), o = mvPose(M, t, P, live);
   M4.trs(_mvA, x, lift * sy, z, ang + wob + (live ? t._mvSp || 0 : 0), 0, 0, sx, sy, sz); M4.trs(_mvB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_mvC, _mvA, _mvB);
   const it = item(M.mesh, _mvC, opts);
+  // her turn throws the robe and mantle the other way (unitmodels_cloth.js clothItem: it.clX, a world offset added to the
+  // cloth's lag): the front of her body's travel, reversed
+  if (live && t._mvSv) { const fx = _mvC[8], fz = _mvC[10], l = Math.hypot(fx, fz) || 1, v = t._mvSv * MVS.clK * s * M.h / l; it.clX = [-fz * v, fx * v]; }
   const pulse = .88 + .12 * Math.sin((typeof vt !== 'undefined' ? vt : 0) * 2.2 + (t.anim || 0) * 5);   // (the blades' gentle pulse)
   t._mvG = t._mvG == null ? P.glow : t._mvG + (P.glow - t._mvG) * .2;
   it.sec = [(MV_GLOW + .06 * Math.max(0, tr - 2) + .3 * t._mvG) * pulse, 0];   // (VS_STY: the blades' extra glow)
@@ -111157,7 +111251,8 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   }
   if (live) {
     t.tipW = T4[0]; t.tipYaw = ang; t.tipAt = G.time; t._mvOn = G.time;
-    mvTrail(t, T4, P.trail ? 1 : 0, t._mvG);
+    mvTrail(t, T4, 0, t._mvG);   // (its history only: the swirl's ribbons took over from its trail)
+    if (!icon) { try { mvSwirl(t, T4, P, s * M.h, x, z); } catch (e) { MVS.err = MVS.err || e.message; } }
   }
   M4.trs(_mvS, T4[0][0], T4[0][1] - .38 * K, T4[0][2]); FX_PM.root = FX_PM.torso = _mvC; FX_PM.main = FX_PM.sword = _mvS;   // (ABANIM's tip on 'main' [-.2, .38, .92] lands near her blade)
   return true;
@@ -111203,12 +111298,141 @@ if (typeof SFX_DRAW !== 'undefined') SFX_DRAW.mv_trail = q => {
     vfxRb.end();
   }
 };
+/* ---- the swirl's effects (the Oathbound's method, unitmodels_oathbound.js obTrail; nothing built on the model):
+   - ribbons off both blades while they move fast: a sheet from part-way up the blade out to its point, bright at the point
+     and fading behind over MVS.rib, crimson off blade A and pink off blade B; and off each point a thin streamer that lasts
+     a little longer. What is left behind drifts on round her the way she was turning and rises, widening, so the ribbons
+     curl into a spiral as she spins and twirls;
+   - wisps: small comet-like embers of both colours spiralling up round her in a strike and a flash-step;
+   - the crescent: on a blow a crisp arc of the cutting blade's colour across the foe, along the blade's own swing (an arc
+     round her), drawn out in a twentieth of a second and gone in MVS.slash, with a small hot flash where it met.
+   hw: her height in the world; cx, cz: where she stands now (a flash-step moves her). ---- */
+const _mvP = [0, 0, 0], _mvQ = [0, 0, 0];
+function mvSwirl(t, T4, P, hw, cx, cz) {
+  const now = G.time, H = t._mvH || (t._mvH = []), last = H[0], dt = last ? now - last.at : 0;
+  const ok = !MVS.off && typeof VX !== 'undefined' && VX && typeof VXO !== 'undefined' && typeof VT !== 'undefined' && typeof vfxReady === 'function' && vfxReady() && typeof vfxRb !== 'undefined';
+  if (!last || dt > 1e-4) {
+    if (dt > .15 || last && Math.hypot(cx - last.cx, cz - last.cz) > .8 * hw) H.length = 0;
+    const mid = (a, b) => [b[0] + (a[0] - b[0]) * MVS.ribIn, b[1] + (a[1] - b[1]) * MVS.ribIn, b[2] + (a[2] - b[2]) * MVS.ribIn];
+    const L = H[0], sp = L && dt > 0 ? Math.max(Math.hypot(T4[0][0] - L.p[0][0], T4[0][1] - L.p[0][1], T4[0][2] - L.p[0][2]), Math.hypot(T4[2][0] - L.p[2][0], T4[2][1] - L.p[2][1], T4[2][2] - L.p[2][2])) / dt : 0;
+    const k = P.trail ? Math.max(0, Math.min(1, (sp / hw - 1.4) / 2.6)) * (P.fx == null ? 1 : P.fx) : 0;   // (fx: quieter in the guard's twirl than in a fight's cut)
+    MVS.sp = sp / hw;
+    H.unshift({ at: now, p: [T4[0].slice(), mid(T4[0], T4[1]), T4[2].slice(), mid(T4[2], T4[3])], k, cx, cz, dir: Math.sign(t._mvSv || 0) || 1 });
+  }
+  while (H.length && (now - H[H.length - 1].at > MVS.str || H.length > 40)) H.pop();
+  const busy = G.creeps && G.creeps.length > 20 ? .5 : 1;   // (the owner: never cloud the field; thinned in busy waves)
+  // the wisps
+  const W = t._mvW || (t._mvW = []), wd = t._mvWt == null ? 0 : Math.max(0, Math.min(.1, now - t._mvWt)); t._mvWt = now;
+  if (P.wisp && !MVS.off) {
+    t._mvWe = Math.min(2, (t._mvWe || 0) + wd * MVS.wisp * P.wisp * busy);
+    while (t._mvWe >= 1) {
+      t._mvWe -= 1; if (W.length >= MVS.wispMax) break;
+      const d = Math.sign(t._mvSv || 0) || (Math.random() < .5 ? 1 : -1);
+      W.push({ at: now, x: cx, z: cz, a: R(TAU), r: hw * R(.16, .3), h: hw * R(.12, .55), w: d * R(4.5, 7.5), vr: hw * R(.12, .3), vh: hw * R(.25, .55), life: R(.45, .7), c: Math.random() < .5 ? 0 : 1, sz: R(.7, 1.2) });
+    }
+  }
+  for (let i = W.length - 1; i >= 0; i--) if (now - W[i].at > W[i].life || now < W[i].at) W.splice(i, 1);
+  // the crescent: on a strike's blow (shots just counted; the forehand A cuts with blade B, pink, the backhand with blade A),
+  // and on a flash-step's cut
+  const B = t.ccBlink, Bt = B && B.at != null ? now - B.at : 9;
+  if (t.tg && !t.tg.dead && (t.shots | 0) > 0 && t.shotT != null && t.shotT < .06 && t._mvSlN !== t.shots && !(Bt < 1)) { t._mvSlN = t.shots; mvSlashAt(t, t.tg, (t.shots % 2 ? 1 : 0) ^ mvSwapped(t), hw, cx, cz, t.shots % 2 ? 1 : -1); }
+  else if (B && Bt > .3 * (B.T || .38) && Bt < .5 * (B.T || .38) && t._mvSlB !== B.at && t.tg && !t.tg.dead) { t._mvSlB = B.at; mvSlashAt(t, t.tg, 1 ^ mvSwapped(t), hw, cx, cz, 1); }
+  if (!ok) return;
+  const g = MVS.gain;
+  // the ribbons
+  const n = H.length;
+  if (n >= 3 && H.some(q => q.k > .03)) {
+    // where an old sample has drifted to: on round her centre the way she turned, out and up
+    const drift = (q, p, out) => {
+      const a = now - q.at, an = q.dir * MVS.curl * a, c = Math.cos(an), sn = Math.sin(an), dx = p[0] - q.cx, dz = p[2] - q.cz, gr = 1 + 1.2 * a;
+      out[0] = q.cx + (dx * c - dz * sn) * gr; out[2] = q.cz + (dx * sn + dz * c) * gr; out[1] = p[1] + MVS.rise * hw * a; return out;
+    };
+    // (smoothed through the samples, a Catmull-Rom curve five steps a frame, so a spin draws a curve and not a polygon)
+    const steps = Math.min(60, (n - 1) * 5), Po = new Array(n * 3), Pm = new Array(n * 3), o3 = [0, 0, 0], m3 = [0, 0, 0];
+    for (let b = 0; b < 2; b++) {
+      const C = MVS_COL[b], ti = b * 2, mi = b * 2 + 1;
+      for (let j = 0; j < n; j++) { drift(H[j], H[j].p[ti], _mvP); drift(H[j], H[j].p[mi], _mvQ); for (let c = 0; c < 3; c++) { Po[j * 3 + c] = _mvP[c]; Pm[j * 3 + c] = _mvQ[c]; } }
+      const at = u => { const v = u * (n - 1), j = Math.min(n - 2, Math.floor(v)), f = v - j; return [H[j].at + (H[j + 1].at - H[j].at) * f, H[j].k + (H[j + 1].k - H[j].k) * f]; };
+      // the sheet: the newest part, within MVS.rib
+      if (VX.room((steps + 1) * 4, steps * 18)) {
+        let prev = -1;
+        for (let k = 0; k <= steps; k++) {
+          const u = k / steps, [qa, qk] = at(u), old = (now - qa) / MVS.rib; if (old > 1) break;
+          const a = qk * Math.pow(1 - old, 1.3) * g; vfxCR(Po, n, u, o3); vfxCR(Pm, n, u, m3);
+          const inr = .15 + .8 * Math.pow(old, .8);   // (the sheet narrows to the point's path behind the blade)
+          const gx = m3[0] + (o3[0] - m3[0]) * inr, gy = m3[1] + (o3[1] - m3[1]) * inr, gz = m3[2] + (o3[2] - m3[2]) * inr;
+          let first = -1;
+          for (const [v, op, c] of [[0, 0, C.body], [.55, .32, C.body], [.88, .75, C.rim], [1, .5, C.rim]]) {
+            const i = VX.vert(gx + (o3[0] - gx) * v, gy + (o3[1] - gy) * v, gz + (o3[2] - gz) * v, .5, .5, c[0], c[1], c[2], Math.min(1, a * op), VT.SOLID, C.add, 0);
+            if (first < 0) first = i;
+          }
+          if (prev >= 0) for (let e = 0; e < 3; e++) VX.tri2(prev + e, first + e, first + e + 1, prev + e + 1);
+          prev = first;
+        }
+        MVS.n++;
+      }
+      // the streamer off the point: thin, a little longer-lived, curling on round her
+      for (let pass = 0; pass < 2; pass++) {
+        vfxRb.begin(VX, VT.GLOW, pass ? 1 : C.add + .2, 0);
+        for (let k = 0; k <= steps; k++) {
+          const u = k / steps, [qa, qk] = at(u), old = Math.min(1, (now - qa) / MVS.str), a = qk * Math.pow(1 - old, 1.4) * g; vfxCR(Po, n, u, o3);
+          vfxRb.pt(o3[0], o3[1], o3[2], hw * (pass ? .012 : .045) * Math.pow(1 - old, .6), pass ? C.hot : C.rim, a * (pass ? .7 * Math.max(0, 1 - old * 2) : .3), u);
+        }
+        vfxRb.end();
+      }
+    }
+  }
+  // the wisps: a short comet's tail along each one's spiral
+  for (const q of W) {
+    const a0 = now - q.at, f = a0 / q.life, env = Math.sin(Math.PI * Math.min(1, f * 1.3)) * Math.pow(1 - f, .5), C = MVS_COL[q.c];
+    if (env <= .01) continue;
+    vfxRb.begin(VX, VT.GLOW, 1, 0);
+    for (let j = 0; j <= 4; j++) {
+      const u = Math.max(0, a0 - j * .03), an = q.a + q.w * u * (1 - .3 * u), r = q.r + q.vr * u, h = q.h + q.vh * u;
+      vfxRb.pt(q.x + Math.cos(an) * r, h, q.z + Math.sin(an) * r, hw * .036 * q.sz * (1 - j / 5), j ? C.rim : C.hot, env * .85 * g * (1 - j / 5), j / 4);
+    }
+    vfxRb.end();
+  }
+  // the crescent
+  const Sl = t._mvSl;
+  if (Sl) {
+    const a = (now - Sl.at) / MVS.slash;
+    if (a >= 1 || a < 0) t._mvSl = null;
+    else {
+      const head = Math.min(1, a * 4.5), tail = Math.max(0, a * 1.7 - .55), fade = Math.pow(1 - a, 1.3), N = 12, C = MVS_COL[Sl.b];
+      for (let pass = 0; pass < 2; pass++) {
+        vfxRb.begin(VXO, pass ? VT.GLOW : VT.SOLID, pass ? 1 : .15, 0, 1);   // (lying flat, so it reads from the camera above; drawn over everything (VXO), as a blow must read on a big foe it cuts through, its body mostly laid over the scene so it shows on a foe flashed white)
+        for (let k = 0; k <= N; k++) {
+          const u = tail + (head - tail) * k / N, an = Sl.a0 + Sl.sg * Sl.span * (u - .5), sh = Math.sin(Math.PI * k / N), y = Sl.y + Sl.tilt * (u - .5);
+          vfxRb.pt(Sl.cx + Math.cos(an) * Sl.r, y, Sl.cz + Math.sin(an) * Sl.r, Sl.w * (pass ? .28 : 1) * (.08 + .92 * Math.pow(sh, .7) * (.5 + .5 * u)), pass ? C.hot : C.body, fade * (pass ? .85 : .97) * g, k / N);
+        }
+        vfxRb.end();
+      }
+      if (a < .35 && typeof vfxSprite === 'function') { const fa = 1 - a / .35; vfxSprite(VXO, Sl.fx, Sl.y, Sl.fz, Sl.w * (1 + 1.4 * (1 - fa)), Sl.w * (1 + 1.4 * (1 - fa)), 0, C.hot, fa * .7 * g, VT.GLOW, 1, 0); }
+    }
+  }
+}
+// whether the blades have swapped ends (an odd number of flash-steps)
+const mvSwapped = t => Math.round((t._mvTb || 0) / Math.PI) % 2 ? 1 : 0;
+// the crescent for a blow on foe c with blade b, swung round her (sg: which way round)
+function mvSlashAt(t, c, b, hw, cx, cz, sg) {
+  const d = Math.hypot(c.x - cx, c.y - cz) || 1, r = (c.def && c.def.r) || .25, hh = typeof hitH === 'function' ? hitH(c) : .5;
+  const len = Math.max(.7, r * 4), R0 = Math.max(.4, d - r * .45);   // (round her, across the foe a little on her side of its middle, at its chest; longer than the foe is wide)
+  t._mvSl = { at: G.time, b, sg, cx, cz, r: R0, a0: Math.atan2(c.y - cz, c.x - cx), span: Math.min(1.4, len / R0), y: Math.max(.2, Math.min(hh * 1.5 + .1, hw * .72)), tilt: hw * .14 * sg, w: hw * .1, fx: cx + (c.x - cx) * R0 / d, fz: cz + (c.y - cz) * R0 / d };
+}
 if (typeof umDraw === 'function') {
   const _mvDrawBase = umDraw;
   umDraw = function (t, u) {
     if (u !== MV_UNIT || !NEWMODELS) return _mvDrawBase.apply(this, arguments);
     const r = mvDraw.apply(this, arguments); if (!r && t) t._mvOn = null; return r;
   };
+}
+// her strike is never held still on its blow (forces_zz_life.js lfHitStop, every force unit's few-frame hold on the hit):
+// held, her follow-through stopped dead for two frames and lurched on; her cut flows through instead (owner: "super smooth
+// and fluid")
+if (typeof lfHitStop === 'function') {
+  const _mvHS = lfHitStop;
+  lfHitStop = function (t) { return t && t.def && t.def.unit === MV_UNIT && NEWMODELS ? t.shotT : _mvHS.apply(this, arguments); };
 }
 // the switch's hint names her too
 if (typeof pauseMenu === 'function') {
@@ -120948,6 +121172,8 @@ function clothItem(rd, gl, u, cl, it) {
     S.t = t; S.f = C.frame;
     lx = (S.x - X) * C.lagK; ly = (S.y - Y) * C.lagK * .5; lz = (S.z - Z) * C.lagK;
     hx = (S.x2 - X) * C.lagK; hy = (S.y2 - Y) * C.lagK * .5; hz = (S.z2 - Z) * C.lagK;
+    // a unit's own throw of its cloth (it.clX, world x and z: Maren's spins, unitmodels_maren.js), the hem a little more
+    if (it.clX) { lx += it.clX[0]; lz += it.clX[1]; hx += it.clX[0] * 1.4; hz += it.clX[1] * 1.4; }
     const mx = C.lagMax * s, L = Math.hypot(lx, ly, lz), H = Math.hypot(hx, hy, hz);
     if (L > mx) { const f = mx / L; lx *= f; ly *= f; lz *= f; }
     if (H > mx) { const f = mx / H; hx *= f; hy *= f; hz *= f; }
