@@ -1,4 +1,4 @@
-const BUILD_TAG = 'cae031da@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'a16baffa@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -113348,7 +113348,8 @@ const RANGER2 = (() => {
      nail        Nailing Shaft (arrowrain): a long heavy over-draw over its cast; loosed with a great kick
                  (each spell's clip has a loose frame, `hit`: the frames before it are played over the cast bar, however
                  long the cast is, so the arrow leaves as the game fires the spell)
-     hit         her health drops;  death  wounded (t.wounded): down on her knee on the bow
+     hit         her health drops;  death  wounded (t.wounded): between her shots and spells, which she still looses, she
+                 sags, the bow let fall forward in her hand
    Her arrows leave the arrow's point (t.tipW, read by unitTip). Her size is the shared rule (unitmodels_size.js: the head
    joint at umHeadAt, growing by UM_TIER); she stands on the Grove's root base. Checks: `python tools/make_gb.py --check`.
    Notes: docs/model_pilot/gladebow3.md. */
@@ -113463,8 +113464,11 @@ const GB3 = (() => {
     if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, mv: 'idle', up: 0 };
     const now = G.time, A = t.ab, ph = now + (t.anim || 0) * 3;
     if (t.hp != null) { if (t._g3Hp != null && t.hp < t._g3Hp - 1e-6 && !t.wounded) t._g3HitAt = now; t._g3Hp = t.hp; }
-    if (t.wounded || S.wound) { const s = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, s), rate: 12, mv: 'death', up: 0 }; }
-    if (t._g3Mv === 'death') t._g3Rise = now;   // (whole again: eased back up)
+    /* (Wounded, a unit still strikes and casts, at a slower pace: her shots and spells play as ever, and between them she
+       sags, the `death` clip from the wound and then held, not her ready stance) */
+    const hurt = !!(t.wounded || S.wound);
+    if (!hurt && t._g3Hurt) t._g3Rise = now;   // (whole again: eased back up)
+    t._g3Hurt = hurt;
     const rise = t._g3Rise != null && now - t._g3Rise < .9;
     // the target's height: eased, so a flyer passing over does not snap the aim
     const up0 = aimUp(t), dt = t._g3UpT == null ? 1 : Math.max(0, Math.min(.1, now - t._g3UpT)); t._g3UpT = now;
@@ -113498,6 +113502,7 @@ const GB3 = (() => {
     const inShot = t.shots && afterAb && s >= 0 && HIT + s * spd < sh.len;
     if (inShot) return { c: 'shot', s: HIT + s * spd, rate: 40, mv: 'shot' + t.shots, up };
     if (fight) { const cd = t.cd || 0; if ((t.windup || 0) > 0 && cd < HIT) return { c: 'shot', s: HIT - cd, rate: 40, mv: 'pre' + t.shots, up }; }
+    if (hurt) { const sw = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, sw), rate: 10, mv: 'death', up: 0 }; }
     const h = t._g3HitAt != null ? now - t._g3HitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: 30, mv: 'hit' + t._g3HitAt, up: 0 };
     if (fight || s < 1.5) return { c: 'ready', s: ph, rate: rise ? 5 : 9, mv: 'ready', up };
     return { c: 'idle', s: ph, rate: 5, mv: 'idle', up: 0 };
