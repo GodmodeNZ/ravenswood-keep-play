@@ -1,4 +1,4 @@
-const BUILD_TAG = '434ae63e@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd2faaae7@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7576,7 +7576,7 @@ function xpHud() {
 
 /* ---- Veterancy: a unit earns its top tiers (IV, V, VI) in the field (owner, 8 Nov 2026) ----
    Every unit counts its kills and its assists, and earns veterancy by what it did to each foe slain (see "credit by
-   contribution" below: its share of the damage, the last hit, its help). Help: a foe it slowed or rooted within the last
+   contribution" below: its share of the damage, and its help). Help: a foe it slowed or rooted within the last
    VET_TOUCH seconds, or still under one of its statuses (frozen, burning, venom, curse, brand, mark, armour crack ...:
    read through buffs.js's registry, bfCapture), or one hurt by a unit its aura, haste, Ward, heal or mana was on (vetAid).
    Tiers IV, V and VI each open for that unit at VET_NEED (it still pays its gold); tiers I-III are open from the start.
@@ -7589,10 +7589,9 @@ function xpHud() {
    about with a mid-damage unit: IV about wave 7-10, V about 11-17. Before (kills + 1 an assist, IV 70 / V 125 / VI 180,
    the old catch-up): a top-damage unit that rarely took the last hit (Grail Knights, Spellblades, Blade Dancers) opened
    IV only at wave 14-17 and never V by wave 20.
-   The stagger (10 Nov 2026, "the pace by standing" below; tools/check_vet_stagger.js scripts it, check_veterancy.js --old plays
-   it without): before, the front three units opened each tier within a wave of each other (IV at about wave 10, V 15, VI 20);
-   now the unit doing the most opens it first and the next two follow about two waves apart each (IV 9 / 11 / 13, V 13 / 15 / 18,
-   VI 17 / 19 / 22), with the army's tier unlocks by wave 15 and 20 about as many as before (4.5 against 4.9, 8.8 against 8.9). */
+   The stagger tried on 10 Nov (a queue that sped the unit in front by 15% and slowed any unit close behind another, to as
+   little as half) was retired on 27 Nov: it ran the main unit further ahead and held back the units bunched at the back
+   (owner: "main unit that gets all the kills becomes a veteran too fast and others languish"). */
 const VET_AST = 1, VET_WIN = 8, VET_HIT = false;   // (VET_AST: an assist's worth in a save from before credit by contribution)
 let VET_ACT = null, VET_TOUCH = 8;   // VET_TOUCH: how long ago a slow, root, stun, burn ... may have landed and still count (seconds)   // the unit whose code is running (updateTowers, impact, a hazard's tick): stuns, mana and wards it gives count as its help
 const VET_NEED = [190, 280, 370];   // veterancy that opens tier IV, V and VI
@@ -7640,15 +7639,15 @@ function vetSeed(t) {
 /* ---- credit by contribution (owner, 10 Nov 2026: "reduce the veterancy drag, noticed a unit took a very long time to get to
    the next rank despite being one of the top damage"; "support units are also still too slow to upgrade") ----
    Each foe slain hands out veterancy by what each unit did to it, worth VET_W of a plain foe (an elite, a leader, a boss):
-   - its share of the damage on that foe (vetDmg, beside every credit() in hurt): VET_K_DMG x share, so a unit that
-     softens a foe for another's last hit is paid for the work;
-   - the last hit: VET_K_LAST more (the kill itself still counts on its own line);
+   - its share of the damage on that foe (vetDmg, through dmgmap.js's dmHit beside every credit()): VET_K_DMG x share.
+     The split is by damage alone: the killing blow earns nothing of its own (owner, 27 Nov 2026: "split by damage"; the
+     kill still counts on its own line). A foe that died with no damage on record counts as all its killer's;
    - help: VET_K_HELP for a foe it slowed, rooted, stunned, branded or still had a status on (vetTouch, bfCapture), and
      VET_K_HELP x the damage share of the units it buffed, warded, healed or fed mana (vetAid), whichever is more.
-   Assists (the card's count): a foe this unit helped with, or dealt VET_AST_SHARE of the damage to, without the last hit.
+   Assists (the card's count): a foe this unit helped with, or dealt VET_AST_SHARE of the damage to, without the killing blow.
    The pacing (tools/check_veterancy.js, 8 units, no items): a top-3 damage unit earns ~12-16 a wave at waves 15-30, so
    V and VI come ~4 waves apart; a support that holds or buffs well earns about what a mid-damage unit does. */
-let VET_K_DMG = 1.6, VET_K_LAST = .3, VET_K_HELP = 1;
+let VET_K_DMG = 1.65, VET_K_HELP = 1;
 const VET_AST_SHARE = .1;
 // a foe's worth: the square root of its health against its wave's plain foe (a brute ~1.5, an elite ~2, a boss 4-5), so the
 // unit that grinds down the big ones is paid for it
@@ -7660,35 +7659,6 @@ function vetW(c) {
 }
 // hurt: unit src dealt a damage to foe c (what its share of the foe is read from)
 function vetDmg(c, src, a) { if (a > 0 && src && src.invested !== undefined && src.id && src.def && !src.def.wall) { const D = c.vD || (c.vD = {}); D[src.id] = (D[src.id] || 0) + a; } }
-/* ---- the pace by standing (owner, 10 Nov 2026: "veterancy unlocks are all happening around the same time, should be
-   staggered a bit more, so that units that contributed the most get it first") ----
-   The army forms a queue for its unlocks, and each unit keeps its distance from the one in front. Units still working
-   toward a tier are ranked by what they have earned plus VET_STAND_LEAD times what they earned lately (t.vRec: the credit
-   before any slowing, VET_STAND_KEEP of it carried from one wave to the next), so the unit doing the most work leads, and a
-   unit that out-earns the one ahead overtakes it. The front unit gains at full pace, as before. Each unit behind it gains
-   at (its gap, in veterancy, to the unit in front / VET_STAND_GAP): full pace once it trails by VET_STAND_GAP, slower as it
-   closes on it, never under VET_STAND_MIN (and at the floor while it is ahead of a unit that is working harder). Units doing
-   about the same work therefore open each tier VET_STAND_GAP apart (about two waves of a busy unit) instead of together,
-   a unit far behind is not slowed at all, and the army as a whole is held up only by that one gap. A unit with every tier
-   open stands aside, so the rest move up. Only the pace changes: the numbers a tier asks for are the same for every unit. */
-let VET_STAND = true, VET_STAND_GAP = 45, VET_STAND_MIN = .5, VET_STAND_UP = 1.15, VET_STAND_LEAD = 1, VET_STAND_KEEP = .6;
-function vetRec(t) {
-  const w = (typeof G !== 'undefined' && G && G.wave) | 0;
-  if (t.vRecW !== w) { t.vRec = (+t.vRec || 0) * Math.pow(VET_STAND_KEEP, Math.max(0, w - (t.vRecW | 0))); t.vRecW = w; }
-  return t.vRec || 0;
-}
-// every unit working toward a tier -> its pace by the gap to the unit in front (a Map; the front unit and any other not in it gain at full pace)
-function vetPaces() {
-  const P = new Map();
-  if (!VET_STAND || !vetOn() || !G.towers) return P;
-  const L = [];
-  for (const o of G.towers) if (!o.def.wall && vetNext(o) != null) { const v = vetRaw(o); L.push([o, v, v + VET_STAND_LEAD * vetRec(o)]); }
-  L.sort((a, b) => b[2] - a[2] || b[1] - a[1] || a[0].id - b[0].id);
-  for (let r = 0; r < L.length; r++) P.set(L[r][0], VET_STAND_UP * (r ? clamp((L[r - 1][1] - L[r][1]) / VET_STAND_GAP, VET_STAND_MIN, 1) : 1));
-  return P;
-}
-const vetStand = (t, P) => (P || vetPaces()).get(t) || 1;
-const vetStandRel = t => { const p = vetPaces().get(t); return p ? Math.min(1, p / VET_STAND_UP) : 1; };   // (what the card shows: 1 at the front)
 function vetRate(t, avg) {
   if (!VET_CATCH || !vetOn()) return 1;
   if (avg === undefined) avg = vetAvg();
@@ -7716,7 +7686,7 @@ function vetKill(c, src) {
   const now = G.time, killer = vetUnit(src) ? src : null, H = c.vHit, D = c.vD || {}, cap = new Set(), w = vetW(c);
   if (typeof bfCapture === 'function') for (const o of bfCapture(c)) cap.add(o);
   let tot = 0; for (const id in D) tot += D[id];
-  const share = t => tot > 0 && D[t.id] ? D[t.id] / tot : 0;
+  const share = t => tot > 0 ? (D[t.id] || 0) / tot : t === killer ? 1 : 0;
   const help = new Map();   // unit -> its help on this foe, 0..1
   const lend = (t, k) => { if (k > (help.get(t) || 0)) help.set(t, Math.min(1, k)); };
   for (const t of G.towers) {
@@ -7732,18 +7702,12 @@ function vetKill(c, src) {
     for (const id in o.vAid) { if (o.vAid[id] + VET_WIN < now) { delete o.vAid[id]; continue; } if (k > 0) aidK[id] = (aidK[id] || 0) + k; }
   }
   for (const t of G.towers) if (aidK[t.id] > 0 && !t.def.wall) lend(t, aidK[t.id]);
-  const pay = new Map();
+  const avg = vetAvg(), gain = (t, n) => { if (!(n > 0)) return; if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0); t.vx += n * vetRate(t, avg); };
   for (const t of G.towers) {
     if (t.def.wall) continue;
     const s = share(t), hp = help.get(t) || 0;
-    if (!(s > 0) && !hp && t !== killer) continue;
-    const n = w * (VET_K_DMG * s + VET_K_HELP * hp + (t === killer ? VET_K_LAST : 0));
-    pay.set(t, n); vetRec(t); t.vRec += n;
-  }
-  const avg = vetAvg(), P = vetPaces(), gain = (t, n) => { if (!(n > 0)) return; if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0); t.vx += n * vetRate(t, avg) * vetStand(t, P); };
-  for (const [t, n] of pay) {
-    const s = share(t), hp = help.get(t) || 0;
-    gain(t, n);
+    if (!(s > 0) && !hp) continue;
+    gain(t, w * (VET_K_DMG * s + VET_K_HELP * hp));
     if (t !== killer && (hp > 0 || s >= VET_AST_SHARE)) t.ast = (t.ast | 0) + 1;
     vetCheck(t);
   }
@@ -7753,12 +7717,11 @@ function vetKill(c, src) {
 const VET_LEAK_K = .5;
 function vetLeak(c) {
   if (!vetOn() || G.state !== 'play' || !G.towers || !c.vD || !(c.maxHp > 0)) return;
-  const w = vetW(c), avg = vetAvg(), P = vetPaces();
+  const w = vetW(c), avg = vetAvg();
   for (const t of G.towers) {
     const d = c.vD[t.id]; if (!(d > 0) || t.def.wall) continue;
     if (t.vx == null) t.vx = vetRaw(t) - (G.playtest && G.playtest.wave ? vetSeason(G.playtest.wave) : 0);
-    const n = w * VET_K_DMG * VET_LEAK_K * Math.min(1, d / c.maxHp); vetRec(t); t.vRec += n;
-    t.vx += n * vetRate(t, avg) * vetStand(t, P); vetCheck(t);
+    t.vx += w * VET_K_DMG * VET_LEAK_K * Math.min(1, d / c.maxHp) * vetRate(t, avg); vetCheck(t);
   }
 }
 // a unit's veterancy just opened a new tier: say so (several at once share one toast), and a small ring on it
@@ -7785,7 +7748,7 @@ function vetSync() { for (const t of G.towers || []) if (!t.def.wall) t.vetOk = 
 // the line for a locked tier (the Upgrade button, a toast)
 function vetLockText(t) {
   const n = (t.tier | 0) + 1, need = vetNeed(n), p = vetPts(t);
-  return `Tier ${ROMAN[n]} opens at ${need} veterancy (its damage, kills and help): ${p} so far, ${need - p} to go`;
+  return `Tier ${ROMAN[n]} opens at ${need} veterancy (its damage and help): ${p} so far, ${need - p} to go`;
 }
 // the next tier this unit's veterancy works toward (tier index), or null when it can climb no higher (tier VI, or VI already open)
 function vetNext(t) { const last = t.def.tiers.length - 1; for (let n = Math.max(3, (t.tier | 0) + 1); n <= last; n++) if (vetPts(t) < vetNeed(n)) return n; return null; }
@@ -7795,7 +7758,7 @@ function vetFrac(t) { const n = (t.tier | 0) + 1; return n >= 3 && n < t.def.tie
 function vetInfoHTML(t) {
   if (!vetOn() || !t || t.def.wall) return '';
   const n = vetNext(t), f = n != null ? clamp(vetPts(t) / vetNeed(n), 0, 1) : 1;
-  return `<p class="mut vet-row" data-vet="${t.id}" tabindex="0">Veterancy <span class="mn-bar vt-bar${vetRate(t) < .995 || vetStandRel(t) < .995 ? ' slow' : ''}"><i class="vt-fill${n == null ? ' full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i></span></p>`;
+  return `<p class="mut vet-row" data-vet="${t.id}" tabindex="0">Veterancy <span class="mn-bar vt-bar${vetRate(t) < .995 ? ' slow' : ''}"><i class="vt-fill${n == null ? ' full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i></span></p>`;
 }
 // the hover card (#itip, the item cards' look): the bar with its numbers, the next tier, kills and assists, what an assist is
 const VET_GLYPH = {
@@ -7809,14 +7772,13 @@ function vetCardHTML(t) {
   const up = n != null ? `<p class="vtc-up">Tier ${ROMAN[n]} unlocks at <b>${need}</b>${(t.tier | 0) + 1 === n ? ' · it still costs its gold' : ''}</p>`
     : `<p class="vtc-up">${(t.tier | 0) >= t.def.tiers.length - 1 ? 'Tier VI: the top' : 'Every tier is open'}${(t.tier | 0) < t.def.tiers.length - 1 ? ' · each still costs its gold' : ''}</p>`;
   const seed = t.vSeed > 0 ? `<p class="vtc-seed">Started with ${t.vSeed} from your army\u2019s experience</p>` : '';
-  const ra = vetRate(t), qu = vetStandRel(t), rt = ra * qu, why = ra < .995 && qu < .995 ? `Ahead of your army, and waiting behind its front ${uw(2)}` : ra < .995 ? 'Ahead of your army' : `Waiting its turn behind your front ${uw(2)}`;
-  const slow = rt < .995 ? `<p class="vtc-slow">${why}: gaining at ${Math.round(rt * 100)}%</p>` : '';
+  const rt = vetRate(t), slow = rt < .995 ? `<p class="vtc-slow">Ahead of your army: gaining at ${Math.round(rt * 100)}%</p>` : '';
   const pt = G.playtest && G.playtest.wave ? `<p class="itc-hint">A playtest army starts seasoned: +${vetSeason(G.playtest.wave)}.</p>` : '';
   return `<div class="itc vtc" data-kw-off><p class="itc-n">Veterancy</p><p class="itc-k">${t.def.name} · tier ${ROMAN[t.tier | 0]}</p>`
     + `<div class="vtc-bar${rt < .995 ? ' slow' : ''}"><i class="${n == null ? 'full' : ''}" style="width:${Math.round(f * 1000) / 10}%"></i><span>${n != null ? `${p} / ${need}` : `${p} · max`}</span></div>`
     + up + slow + seed
     + `<ul class="vtc-ka"><li>${VET_GLYPH.kill}<b>${K}</b> ${pl(K, 'kill')}</li><li>${VET_GLYPH.assist}<b>${A}</b> ${pl(A, 'assist')}</li></ul>`
-    + `<p class="itc-hint">Each foe slain pays this ${uw(1)} for its share of the damage on it (a last hit a little more), and for its help: a foe it slowed, rooted, stunned or left a status on, or one hurt by a ${uw(1)} it buffed, warded, healed or fed mana. An assist: a foe it helped with or hurt, without the last hit. Units doing about the same work open each tier a couple of waves apart, the one doing more first.</p>${pt}</div>`;
+    + `<p class="itc-hint">Each foe slain pays this ${uw(1)} for its share of the damage on it (the killing blow earns nothing extra), and for its help: a foe it slowed, rooted, stunned or left a status on, or one hurt by a ${uw(1)} it buffed, warded, healed or fed mana. An assist: a foe it helped with or hurt, without the killing blow.</p>${pt}</div>`;
 }
 
 /* ================= FORCES: who answered the keep's call =================
@@ -10201,7 +10163,7 @@ function goldAct(t) {
   b.midasK = 3; b.gilded = true;
   fxCoins(b.x, b.y, hitH(b), 16); fxSparkle(b.x, b.y, hitH(b), '#ffe08a'); part({ k: 'flare', x: b.x, z: b.y, h: hitH(b), life: .4, max: .4, size: 1.6, col: '#ffd84a' }); flashLight(b.x, b.y, 1, [1.8, 1.4, .4], 2.5, .3);
   rfx({ k: 'streak', x0: t.x, h0: towerTop(t), z0: t.y, c: b, col: '#ffd84a', w: .08, life: .35 });
-  credit(t, b.hp, false, 0); kill(b, t); sfx('cash', 3);
+  credit(t, b.hp, false, 0); if (typeof dmHit === 'function') dmHit(b, t, b.hp, null); kill(b, t); sfx('cash', 3);
   return true;
 }
 function ruinAct(t, it) {
@@ -52706,7 +52668,7 @@ function a2Hit(c, amt, type, src, dot, elem) {
     const live = c.a2ch.m.filter(o => !o.dead && o.hp > 0), n = live.length;
     if (n > 1) {
       const share = amt / n;
-      for (const o of live) { if (o === c) continue; o.hp -= share; o.hit = Math.max(o.hit || 0, .08); if (typeof credit === 'function') credit(src, Math.min(share, o.hp + share), dot, 0); if (o.hp <= 0) kill(o, src, elem); }
+      for (const o of live) { if (o === c) continue; o.hp -= share; o.hit = Math.max(o.hit || 0, .08); if (typeof credit === 'function') credit(src, Math.min(share, o.hp + share), dot, 0); if (typeof dmHit === 'function') dmHit(o, src, Math.min(share, o.hp + share), type); if (o.hp <= 0) kill(o, src, elem); }
       amt = share;
     }
   }
@@ -101264,7 +101226,7 @@ function infoHTML() {
   if (s && s.kind === 'keep') {
     const a = ageNext(), r = G.ageRes, cur = AGES[G.age], top = ROMAN[maxTierFor(G.age)];
     const fk = !!G.force && !G.vs;   // a force run: units, and Renown opens them (Classic: schools and School Keys)
-    let h = vetOn() ? `<h3>Your keep</h3><p class="mut" data-d="2">${uw(2, true)} open tiers I to III here. Tiers IV, V and VI each ${uw(1)} earns with veterancy: its share of the damage on foes slain, its kills and its help (${VET_NEED.join(', ')}). Its card shows how far it has to go.</p>`
+    let h = vetOn() ? `<h3>Your keep</h3><p class="mut" data-d="2">${uw(2, true)} open tiers I to III here. Tiers IV, V and VI each ${uw(1)} earns with veterancy: its share of the damage on foes slain and its help (${VET_NEED.join(', ')}). Its card shows how far it has to go.</p>`
       : `<h3>${cur.name} <span class="tier asc">${cur.short}</span></h3><p class="mut" data-d="2">${fk ? 'Units' : 'Towers'} can climb to tier ${top}. Upgrade the keep to open the next tier.</p>`;
     if (r) { const f = clamp(r.t / r.T, 0, 1); h += `<p class="up">Upgrading to a ${AGES[r.to].name}: ${Math.ceil(r.T - r.t)}s left</p><div class="agebar"><i style="width:${Math.round(f * 100)}%"></i></div>`; }
     else if (a) h += `<p class="up">Next: ${a.name} · <b>${a.cost}</b> gold${G.wave < a.wave ? ` · from wave ${a.wave}` : ''}</p><p class="up perk" data-d="1">${fk ? a.text.replace(/^Towers/, 'Units') : a.text}</p>`;
@@ -103622,7 +103584,7 @@ function endTips(won) {
     const fk = !!G.force && !G.vs;
     if (vetOn()) { const U = G.towers.filter(t => !t.def.wall), top = U.reduce((m, t) => Math.max(m, t.tier | 0), 0), up = U.filter(t => t.tier === 2 && !vetLocked(t) && upgradeCost(t)).length;
       if (n >= 12 && up) add(5, `${up} of your ${uw(2)} had earned tier IV with veterancy but were still at tier III. Their Upgrade button pulses when it opens: tier IV hits far harder.`);
-      else if (n >= 14 && top < 3) add(4, `No ${uw(1)} reached tier IV. Veterancy (its share of the damage, kills and help) opens it: put your strongest ${uw(2)} where the most foes walk past them.`); }
+      else if (n >= 14 && top < 3) add(4, `No ${uw(1)} reached tier IV. Veterancy (its share of the damage, and its help) opens it: put your strongest ${uw(2)} where the most foes walk past them.`); }
     else if (n >= 12 && (G.age | 0) === 0) add(5, fk ? `Your keep was still a Keep at wave ${n}. Tap it to upgrade to a Castle: tier IV units hit far harder.` : `Your keep was still a Keep at wave ${n}. Tap it to upgrade to a Castle: tier IV towers hit far harder and take a path.`);
     else if (n >= 22 && (G.age | 0) < 2) add(5, `Your keep wasn't a Fortress by wave ${n}. Tier V ${fk ? 'units' : 'towers'} open there, with a third socket.`);
     if ((G.tp | 0) >= 3) add(4, `You fell with ${G.tp} talent points unspent. Spend them in Talents between waves: every point helps.`);
@@ -143437,10 +143399,9 @@ const GV2 = (() => {
     const it = item(GLV_, _f3.slice(), { shadow: false }); it.sec = [0, 0]; it.bones = IDENT;
   }
   /* (27 Nov 2026, the owner on the throw: "so the vfx": crafted and understated, foes always in view)
-     - a disc: laid flat, banked a little into its curve, spinning on its own axis, a faint ring of blur over its rim so
+     - a disc: laid flat, spinning on its own axis, a faint ring of blur over its rim so
        the spin reads at 30 frames a second (its four hooks strobed without it);
-     - its path: drawn bowed out to one side and lifted a little over each leg (nothing at a leg's ends, so every strike
-       and the catch are where and when the game has them), the bow changing sides at each ricochet;
+     - its path: the game's own, straight from strike to strike and straight home (a bowed path was tried and dropped);
      - each strike bites: the disc wobbles for a fifth of a second and a small star of gold splinters opens at the foe;
      - its trail: a short tapered ribbon along the way it actually came (a sixth of a second of it: a cell or two), gold thinning to
        nothing, in place of the game's straight threads from strike to strike;
@@ -143455,17 +143416,9 @@ const GV2 = (() => {
     const big = p.big ? 1.2 : 1, sc = (t._gvScale || 1.4) * FLY_K * big, now = G.time, RR = .127 * sc;
     const T = p.pts, L = T && T.length ? T[T.length - 1] : [p.x0 != null ? p.x0 : p.x, p.h0 || .6, p.z0 != null ? p.z0 : p.z];
     const n = T ? T.length : 0; if (p._gvN == null) { p._gvN = n; p._gvSide = (p.t && ((p.t.i + p.t.j) & 1)) ? 1 : -1; }
-    if (n > p._gvN) { p._gvN = n; p._gvBite = now; p._gvB = [L[0], L[1], L[2]]; p._gvSide = -p._gvSide; }   // (a strike: the bite, and the bow changes sides)
+    if (n > p._gvN) { p._gvN = n; p._gvBite = now; p._gvB = [L[0], L[1], L[2]]; p._gvSide = -p._gvSide; }   // (a strike: the bite)
     let x = p.x, h = p.h || .6, z = p.z;
-    const g = t._gvGR; let gx = null, gz = null;
-    if (p.k === 'rglaive') { if (p.home) { gx = g ? g[0] : t.x; gz = g ? g[2] : t.y; } else if (p.tx != null) { gx = p.tx; gz = p.tz; } }
-    if (gx != null) {   // the bow over this leg (drawn only)
-      const lx = gx - L[0], lz = gz - L[2], len = Math.hypot(lx, lz);
-      if (len > .25) {
-        const u = Math.max(0, Math.min(1, ((x - L[0]) * lx + (z - L[2]) * lz) / (len * len))), sn = Math.sin(Math.PI * u), A = Math.min(.3, .12 * len) * p._gvSide;
-        x += -lz / len * A * sn; z += lx / len * A * sn; h += .06 * Math.min(1, len / 2) * sn;
-      }
-    }
+    const g = t._gvGR;   // (its route is the game's own: straight from her hand to each strike and straight home. The owner, 27 Nov 2026: "would prefer the glaive to do its older route, rather the circling back": the bowed legs are gone)
     if (p._gvOff) { const u = Math.max(0, 1 - (now - (p._gvAt || now)) / LEAVE), e = u * u * (3 - 2 * u); x += p._gvOff[0] * e; h += p._gvOff[1] * e; z += p._gvOff[2] * e; }
     if (p.home && g) { const d = Math.hypot(g[0] - x, g[1] - h, g[2] - z), k = Math.max(0, 1 - d / HOME), e = k * k; x += (g[0] - x) * e; h += (g[1] - h) * e; z += (g[2] - z) * e; }
     // its heading, from where it was last drawn
@@ -143473,13 +143426,13 @@ const GV2 = (() => {
     if (q) { const dx = x - q[0], dz = z - q[2], d = Math.hypot(dx, dz); if (d > .004) { vx = dx / d; vz = dz / d; } }
     p._gvLast = [x, h, z]; p._gvVx = vx; p._gvVz = vz;
     const bt = p._gvBite != null ? now - p._gvBite : 9, wob = bt < BITE ? Math.sin(bt * 58) * .42 * (1 - bt / BITE) : 0;
-    discAt(x, h, z, Math.atan2(vx, vz), .10 + wob * .6, .17 * p._gvSide * (p.home ? -1 : 1) + wob, p.spin * 1.25, sc);
+    discAt(x, h, z, Math.atan2(vx, vz), .10 + wob * .6, wob, p.spin * 1.25, sc);
     const gold = WB_COL.goldL, iv = WB_COL.ivory;
     QADD.ground(x, z, h + .004, RR * 1.02, RR * 1.02, wbgA(gold, .11), 4, .12, p.spin * 1.25);   // the rim's blur: it reads as spinning
     QADD.bill(RD, x, h, z, RR * 1.5, RR * 1.5, wbgA(gold, .07), 1, 0);
     QG.ground(x, z, .03, RR * .85, RR * .85, [0, 0, 0, .22], 2, 0);
     // the trail: the way it actually came, a third of a second of it, as smooth ribbons through the places it was drawn
-    // (Catmull-Rom, so a bowed leg leaves a curved wake and a ricochet a bent one, never a chain of straight pieces):
+    // (Catmull-Rom, so a ricochet leaves a bent wake, never a chain of straight pieces):
     // - a soft wake lying flat in the disc's own plane, as wide as the disc where it leaves it and tapering to a point;
     // - two fine pale streaks peeling off the rim's two sides and drawing together behind it (the blade's edges cutting air).
     // Low and warm: nothing a foe can hide behind. Without the toolkit (Graphics on Low) a plain tapered streak.
