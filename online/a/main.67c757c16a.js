@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd4189197@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '961df4c8@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -8804,6 +8804,10 @@ const FORCE_PARTS = {
     { k: 'seed', par: 'hand', piv: [-.03, -.14, .07], build(g) { g.em = 1; g.ico(0, 0, 0, .03, '#b8ff6a', .3); g.em = .6; for (let k = 0; k < 3; k++) leaf(g, [0, .02, 0], [Math.cos(k * 2.1) * .5, .8, Math.sin(k * 2.1) * .5], .045, .015, '#7ac040'); g.em = 0; }, pose: () => null }],   // Binding Seed: a glowing seed in the hand
 };
 const FSPLIT = {};   // each unit and tier's body cut into its layers (splitGeo): { base, low, up }
+/* its key (fsKey): the unit sheet's body, built with no base (models.js MESH_NOBASE), is kept under its own, as towerMesh keeps its mesh;
+   under the battlefield's key its empty base took the platform off every one of that unit on the maze (owner, 28 Nov 2026: "unit
+   platforms dissapear after opening them in the character pane") */
+const fsKey = (u, tr) => u + tr + (typeof MESH_NOBASE !== 'undefined' && MESH_NOBASE ? '_nb' : '');
 /* Every force unit's body and parts are smooth-shaded (Geo's g.smooth: normals welded across edges gentler than
    UNIT_SMOOTH degrees), so round tubes, lathes and spheres read as round forms, not facets, while a box's edges, a blade's
    bevel and a pauldron's rim stay crisp. It costs nothing at draw time (the normals are baked when the mesh is built).
@@ -8820,7 +8824,7 @@ function buildForceUnit(unit, tier) {
   const g = unitGeo(new Geo(unit.length * 37 + tier * 11)), rnd = mulberry32(unit.length * 17 + tier * 7 + 3);
   g.jit = .05; withPal(unit, () => g.with(T(0, 0, 0, 0, 0, 0, unitK(unit, tier)), () => FORCE_BUILD[unit](g, tier, rnd)));
   if (g._sf) g._smoothPass();   // (before the layers are cut apart: they keep the welded normals)
-  FSPLIT[unit + tier] = splitGeo(g);
+  FSPLIT[fsKey(unit, tier)] = splitGeo(g);
   return g.finish();
 }
 
@@ -8894,7 +8898,7 @@ function drawForceUnit(t, tier, sx, sy, sz, wob, opts) {
   if (!isGroveUnit(t.def.unit)) { drawForceUnitPlain(t, tier, sx, sy, sz, wob, opts); return; }   // another force: one body and its parts, as before
   const dr = t.def.unit === 'wayfarer' && typeof druidModel === 'function', u = dr ? druidModel(t) : t.def.unit, tr = unitTier(t, tier), K = unitK(u, tr), live = typeof G !== 'undefined' && G.time != null;   // (a Grove Shifter: its form's body)
   if (dr) { const k = druidPopK(t); sx *= k; sy *= typeof druidPopY === 'function' ? druidPopY(t) : k; sz *= k; }   // (a shift: the old shape folds away, the new one blooms, squashing and stretching)
-  const full = dr ? druidMesh(u, tr) : towerMesh(t.type, tr), L = FSPLIT[u + tr];
+  const full = dr ? druidMesh(u, tr) : towerMesh(t.type, tr), L = FSPLIT[fsKey(u, tr)];
   const B = unitPose(t, u, live), [x, z] = live && t.chg ? chargePos(t, B.cast) : [t.x, t.y];
   const ang = t.ang == null ? 0 : t.ang, yaw = ang + B.spin;
   FX_PM.root = FX_PM.torso = null;
@@ -15919,7 +15923,7 @@ function druidPopY(t) {
   if (s < .32) { const q = (s - .15) / .17; return .42 + .8 * (1 - (1 - q) * (1 - q)); }   // up past full height
   const q = s - .32; return 1 + .22 * Math.cos(q * 15) * Math.exp(-q * 8);   // springing down and back
 }
-function druidMesh(u, tr) { const k = 'f_' + u + tr; return MESH[k] || (MESH[k] = buildForceUnit(u, tr)); }
+function druidMesh(u, tr) { const k = 'f_' + fsKey(u, tr); return MESH[k] || (MESH[k] = buildForceUnit(u, tr)); }
 // a form's body with its parts at rest, in one piece (the build ghost)
 function druidFullMesh(u, tr) {
   const key = 'f_' + u + tr + '_full'; if (MESH[key]) return MESH[key];
@@ -36744,7 +36748,7 @@ function wallsTouch(i, j) {   // something changed at cell (i, j): it and its fo
 }
 // the piece for a mask (0: the lone post, the force's own model)
 function wallMesh(u, m) {
-  if (!m || !WALL_KIT[u]) { const k = 'f_' + u + 0; return MESH[k] || (MESH[k] = buildForceUnit(u, 0)); }
+  if (!m || !WALL_KIT[u]) { const k = 'f_' + fsKey(u, 0); return MESH[k] || (MESH[k] = buildForceUnit(u, 0)); }
   const k = 'w_' + u + m; return MESH[k] || (MESH[k] = buildWallPiece(u, m));
 }
 function buildWallPiece(u, m) {
@@ -65146,8 +65150,10 @@ function sevLate() {
    other forces' tree layouts"; tools/open_layout.js grove; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'grove';
-  ezLayout(F, 'glaive', [[0,0],[2,3],[3,3],[0,1],[1,3],[3,0],[4,2],[3,1],[5,2],[5,1],[2,2],[5,0],[2,1],[3,2],[0,2],[4,3],[1,0]], [[10,13,6,8],[12,7,9],[0,16]]);   /* rows 3 2 3 4 2 3; chains: Spearwood Rising > Tossed Off the Point > Last Thrust > Wall of Spears | Skewer > Phalanx > Impaler | Long Haft > Braced Rhythm */
-  ezLayout(F, 'arrow', [[0,0],[0,1],[3,3],[2,2],[2,1],[1,1],[1,3],[2,3],[5,1],[5,3],[4,2],[4,1],[3,0],[5,2],[0,2],[2,0],[4,0]], [[6,7,2,9],[1,5,4],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Through the Gap > Long Draw > Fletcher's Focus > Thornrain | Heartwood Volley > Thornseed Arrow > Spirit Hawk | Nailing Shaft > Hail of Shafts */
+  ezLayout(F, 'glaive', [[0,0],[0,2],[4,3],[2,1],[1,3],[1,2],[3,2],[3,1],[5,1],[5,2],[2,2],[4,0],[3,0],[2,3],[0,1],[0,3],[1,0]], [[0,16],[14,3,7,8],[1,5,10],[6,9],[15,4,13]]);   /* (29 Nov 2026, the Thornguard's new identity, forces_..._easy_zthornguard.js: the Long Spear in columns 1-2, Pinned Prey in 3-4; rows 4 3 3 3 2 2; chains: Long Haft > Braced Rhythm | Deep Thrust > Shieldsplitter > Long Reach > Wall of Spears | Pinned Prey > Through the Pinned > Spearwood Rising | Last Thrust > Thorn and Spear | Next Prey > Thornhedge > Tossed Off the Point) */
+  if (0) ezLayout(F, 'glaive', [[0,0],[2,3],[3,3],[0,1],[1,3],[3,0],[4,2],[3,1],[5,2],[5,1],[2,2],[5,0],[2,1],[3,2],[0,2],[4,3],[1,0]], [[10,13,6,8],[12,7,9],[0,16]]);   /* rows 3 2 3 4 2 3; chains: Spearwood Rising > Tossed Off the Point > Last Thrust > Wall of Spears | Skewer > Phalanx > Impaler | Long Haft > Braced Rhythm */
+  ezLayout(F, 'arrow', [[0,1],[0,0],[3,3],[1,2],[2,0],[1,0],[3,1],[1,1],[5,1],[5,3],[4,3],[3,0],[4,1],[5,2],[0,3],[0,2],[2,2]], [[7,6,12,8],[1,5,4],[15,3,16,13],[2,10,9]]);   /* (29 Nov 2026, the Gladebow's two fantasies, forces_..._easy_zgladebow.js: the Long Shot in column 2, the Hunt in column 3; rows 4 3 2 3 2 3; chains: Long Draw > Through the Gap > First Arrow > Deadeye Draw | Heartwood Volley > Thornseed Arrow > Spirit Hawk | On the Scent > Thornpoint Arrows > Ricochet > The Hunt Goes On | Fletcher's Focus > Nailing Shaft > Thornrain) */
+  if (0) ezLayout(F, 'arrow', [[0,0],[0,1],[3,3],[2,2],[2,1],[1,1],[1,3],[2,3],[5,1],[5,3],[4,2],[4,1],[3,0],[5,2],[0,2],[2,0],[4,0]], [[6,7,2,9],[1,5,4],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Through the Gap > Long Draw > Fletcher's Focus > Thornrain | Heartwood Volley > Thornseed Arrow > Spirit Hawk | Nailing Shaft > Hail of Shafts */
   ezLayout(F, 'frost', [[0,0],[0,2],[4,3],[1,0],[1,2],[5,1],[4,1],[3,3],[3,0],[2,3],[2,2],[4,0],[5,3],[5,2],[4,2],[2,1],[0,1]], [[9,7,2,12],[1,4,10],[6,5],[0,3]]);   /* rows 3 2 3 2 4 3; chains: Spreading Roots > Second Snare > Root Run > Overgrowth | Thorned Vines > Mothcloud > Lashing Roots | Wither > Briar Spirit | Deep Roots > Thorn Hold */
   ezLayout(F, 'arcane', [[3,1],[0,2],[1,3],[3,2],[5,1],[1,1],[2,2],[4,1],[2,3],[5,2],[5,3],[3,3],[3,0],[0,1],[1,0],[4,0]], [[2,8,11,10],[1,6,3],[7,4],[13,5]]);   /* rows 2 3 2 4 2 3; chains: Opening Charge > Lord of the Glade > Second Charge > White Stag Spirit | Trample > Bounding Leap > Fresh Legs | White Hart's Hunt > Endless Hunt | Spell-Spurred > Through and On */
   ezLayout(F, 'storm', [[3,1],[0,2],[4,3],[4,1],[1,3],[2,3],[3,2],[2,1],[5,1],[2,2],[1,0],[4,2],[5,2],[5,3],[0,1],[0,0],[4,0]], [[7,0,3,8],[9,6,11],[15,10],[4,5]]);   /* rows 3 2 3 2 4 3; chains: Moonsap Bolts > Owl's Reach > Bramble Claws > Skyfall | Shapestorm > Wild Sweep > Wild Hunger | Shift Surge > Second Skin | Primal Swipe > Stoop */
@@ -65561,7 +65567,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
      Thornguard Spears     Bristling Hedge     ground foes in the spearman's reach are pricked every second
      Briarwardens          Strangling Briars   rooted foes in reach are crushed while the roots hold
      Stag Lancers          Full Tilt           the further the charge, the harder the lance
-     Grove Shifters        Bear's Wrath        every 3rd attack is a bear's swipe, round the target
+     Grove Shifters        Bear's Wrath        every attack is a bear's swipe, round the target
      Golem Wardens         Crushing Weight     attacks take a share of the foe's present health
      Ironbreakers          Sundering Blows     each attack breaks armour for the rest of the wave
      Chain Trappers        Spring the Trap     attacks finish off any foe nearly dead
@@ -65631,7 +65637,7 @@ function ezkPulse(t, st, dt) {
   const S = t.ezk || (t.ezk = {});
   if ((S.t = (S.t || 0) - dt) > 0) return;
   switch (d.kind) {
-    case 'hedge': S.t = 1; { let any = 0; for (const c of G.creeps) if (!c.dead && !c.ent && !c.fly && canTarget(t, st, c) && inRange(t, st, c)) { any = 1; ezcHit(t, st, c, st.dmg * d.k); part({ k: 'leaf', x: c.x, z: c.y, h: .25, vx: 0, vz: 0, vh: .4, g: 0, life: .35, max: .35, size: .12, col: d.col }); } if (any) part({ k: 'ring', x: t.x, z: t.y, h: .05, life: .4, max: .4, size: st.range || 1.3, col: d.col }); } break;
+    case 'hedge': S.t = 1; { let any = 0; for (const c of G.creeps) if (!c.dead && !c.ent && !c.fly && canTarget(t, st, c) && inRange(t, st, c)) { any = 1; ezcHit(t, st, c, st.dmg * d.k * (d.ranked ? st.caps[d.cap] || 1 : 1)); part({ k: 'leaf', x: c.x, z: c.y, h: .25, vx: 0, vz: 0, vh: .4, g: 0, life: .35, max: .35, size: .12, col: d.col }); } if (any) part({ k: 'ring', x: t.x, z: t.y, h: .05, life: .4, max: .4, size: st.range || 1.3, col: d.col }); } break;
     case 'strangle': S.t = .5; for (const c of ezcFoes(t, st)) if (c.rootT > G.time) { ezcHit(t, st, c, st.dmg * d.k * .5); part({ k: 'leaf', x: c.x, z: c.y, h: .3, vx: 0, vz: 0, vh: .5, g: 0, life: .4, max: .4, size: .14, col: d.col }); } break;
     case 'quarry': S.t = .4; { const L = ezcFoes(t, st); S.q = L.length ? L.reduce((a, b) => b.hp > a.hp ? b : a) : null; if (S.q) part({ k: 'ring', x: S.q.x, z: S.q.y, h: .05, life: .45, max: .45, size: .34, col: d.col }); } break;
     case 'embers': S.t = .5; if (S.b) for (const [c, e] of S.b) { if (c.dead || e.until < G.time) { S.b.delete(c); continue; } ezcHit(t, st, c, st.dmg * d.k * .5 * e.n); part({ k: 'ember', x: c.x, z: c.y, h: hitH(c), vx: 0, vz: 0, vh: .6, g: 0, drag: 2, life: .4, max: .4, size: .07 + .02 * e.n, col: d.col }); } break;
@@ -65710,8 +65716,8 @@ const EZH = { EVERY: 6, R: .6, PCT: .45 };
     "Rooted foes in the Briarwarden's reach are crushed by the roots: 20% damage a second while they are held.");
   D('grove', 'arcane', 'White Stag Spirit', 'Full Tilt', 'tilt', { k: .15, max: .45, col: '#f2f6ff' },
     "The Stag Lancer's attacks deal 15% more damage for each cell between the Stag Lancer and the target, up to 45%.");
-  D('grove', 'storm', 'Owl Lord', "Bear's Wrath", 'bear', { n: 2, k: 3, side: 1.5, r: .8, col: '#c8a070' },
-    'Every 2nd attack of the Grove Shifter is a bear swipe: 200% more damage to the target, and 150% damage to other foes within 0.8 cells.');
+  D('grove', 'storm', 'Owl Lord', "Bear's Wrath", 'bear', { n: 1, k: 2, side: .75, r: .8, col: '#c8a070' },
+    "The Grove Shifter's attacks are bear swipes: 100% more damage to the target, and 75% damage to other foes within 0.8 cells.");
   // the Conclave
   D('conclave', 'earth', 'Stone Sprite', 'Crushing Weight', 'weight', { k: .05, boss: .01, col: '#b89868' },
     "The Golem Warden's attacks also take 5% of the target's present health (1% from bosses and leaders).");
@@ -65738,6 +65744,355 @@ const EZH = { EVERY: 6, R: .6, PCT: .45 };
     'Each attack of the Windrunner on a different foe than the last deals 30% more damage.');
   D('stormborn', 'earth', 'Bison Spirit', 'Weight of the Mountain', 'mana', { k: .002, max: .3, col: '#e8c890' },
     "The Earthbinder's attacks hit 1% harder for every 5 mana the Earthbinder holds, up to 30%.");
+})();
+
+/* Fewer "every Nth attack" talents (owner, 29 Nov 2026, of the Gladebow Rangers: "don't really like that on gladebow all
+   options are after x attacks it does y"). After forces_..._easy_zcapstones.js (ezcHit, ezcFoes).
+
+   THE GLADEBOW RANGERS had four counted talents, three of them all three capstones (owner: "capstone... all capstones have
+   that sorry... all 3"). None is left. The tree is two fantasies the owner approved ("these sound good": shots hit harder
+   the farther they fly, arrows pierce or ricochet, extra damage on foes the Grove has rooted or slowed, attack speed that
+   builds on one target):
+     THE LONG SHOT (columns 1-2 and the top of 4)
+       Long Flight (was Warming Bow)   more damage for each cell the arrow flies
+       Long Draw                       range (kept)
+       Far Sight (was Quick Nock)      crit chance for each cell to the target
+       Through the Gap                 the shaft passes into the foe behind (kept)
+       First Arrow                     more on unhurt foes (kept)
+       capstone DEADEYE DRAW           every arrow flies on through every foe in its line, harder for each cell flown
+     THE HUNT (columns 3-4)
+       On the Scent (was Hunter's Rhythm)   attacks faster for each attack on the same foe
+       Thornpoint Arrows                    more damage to slowed foes (was rooted foes: the Thornguard owns those now)
+       Ricochet (was Running Fire)          an arrow that strikes a slowed foe leaps to another
+       capstone THE HUNT GOES ON (was Hail of Shafts)   the speed built on one foe is kept when it dies, and builds higher
+       capstone THORNRAIN                   each Nailing Shaft rains thorns on every foe in reach, twice as hard on the held
+     Kept as they were: Heartwood Volley, Spirit Hawk, Spent Shaft, Fletcher's Focus, and the two spells.
+
+   THE SWEEP: any tree with more than two counted talents loses the extra ones, to simple passives or a rule with no count:
+     Grove Shifters        Wild Pace -> Keen Senses (crit chance); Rampage -> each attack quickens the next
+     Magelings             Twin Casting -> Keen Study (crit chance)
+     Frostweavers          Icicle Volley rides Frost Spear, not a count (forces_..._easy_zvariety.js); Second Spear is kept:
+                           without it the Frostweavers fell from 32% to 18% of a wave
+     Pyroclasts            Counted Coals -> White Heat (crit chance)
+     Ironbreakers          Brace and Shove -> Measured Blows (harder on the same foe); Anvil Strike -> every attack rings
+                           on the foes beside the target
+     Anvilwrights          Anvil Storm -> Hammer Rhythm (each attack quickens the next)
+     Mortar Crew           Double Crew -> Long Tube (range)
+     Oathsworn             Ringing Shield -> Bulwark Bash rings on the foes round it. Unyielding is kept (its bash on every
+                           2nd attack is most of what the Oathsworn hold with): three counted talents are left here
+     Silverbolt Crossbows  Storm of Silver -> Consecrated Bolt bursts (Heavy Quarrel is kept: two counted talents are left)
+     Lightbinder Sisters   Double Lash -> Quickened Chains (faster after a crit); Chain Whirl -> every attack lashes the
+                           foes beside the target
+     Templars of the Ford  Twin Throw -> Blade Fury (faster after a crit). Their three other counted talents are one rule
+                           (the Twin Cut) said three ways and are left.
+     Hail Shamans          left as they are: Great Stones carries a tenth of what they do, and crit chance did not replace it
+                           (three counted talents are left here)
+   CAPSTONES: a tree with two counted capstones of three loses one: the Magelings' Missile Storm (a second foe while
+   the reach is crowded), the Silverbolts' Storm of Silver (Consecrated Bolt bursts), the Windrunners' Gale Volley (a second foe while
+   the reach is crowded), the Thunder Callers' Thunderclap (every attack cracks on), the Grove Shifters' Bear's Wrath (every attack, forces_..._easy_zcapstones.js).
+   Left as they are: Celestine's Champion tree (four, all on her Exposed rule), and the Seedcasters' Spore Cloud and
+   Puffcap Trail (two counted capstones, but each leaves a thing on the field: a cloud, a puffcap). */
+const GBW = { cfg: {}, HAIL_T: 3, FAR: .04, CRIT: .01, CRIT_CELLS: 4, LINE: .12, LINE_W: .35, HUNT: .03, HUNT_MAX: 5, HUNT_MORE: 3, PREY: .12, RICO: .4, RICO_R: 2, RAIN: 3 };
+(function () {
+  if (typeof FORCES === 'undefined' || typeof ezClear !== 'function') return;
+  const P = v => String(Math.round(v * 100)), N = v => String(+(+v).toFixed(2));
+  const find = (f, s, name) => { const T = FORCES[f] && FORCES[f].talents && FORCES[f].talents[s], t = T && T.list.find(q => q.name === name && !q.spell); if (!t && typeof console !== 'undefined') console.warn('fewer counts: no talent', f, s, name); return t || null; };
+  const rename = (t, name) => { if (!name || name === t.name) return; if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[name]) TAL_ART_ALIAS[name] = TAL_ART_ALIAS[t.name] || t.name; t.oldName = t.oldName || t.name; t.name = name; };
+  const M = (t, n) => Math.max(1, Math.min(n | 0 || 1, t.max));
+  // a plain stat or flavour node of the easy-talents engine, in this unit's own words
+  const stat = (f, s, old, name, kind, a, pro) => { const t0 = find(f, s, old); if (!t0) return null; const t = (kind === 'crit' || kind === 'reach' || kind === 'splash' ? ezTal : ezFlav)(f, s, old, kind, a); if (!t) return null; rename(t, name); t.pro = n => pro(M(t, n)); return t; };
+  const own = (f, s, old, name, o) => { const t = find(f, s, old); if (!t) return null; ezClear(t); rename(t, name); t.tag = o.tag || 'Damage'; t.cap = o.cap; t.capK = 1; t.ez = 'plain'; t.atkPlain = true; delete t.ezLadder; if (o.sp) t.sp = () => o.sp; t.pro = n => o.pro(M(t, n)); (GBW.cfg[FORCES[f].units[s].id] || (GBW.cfg[FORCES[f].units[s].id] = [])).push(Object.assign({ cap: o.cap }, o.rule)); return t; };
+  // ---- the Gladebow Rangers ----
+  const gb = (old, name, cap, kind, o) => own('grove', 'arrow', old, name, Object.assign({ cap, rule: Object.assign({ kind }, o.rule || {}) }, o));
+  gb('Warming Bow', 'Long Flight', 'gbFar', 'far', { pro: n => `The Gladebow Ranger's attacks deal ${P(GBW.FAR * n)}% more damage for each cell the arrow flies.` });
+  gb('Quick Nock', 'Far Sight', 'gbCrit', 'critfar', { pro: n => `Increases the Gladebow Ranger's critical strike chance by ${P(GBW.CRIT * n)}% for each cell to the target, up to ${GBW.CRIT_CELLS} cells.` });
+  gb('Deadeye Draw', 'Deadeye Draw', 'gbLine', 'line', { pro: () => `The Gladebow Ranger's arrows fly on through every foe in their line. Each foe an arrow strikes takes ${P(GBW.LINE)}% more damage for each cell the arrow has flown.` });
+  gb("Hunter's Rhythm", 'On the Scent', 'gbHunt', 'hunt', { pro: n => `Each attack on the same foe: the Gladebow Ranger attacks ${P(GBW.HUNT * n)}% faster, up to ${GBW.HUNT_MAX} times. A new target starts the count again.` });
+  gb('Thornpoint Arrows', 'Thornpoint Arrows', 'gbPrey', 'prey', { pro: n => `The Gladebow Ranger's attacks deal ${P(GBW.PREY * n)}% more damage to slowed foes.` });
+  gb('Running Fire', 'Ricochet', 'gbRico', 'rico', { rule: { col: '#b8e88a' }, pro: n => `An arrow of the Gladebow Ranger that strikes a slowed foe leaps to another slowed foe within ${GBW.RICO_R} cells, for ${P(GBW.RICO * n)}% damage.` });
+  gb('Hail of Shafts', 'The Hunt Goes On', 'gbOn', 'on', { pro: () => `When the Gladebow Ranger's target dies, the attack speed built on it is kept for the next target, and it builds ${GBW.HUNT_MORE} times higher.` });
+  gb('Thornrain', 'Thornrain', 'gbRain', 'rain', { tag: 'Spell', sp: { ab: 'arrowrain', haste: [.3, 4] }, rule: { ab: 'arrowrain', col: '#9be87a' },
+    pro: () => `Each Nailing Shaft: thorns hit every foe in reach for ${P(GBW.RAIN)}% damage (double on slowed foes), and the Gladebow Ranger attacks 30% faster for 4s.` });
+  // ---- capstones elsewhere that were two counted procs of three ----
+  /* (the Magelings' Missile Storm: in forces_..._easy_zvariety.js, which loads after this file) */
+  own('stormborn', 'arrow', 'Gale Volley', 'Gale Volley', { cap: 'gbGale', rule: { kind: 'multi', need: 3, k: 1, col: '#d0f0ff' },
+    pro: () => "While 3 or more foes are in the Windrunner's reach, each attack of the Windrunner also strikes a second foe for full damage." });
+  own('stormborn', 'storm', 'Thunderclap', 'Thunderclap', { cap: 'gbClap', rule: { kind: 'cleave', r: 1, k: .9, col: '#bfe8ff' },
+    pro: () => "The Thunder Caller's attacks crack on: every other foe within 1 cell of the target takes 90% damage." });
+  own('silver', 'arrow', 'Storm of Silver', 'Storm of Silver', { cap: 'gbSilver', tag: 'Spell', sp: { ab: 'so_sanct' }, rule: { kind: 'castsplash', ab: 'so_sanct', r: 1.2, k: 3, col: '#e8f0ff' },
+    pro: () => 'Consecrated Bolt bursts where it lands: every other foe within 1.2 cells of its target takes 300% damage.' });
+  // ---- the sweep ----
+  stat('grove', 'storm', 'Wild Pace', 'Keen Senses', 'crit', .04, n => `Increases the Grove Shifter's critical strike chance by ${4 * n}%.`);
+  stat('grove', 'storm', 'Rampage', 'Rampage', 'tempo', .06, n => `Each attack: the Grove Shifter attacks ${6 * n}% faster, up to 5 times. A 2s pause between attacks resets it.`);
+  stat('conclave', 'arrow', 'Twin Casting', 'Keen Study', 'crit', .04, n => `Increases the Mageling's critical strike chance by ${4 * n}%.`);
+  stat('conclave', 'cannon', 'Counted Coals', 'White Heat', 'crit', .04, n => `Increases the Pyroclast's critical strike chance by ${4 * n}%.`);
+  stat('ironhold', 'glaive', 'Brace and Shove', 'Measured Blows', 'rhythm', .03, n => `Each attack of the Ironbreaker on the same foe hits ${3 * n}% harder, up to 5 times.`);
+  own('ironhold', 'glaive', 'Anvil Strike', 'Anvil Strike', { cap: 'gbCleaveA', rule: { kind: 'cleave', r: .8, k: .6, col: '#ffc070' },
+    pro: () => "The Ironbreaker's attacks ring on: every other ground foe within 0.8 cells of the target takes 60% damage." });
+  stat('ironhold', 'arcane', 'Anvil Storm', 'Hammer Rhythm', 'tempo', .076, n => `Each attack: the Anvilwright attacks ${7.5 * n}% faster, up to 5 times. A 2s pause between attacks resets it.`);
+  stat('ironhold', 'cannon', 'Double Crew', 'Long Tube', 'reach', .2, n => `Increases the Mortar Crew's range by ${N(.2 * n)} cells.`);
+  own('silver', 'glaive', 'Ringing Shield', 'Ringing Shield', { cap: 'gbRing', tag: 'Spell', sp: { ab: 'so_bash' }, rule: { kind: 'castsplash', ab: 'so_bash', r: 1, k: 2.5, col: '#e8f0ff' },
+    pro: () => 'Bulwark Bash rings on: every other ground foe within 1 cell of its target takes 250% damage.' });
+  stat('silver', 'frost', 'Double Lash', 'Quickened Chains', 'flurry', .02, n => `After a critical strike: the Lightbinder Sister attacks ${2 * n}% faster for 3s.`);
+  own('silver', 'frost', 'Chain Whirl', 'Chain Whirl', { cap: 'gbCleaveB', rule: { kind: 'cleave', r: .8, k: .05, col: '#ffe9a8' },
+    pro: () => "The Lightbinder Sister's attacks lash on: every other foe within 0.8 cells of the target takes 5% damage." });
+  stat('silver', 'earth', 'Twin Throw', 'Blade Fury', 'flurry', .35, n => `After a critical strike: the Templar attacks ${35 * n}% faster for 3s.`);
+})();
+/* ---------- the rules (no counts) ---------- */
+const gbwOf = (t, st, kind) => { const L = t && t.def && GBW.cfg[t.def.unit]; if (!L || !st || !st.caps) return null; for (const c of L) if (c.kind === kind && st.caps[c.cap]) return c; return null; };
+const gbwHeld = c => c.slowT > 0;   /* (slowed only, 29 Nov 2026: the Thornguard owns "rooted"; forces_..._easy_zthornguard.js) */
+function gbwOnFire(t, st, tg) {
+  const L = t && t.def && GBW.cfg[t.def.unit]; if (!L || !st || !st.caps || !tg) return;
+  const S = t.gbw || (t.gbw = {}), C = st.caps;
+  for (const c of L) {
+    if (!C[c.cap]) continue;
+    if (c.kind === 'hunt') {   /* (On the Scent; with The Hunt Goes On the count outlives a dead target and runs higher) */
+      const on = gbwOf(t, st, 'on'), max = GBW.HUNT_MAX + (on ? GBW.HUNT_MORE : 0), live = G.time - (S.at || 0) <= GBW.HAIL_T;
+      if (S.tg === tg && live) S.n = Math.min(max, (S.n || 0) + 1); else if (!(on && live && S.tg && S.tg.dead)) S.n = 0;
+      S.at = G.time;
+    } else if (c.kind === 'line') {
+      const dx = tg.x - t.x, dz = tg.y - t.y, D = Math.hypot(dx, dz) || 1, ux = dx / D, uz = dz / D, len = (st.range || 2.6) + 1;
+      for (const q of G.creeps) {
+        if (q === tg || q.dead || q.ent || q.phased || !canTarget(t, st, q)) continue;
+        const px = q.x - t.x, pz = q.y - t.y, along = px * ux + pz * uz; if (along < .1 || along > len || Math.abs(px * uz - pz * ux) > GBW.LINE_W) continue;
+        G.delayed.push({ t: Math.min(.3, along / 14), fn: () => { if (G.towers.includes(t) && G.state === 'play' && !q.dead) { ezcHit(t, t.st || st, q, (t.st || st).dmg * (1 + GBW.LINE * along)); part({ k: 'flare', x: q.x, z: q.y, h: hitH(q), life: .15, max: .15, size: .45, col: '#e8ffd0' }); } } });
+      }
+      rfx({ k: 'streak', x0: t.x, h0: towerTop(t) * .8, z0: t.y, x1: t.x + ux * len, h1: .35, z1: t.y + uz * len, col: '#e8ffd0', w: .03, trav: .15, life: .28 });
+    } else if (c.kind === 'rico' && gbwHeld(tg)) {
+      const q = G.creeps.filter(o => o !== tg && !o.dead && !o.ent && !o.phased && gbwHeld(o) && Math.hypot(o.x - tg.x, o.y - tg.y) <= GBW.RICO_R && canTarget(t, st, o)).sort((a, b) => Math.hypot(a.x - tg.x, a.y - tg.y) - Math.hypot(b.x - tg.x, b.y - tg.y))[0];
+      if (q) { const k = GBW.RICO * C[c.cap]; G.delayed.push({ t: .18, fn: () => { if (!G.towers.includes(t) || G.state !== 'play' || q.dead) return; rfx({ k: 'streak', x0: tg.x, h0: .4, z0: tg.y, c: q, col: c.col, w: .03, trav: .1, life: .22 }); ezcHit(t, t.st || st, q, (t.st || st).dmg * k); } }); }
+    } else if (c.kind === 'multi') {
+      const P2 = ezcFoes(t, st); if (P2.length < c.need) continue;
+      const q = P2.filter(o => o !== tg).sort((a, b) => a.remain - b.remain)[0];
+      if (q) { rfx({ k: 'streak', x0: t.x, h0: towerTop(t) * .8, z0: t.y, c: q, col: c.col, w: .03, trav: .12, life: .25 }); G.delayed.push({ t: .12, fn: () => { if (G.towers.includes(t) && G.state === 'play') ezcHit(t, t.st || st, q, (t.st || st).dmg * c.k); } }); }
+    } else if (c.kind === 'pierce') {
+      const dx = tg.x - t.x, dz = tg.y - t.y, D = Math.hypot(dx, dz) || 1, ux = dx / D, uz = dz / D, len = (st.range || 2.6) + 1;
+      for (const q of G.creeps) { if (q === tg || q.dead || q.ent || q.phased || !canTarget(t, st, q)) continue; const px = q.x - t.x, pz = q.y - t.y, along = px * ux + pz * uz; if (along < D - .05 || along > len || Math.abs(px * uz - pz * ux) > c.w) continue; G.delayed.push({ t: .15, fn: () => { if (G.towers.includes(t) && G.state === 'play' && !q.dead) { ezcHit(t, t.st || st, q, (t.st || st).dmg * c.k); part({ k: 'flare', x: q.x, z: q.y, h: hitH(q), life: .15, max: .15, size: .45, col: c.col }); } } }); }
+    } else if (c.kind === 'cleave') {
+      const x = tg.x, z = tg.y;
+      G.delayed.push({ t: .15, fn: () => { if (!G.towers.includes(t) || G.state !== 'play') return; const s = t.st || st; let any = 0; inSplash(x, z, c.r, false, q => { if (q !== tg && !q.ent && !q.dead && canTarget(t, s, q)) { any = 1; ezcHit(t, s, q, s.dmg * c.k); } }); if (any) part({ k: 'ring', x, z, h: .05, life: .3, max: .3, size: c.r, col: c.col }); } });
+    }
+  }
+  S.tg = tg;
+}
+// how hard the Gladebow Ranger's own attacks land: by the cells flown, and on rooted or slowed foes
+if (typeof forceHook === 'function') {
+  const _gbwHook = forceHook;
+  forceHook = function (k, a0, a1, a2) {
+    const r = _gbwHook.apply(this, arguments);
+    if (k !== 'amp' || a2 || !a0 || !a1 || !a1.def || !GBW.cfg[a1.def.unit] || !a1.st || !a1.st.caps || EZK_OWN) return r;
+    if ((typeof AB_TAG !== 'undefined' && DTAG === AB_TAG) || DTAG === 'relic' || DTAG === 'rx') return r;
+    const C = a1.st.caps, d = Math.hypot(a0.x - a1.x, a0.y - a1.y); let v = 0;
+    if (C.gbFar) v += GBW.FAR * C.gbFar * d;
+    if (C.gbLine) v += GBW.LINE * d;
+    if (C.gbPrey && gbwHeld(a0)) v += GBW.PREY * C.gbPrey;
+    return v ? (r || 0) + v : r;
+  };
+}
+if (typeof fire === 'function') {
+  const _gbwFire = fire;
+  fire = function (t, st, tg, echo) {
+    const r = _gbwFire.apply(this, arguments);
+    if (!echo && t && t.def && t.def.force && tg) { try { gbwOnFire(t, st || t.st, tg); } catch (e) { if (typeof console !== 'undefined') console.warn('fewer counts:', e); } }
+    return r;
+  };
+}
+// On the Scent: the Gladebow Ranger's attacks come faster the longer one foe is the target. Far Sight: crit by the cells to it.
+if (typeof effStats === 'function') {
+  const _gbwEff = effStats;
+  effStats = function (t) {
+    const st = _gbwEff.apply(this, arguments);
+    if (!st || st.gbwH || !t || !t.def || !GBW.cfg[t.def.unit] || !st.caps || typeof G === 'undefined' || !G || G.state !== 'play') return st;
+    const S = t.gbw, C = st.caps; st.gbwH = 1;
+    if (C.gbHunt && st.rate && S && S.n > 0 && G.time - (S.at || 0) <= GBW.HAIL_T) st.rate /= 1 + GBW.HUNT * C.gbHunt * S.n;
+    if (C.gbCrit && S && S.tg && !S.tg.dead) st.crit = (st.crit || 0) + GBW.CRIT * C.gbCrit * Math.min(GBW.CRIT_CELLS, Math.hypot(S.tg.x - t.x, S.tg.y - t.y)) / (typeof ezCritK === 'function' ? ezCritK() : 1);
+    return st;
+  };
+}
+// Ringing Shield: Bulwark Bash rings on the foes round its target
+if (typeof castAbility === 'function') {
+  const _gbwCast = castAbility;
+  castAbility = function (t, ab, tg, st, manual) {
+    const r = _gbwCast.apply(this, arguments);
+    try {
+      const s = t && (t.st || st), c = r !== false && ab && tg && tg.x != null ? gbwOf(t, s, 'castsplash') : null;
+      const rn = r !== false && ab ? gbwOf(t, s, 'rain') : null;
+      if (rn && rn.ab === ab.id) G.delayed.push({ t: .5, fn: () => { if (!G.towers.includes(t) || G.state !== 'play') return; const s2 = t.st || s; for (const q of ezcFoes(t, s2)) { ezcHit(t, s2, q, s2.dmg * GBW.RAIN * (gbwHeld(q) ? 2 : 1)); part({ k: 'leaf', x: q.x, z: q.y, h: 1.1, vx: 0, vz: 0, vh: -2.4, g: 0, life: .35, max: .35, size: .16, col: rn.col }); } } });
+      if (c && c.ab === ab.id) { const x = tg.x, z = tg.y != null ? tg.y : tg.z; G.delayed.push({ t: .2, fn: () => { if (!G.towers.includes(t) || G.state !== 'play') return; const s2 = t.st || s; inSplash(x, z, c.r, false, q => { if (q !== tg && !q.ent && !q.dead && canTarget(t, s2, q)) ezcHit(t, s2, q, s2.dmg * c.k); }); part({ k: 'ring', x, z, h: .05, life: .4, max: .4, size: c.r, col: c.col }); } }); }
+    } catch (e) { if (typeof console !== 'undefined') console.warn('fewer counts:', e); }
+    return r;
+  };
+}
+// Hub text pass on merge (owner, 28 Nov 2026: "merge them" with the text fixes): Spirit Hawk only readies Thornseed Arrow
+// sooner, so it is named for that (saved ranks carry over through TAL_ALIAS); Deep Thrust names the Thornguard.
+(function () {
+  if (typeof FORCES === 'undefined' || !FORCES.grove) return;
+  const T = FORCES.grove.talents, find = (s, n) => T[s] && T[s].list.find(t => t.name === n);
+  const h = find('arrow', 'Spirit Hawk');
+  if (h) { h.name = 'Seed in Hand'; if (typeof TAL_ALIAS !== 'undefined') TAL_ALIAS['Spirit Hawk'] = 'Seed in Hand'; if (typeof TAL_ART_ALIAS !== 'undefined') TAL_ART_ALIAS['Seed in Hand'] = 'Spirit Hawk'; }
+  const d = find('glaive', 'Deep Thrust');
+  if (d) d.pro = n => `The Thornguard's attacks also hit the foe behind for ${35 + 15 * n}% damage.`;
+})();
+
+/* The Thornguard Spears' new identity (owner, 29 Nov 2026): the Thornguard never roots anything; it kills what the Grove
+   holds. Any Grove root counts (the Briarwardens', Elowen's, the Bogwitches', the Gladebows' Thornseed Arrow). After
+   forces_..._easy_zgladebow.js (ezcHit, ezcFoes from the capstones file). 17 talents in the same list order (saves load by
+   index; a renamed talent keeps its painting).
+
+   NO ROOTS IN ITS KIT: rootFoe from a Thornguard does nothing, whatever asks for it. ITS THREE SPELLS are the owner's
+   picks (29 Nov 2026), in the old spells' places (their ids, rows and columns kept, so saves and the tree hold):
+     Thorn Lunge (lunge)          a long thrust at the toughest foe in reach, 50% more on a rooted foe
+     Pinning Spear (brambleguard, was Thornhedge)   a spear thrown into a rooted foe (the toughest foe if none is rooted);
+                                  when its root ends, or after 2s, the spear bursts on the foes round it
+     Hundred Spears (sunder, was Spearwood Rising)  for 4s the Thornguard strikes every ground foe in reach, faster and
+                                  faster; a rooted foe is struck by 3 spears at once
+   None of them roots or slows. Tossed Off the Point (it added foes to Thornhedge) is Barbed Spear: a wider burst.
+
+   PINNED PREY (columns 3-4): works off Grove roots
+     Pinned Prey (was Hold the Line)     more damage to rooted foes
+     Through the Pinned (was Jab and Jab)  an attack on a rooted foe also strikes the nearest other foe
+     Slow Death (was Point First)        more damage for each second the foe has been rooted
+     Next Prey (was Spear Rhythm)        faster attacks after a rooted foe dies in reach
+     capstone THORN AND SPEAR (was Impaler)  each attack on a rooted foe also strikes every other rooted foe in reach
+   THE LONG SPEAR (columns 1-2): works with no roots at all
+     Long Haft, Braced Rhythm (Thorn Lunge), Deep Thrust, Skewer, Shieldsplitter: kept
+     Long Reach (was Phalanx)            range
+     Bristling Hedge                     its thorns prick foes in reach; two ranks now, no longer a capstone
+     capstone WALL OF SPEARS             kept
+   Cut: Hold the Line, Impaler, Point First, Jab and Jab, Spear Rhythm (and Phalanx, for the reach the owner asked for).
+   No counted talent is left in the tree. */
+const TGS = { LUNGE_R: 1, LUNGE_ROOT: 1.5, PIN_HIT: 1.5, PIN_FUSE: 2, PIN_MAX: 5, HS_T: 4, HS_AT: [0, .7, 1.3, 1.8, 2.2, 2.55, 2.85, 3.1, 3.35, 3.55, 3.75, 3.95], HS_K: .55, HS_ROOT: 3, BARB: .25, COL: '#e0c890' };
+const TGP = { U: 'thornguard', PIN: .25, THRU: .6, THRU_R: 1, SLOW: .15, SLOW_MAX: 3, NEXT: .2, NEXT_T: 3, ALL: 1.5, REACH: .15, HEDGE: .4 };
+if (typeof rootFoe === 'function') {
+  const _tgpRoot = rootFoe;
+  rootFoe = function (c, dur, src) { if (src && src.def && src.def.unit === TGP.U) return; return _tgpRoot.apply(this, arguments); };
+}
+(function () {
+  if (typeof FORCES === 'undefined' || typeof ezClear !== 'function' || !FORCES.grove || !FORCES.grove.talents) return;
+  const T = FORCES.grove.talents.glaive; if (!T) return;
+  const P = v => String(Math.round(v * 100)), N = v => String(+(+v).toFixed(2));
+  const set = (old, name, o) => {
+    const t = T.list.find(q => q.name === old && !q.spell); if (!t) { if (typeof console !== 'undefined') console.warn('thornguard tree: no talent', old); return null; }
+    ezClear(t);
+    if (name !== old) { if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[name]) TAL_ART_ALIAS[name] = TAL_ART_ALIAS[old] || old; t.oldName = t.oldName || old; t.name = name; }
+    t.tag = o.tag || 'Damage'; if (o.max) t.max = o.max; if (o.cap) { t.cap = o.cap; t.capK = 1; } if (o.mod) t.mod = o.mod;
+    t.ez = 'plain'; t.atkPlain = true; delete t.ezLadder;
+    t.pro = n => o.pro(Math.max(1, Math.min(n | 0 || 1, t.max)));
+    return t;
+  };
+  set('Hold the Line', 'Pinned Prey', { cap: 'tgpPin', pro: n => `The Thornguard's attacks deal ${P(TGP.PIN * n)}% more damage to rooted foes.` });
+  set('Jab and Jab', 'Through the Pinned', { cap: 'tgpThru', pro: n => `An attack of the Thornguard on a rooted foe also strikes the nearest other foe within ${N(TGP.THRU_R)} cell for ${P(TGP.THRU * n)}% attack damage.` });
+  set('Point First', 'Slow Death', { cap: 'tgpSlow', pro: n => `The Thornguard's attacks deal ${P(TGP.SLOW * n)}% more damage for each second the foe has been rooted, up to ${TGP.SLOW_MAX} seconds.` });
+  set('Spear Rhythm', 'Next Prey', { cap: 'tgpNext', pro: n => `When a rooted foe dies in the Thornguard's reach, the Thornguard attacks ${P(TGP.NEXT * n)}% faster for ${TGP.NEXT_T}s.` });
+  set('Impaler', 'Thorn and Spear', { cap: 'tgpAll', pro: () => `Each attack of the Thornguard on a rooted foe also strikes every other rooted foe in reach for ${P(TGP.ALL)}% attack damage.` });
+  set('Phalanx', 'Long Reach', { mod: n => ({ range: TGP.REACH * n }), pro: n => `Increases the Thornguard's range by ${N(TGP.REACH * n)} cells.` });
+  // Bristling Hedge: two ranks, a plain talent now (its rule is the capstones file's hedge, sized by rank)
+  { const t = T.list.find(q => q.name === 'Bristling Hedge'); if (t) { t.max = 2; if (typeof EZK !== 'undefined' && EZK.cfg[TGP.U]) { EZK.cfg[TGP.U].k = TGP.HEDGE; EZK.cfg[TGP.U].ranked = 1; } t.pro = n => `Ground foes in the Thornguard's reach are pricked by thorns: ${N(TGP.HEDGE * 100 * Math.max(1, Math.min(n | 0 || 1, 2)))}% damage every second.`; } }
+  { const t = T.list.find(q => q.name === 'Tossed Off the Point' && !q.spell); if (t) { ezClear(t); if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS['Barbed Spear']) TAL_ART_ALIAS['Barbed Spear'] = 'Tossed Off the Point'; t.oldName = 'Tossed Off the Point'; t.name = 'Barbed Spear'; t.tag = 'Spell'; t.ez = 'plain'; delete t.ezLadder; t.sp = n => ({ ab: 'brambleguard', by: { r: TGS.BARB * n } }); t.pro = n => `Increases the reach of the burst of Pinning Spear by ${N(TGS.BARB * Math.max(1, Math.min(n | 0 || 1, t.max)))} cells.`; } }
+})();
+/* ---------- the rules ---------- */
+const tgpCaps = t => (t && t.def && t.def.unit === TGP.U && t.st && t.st.caps) || null;
+const tgpRooted = c => c.rootT > G.time;
+// how long a foe has been rooted: stamped the first moment it is seen held, cleared a little after the root ends
+function tgpHeld(c) { if (!tgpRooted(c)) return 0; if (!(c.tgpR0 > 0) || c.tgpREnd < G.time - .3) c.tgpR0 = G.time; c.tgpREnd = c.rootT; return G.time - c.tgpR0; }
+if (typeof forceHook === 'function') {
+  const _tgpHook = forceHook;
+  forceHook = function (k, a0, a1, a2) {
+    const r = _tgpHook.apply(this, arguments);
+    try {
+      if (k === 'pulse') { const C = tgpCaps(a0); if (C && C.tgpSlow && (a0.tgpT = (a0.tgpT || 0) - (a2 || 0)) <= 0) { a0.tgpT = .25; for (const c of G.creeps) if (!c.dead && tgpRooted(c)) tgpHeld(c); } return r; }
+      if (k === 'kill') {   /* (Next Prey: a rooted foe dies in a Thornguard's reach, whoever killed it) */
+        const c = a0; if (c && tgpRooted(c)) for (const t of G.towers) { const C = tgpCaps(t); if (C && C.tgpNext && !t.wrecked && inRange(t, t.st, c)) t.tgpFast = G.time + TGP.NEXT_T; }
+        return r;
+      }
+      if (k !== 'amp' || a2 || !a0 || !a1) return r;
+      const C = tgpCaps(a1); if (!C || (typeof EZK_OWN !== 'undefined' && EZK_OWN) || !tgpRooted(a0)) return r;
+      if ((typeof AB_TAG !== 'undefined' && DTAG === AB_TAG) || DTAG === 'relic' || DTAG === 'rx') return r;
+      let v = 0;
+      if (C.tgpPin) v += TGP.PIN * C.tgpPin;
+      if (C.tgpSlow) v += TGP.SLOW * C.tgpSlow * Math.min(TGP.SLOW_MAX, tgpHeld(a0));
+      return v ? (r || 0) + v : r;
+    } catch (e) { if (typeof console !== 'undefined') console.warn('thornguard:', e); }
+    return r;
+  };
+}
+if (typeof fire === 'function') {
+  const _tgpFire = fire;
+  fire = function (t, st, tg, echo) {
+    const r = _tgpFire.apply(this, arguments);
+    try {
+      const C = !echo && tg ? tgpCaps(t) : null;
+      if (C && tgpRooted(tg) && (C.tgpThru || C.tgpAll)) {
+        const s0 = st || t.st, col = '#b8e88a';
+        G.delayed.push({ t: .12, fn: () => {
+          if (!G.towers.includes(t) || G.state !== 'play') return; const s = t.st || s0, hit = new Set([tg]);
+          if (C.tgpAll) for (const q of ezcFoes(t, s)) if (q !== tg && tgpRooted(q)) { hit.add(q); ezcHit(t, s, q, s.dmg * TGP.ALL); rfx({ k: 'streak', x0: t.x, h0: towerTop(t) * .7, z0: t.y, c: q, col, w: .035, trav: .1, life: .22 }); }
+          if (C.tgpThru) { const q = G.creeps.filter(o => !hit.has(o) && !o.dead && !o.ent && !o.phased && Math.hypot(o.x - tg.x, o.y - tg.y) <= TGP.THRU_R && canTarget(t, s, o)).sort((a, b) => Math.hypot(a.x - tg.x, a.y - tg.y) - Math.hypot(b.x - tg.x, b.y - tg.y))[0]; if (q) { ezcHit(t, s, q, s.dmg * TGP.THRU * C.tgpThru); part({ k: 'flare', x: q.x, z: q.y, h: hitH(q), life: .18, max: .18, size: .5, col }); } }
+        } });
+      }
+    } catch (e) { if (typeof console !== 'undefined') console.warn('thornguard:', e); }
+    return r;
+  };
+}
+if (typeof effStats === 'function') {
+  const _tgpEff = effStats;
+  effStats = function (t) {
+    const st = _tgpEff.apply(this, arguments);
+    if (!st || st.tgpN || !st.rate || !t || !t.def || t.def.unit !== TGP.U || !st.caps || !st.caps.tgpNext || typeof G === 'undefined' || !G || !(t.tgpFast > G.time)) return st;
+    st.tgpN = 1; st.rate /= 1 + TGP.NEXT * st.caps.tgpNext;
+    return st;
+  };
+}
+/* ---------- its three spells ---------- */
+(function () {
+  if (typeof ABIL === 'undefined' || typeof abHit !== 'function') return;
+  { const T = typeof FORCES !== 'undefined' && FORCES.grove && FORCES.grove.talents && FORCES.grove.talents.glaive; if (T) for (const t of T.list) if (t.spell === 'brambleguard' || t.spell === 'sunder') t.tag = 'Damage'; }   /* (their talents were tagged Control: neither spell holds anything now) */
+  const rooted = c => c.rootT > G.time, live = t => G.towers.includes(t) && G.state === 'play';
+  const L = ABIL.lunge, Pn = ABIL.brambleguard, H = ABIL.sunder;
+  if (L) { L.by = Object.assign({}, L.by, { mult: [3, 3.3, 3.6, 4, 4.4, 4.8] }); }
+  if (L) Object.assign(L, { name: 'Thorn Lunge', short: 'Lunge', rAdd: TGS.LUNGE_R,
+    auto: 'the toughest ground foe in reach (a rooted one first)',
+    text: (t, st, ab) => `A long thrust at the toughest ground foe within ${nf1(abReach(t, st, ab))} cells: ${xD(st, byT(ab.by.mult, t))}, and 50% more damage if that foe is rooted.`,
+    pick: (t, st, ab) => { const F = abFoes(t, st, abReach(t, st, ab), abWalker); return abToughest(F.filter(rooted)) || abToughest(F); },
+    cast(t, st, c, ab) {
+      const [ux, uz] = abDir(t, c), pin = rooted(c);
+      abHit(t, st, c, byT(ab.by.mult, t) * (pin ? TGS.LUNGE_ROOT : 1), 'phys', [ux * .14, uz * .14]);
+      rfx({ k: 'streak', x0: t.x, h0: towerTop(t) * .7, z0: t.y, c, col: TGS.COL, w: .05, trav: .1, life: .25 });
+      fxSpark(c.x, c.y, hitH(c), pin ? '#fff2c8' : '#f0e8c0', pin ? 16 : 10); sfx('tgLunge', (typeof TG_HIT_S !== 'undefined' ? TG_HIT_S : .25) / (G.speed || 1));
+    } });
+  if (Pn) { Pn.by = Object.assign({}, Pn.by, { burst: [2.5, 2.5, 2.75, 2.75, 3, 3], r: [1, 1, 1, 1, 1, 1] }); delete Pn.zone;
+    Object.assign(Pn, { name: 'Pinning Spear', short: 'Pin', glyph: 'spikes', hue: TGS.COL, r: undefined, pref: undefined,
+      auto: 'a rooted ground foe in reach (the toughest foe if none is rooted)', none: 'no ground foes in reach',
+      text: (t, st, ab) => `Throws a spear into a rooted ground foe in reach (the toughest foe if none is rooted): ${xD(st, TGS.PIN_HIT)}. When its root ends, or after ${TGS.PIN_FUSE}s on a foe that is not rooted, the spear bursts: ${xD(st, byT(ab.by.burst, t))} to foes within ${nf1(byT(ab.by.r, t))} cell.`,
+      pick: (t, st, ab) => { const F = abFoes(t, st, abReach(t, st, ab), abWalker); return abToughest(F.filter(rooted)) || abToughest(F); },
+      cast(t, st, c, ab) {
+        const was = rooted(c), t0 = G.time, R0 = byT(ab.by.r, t), K = byT(ab.by.burst, t); let lx = c.x, lz = c.y;
+        rfx({ k: 'streak', x0: t.x, h0: towerTop(t) * .8, z0: t.y, c, col: TGS.COL, w: .05, trav: .14, life: .3 });
+        abHit(t, st, c, TGS.PIN_HIT, 'phys'); sfx('glaiveHit', 1);
+        const burst = () => { if (!live(t)) return; const s2 = t.st || st; abRun(ab.id, () => abAoe(() => inSplash(lx, lz, R0, false, q => { if (!q.ent && !q.dead && canTarget(t, s2, q)) abHit(t, s2, q, K, 'phys'); }))); part({ k: 'ring', x: lx, z: lz, h: .05, life: .4, max: .4, size: R0, col: TGS.COL }); fxSpark(lx, lz, .4, '#fff2c8', 14); sfx('glaiveHit', 2); };
+        const watch = () => {
+          if (!live(t)) return;
+          if (!c.dead) { lx = c.x; lz = c.y; }
+          const age = G.time - t0;
+          if (c.dead || age >= TGS.PIN_MAX || (was ? !rooted(c) : age >= TGS.PIN_FUSE)) return burst();
+          part({ k: 'chunk', x: c.x, z: c.y, h: hitH(c) + .28, vx: 0, vz: 0, vh: 0, g: 0, life: .16, max: .16, size: .09, col: TGS.COL });   /* (the spear's butt, standing in the foe) */
+          G.delayed.push({ t: .12, fn: watch });
+        };
+        G.delayed.push({ t: .12, fn: watch });
+      } }); }
+  if (H) { delete H.zone;
+    Object.assign(H, { name: 'Hundred Spears', short: 'Hundred', glyph: 'spikes', hue: '#f2d27a', len: undefined, pref: undefined,
+      auto: 'two or more ground foes in reach (or a boss or elite)', none: 'no ground foes in reach',
+      text: (t, st, ab) => `Ultimate. For ${TGS.HS_T}s the Thornguard strikes every ground foe in reach, faster and faster (${TGS.HS_AT.length} strikes): ${xD(st, TGS.HS_K)} each. A rooted foe is struck by ${TGS.HS_ROOT} spears at once.`,
+      pick: (t, st, ab, man) => { const F = abFoes(t, st, abReach(t, st, ab), abWalker); return F.length >= (man ? 1 : 2) || F.some(abBig) ? abToughest(F) : null; },
+      cast(t, st, c, ab) {
+        sfx('tgLunge', (typeof TG_HIT_S !== 'undefined' ? TG_HIT_S : .25) / (G.speed || 1));
+        for (const at of TGS.HS_AT) G.delayed.push({ t: at, fn: () => {
+          if (!live(t) || t.wrecked) return; const s2 = t.st || st, F = abFoes(t, s2, abReach(t, s2, ab), abWalker); if (!F.length) return;
+          abRun(ab.id, () => { for (const q of F) { const n = rooted(q) ? TGS.HS_ROOT : 1; for (let k = 0; k < n && !q.dead; k++) abHit(t, s2, q, TGS.HS_K, 'phys'); rfx({ k: 'streak', x0: t.x, h0: towerTop(t) * .7, z0: t.y, c: q, col: n > 1 ? '#fff2c8' : TGS.COL, w: n > 1 ? .05 : .03, trav: .07, life: .16 }); } });
+          t.recoil = 1;
+        } });
+      } }); }
 })();
 
 /* Capstones that were a burst of extra hits or a bare number, and trees with two "hits again" talents (the hub's review of
@@ -65819,10 +66174,9 @@ if (typeof castAbility === 'function') {
   // ---- capstones ----
   ezvDef(tree('conclave', 'glaive'), uid('conclave', 'glaive'), 'Riftsteel Flurry', { kind: 'zone', n: 5, pct: .16, r: .7, dur: 3, every: .5, col: '#b89aff', ground: true,
     text: 'Every 5th attack tears a rift under the target for 3s: ground foes in it take 16% damage every 0.5s.' });
-  ezvDef(tree('conclave', 'arrow'), uid('conclave', 'arrow'), 'Missile Storm', { kind: 'volley', n: 8, pct: .6, col: '#c8b0ff',
-    text: "Every 8th attack: a storm of missiles strikes every foe in the Mageling's reach for 60% damage." });
-  ezvDef(tree('conclave', 'frost'), uid('conclave', 'frost'), 'Icicle Volley', { kind: 'line', n: 5, pct: .5, slow: .3, elem: 'frost', part: 'shard', col: '#d8f2ff', tag: 'Control',
-    text: 'Every 5th attack: an ice lance flies on through the target. Each foe on the line takes 50% damage and is slowed 30% for 2s.' });
+  { const t = tree('conclave', 'arrow') && tree('conclave', 'arrow').list.find(q => q.name === 'Missile Storm'); if (t) { ezClear(t); t.tag = 'Damage'; t.ez = 'plain'; t.atkPlain = true; delete t.ezLadder; t.cap = 'gbMissile'; t.capK = 1; if (typeof GBW !== 'undefined') (GBW.cfg[uid('conclave', 'arrow')] || (GBW.cfg[uid('conclave', 'arrow')] = [])).push({ cap: 'gbMissile', kind: 'multi', need: 5, k: .7, col: '#c8b0ff' }); t.pro = () => "While 5 or more foes are in the Mageling's reach, each attack of the Mageling also strikes a second foe for 70% damage."; } }   /* (29 Nov 2026: it was "every 8th attack", the Magelings' second counted capstone) */
+  ezvDef(tree('conclave', 'frost'), uid('conclave', 'frost'), 'Icicle Volley', { kind: 'line', ab: 'cc_glacialglyph', sp: 'cc_glacialglyph', pct: 1.2, skip: 1, more: 1.5, slow: .3, elem: 'frost', part: 'shard', col: '#d8f2ff', tag: 'Control',
+    text: 'Frost Spear flies on through its target: each foe behind it on the line takes 120% damage and is slowed 30% for 2s.' });   /* (29 Nov 2026: it was "every 5th attack") */
   ezvDef(tree('ironhold', 'arrow'), uid('ironhold', 'arrow'), 'Called Shot', { kind: 'line', ab: 'ih_longshot', sp: 'ih_longshot', pct: .6, skip: 1, more: 2, w: .4, col: '#ffe08a', tag: 'Spell',
     text: 'Long Shot flies on through its target: each foe behind it on the line takes 60% damage.' });
   if (typeof CHAMPS !== 'undefined' && CHAMPS.so_lion && CHAMPS.so_lion.tree) ezvDef(CHAMPS.so_lion.tree, 'ch_aurelian', 'The Ford Itself', { kind: 'zone', ab: 'ch_fordstandard', sp: 'ch_fordstandard', pct: .25, r: 1, dur: 4, every: 1, slow: .3, ground: true, col: '#8ec8ff', tag: 'Control',
@@ -66405,6 +66759,20 @@ const unChamp = n => ({ n: String(n || '').replace(/^(Lady|Lord|Elder)\s+/, '').
     n.text = function () { return unSay(text.apply(this, arguments), { n: '' }, f + '.ftree', n.name); };
   }
   if (typeof CHAMPS !== 'undefined') for (const id in CHAMPS) { const C = CHAMPS[id]; if (C && C.tree && C.unit) unWrap(C.tree.list, unChamp(C.unit.name), (C.force || '') + '.champ'); }
+})();
+
+/* "Attack damage" (owner, 29 Nov 2026, of Bristling Hedge's "25% damage every second": "just call it attack damage").
+   Where a talent's number is a share of the unit's own hit, its text says "X% attack damage", not "X% damage": "pricked by
+   thorns: 25% attack damage every second". Text only: no number and no rule changes.
+   Left alone, because they are multipliers or shares of something else: "deal X% more damage", "X% of the damage",
+   "X% of its maximum health", "three times the damage". Loaded last of the forces_ files, so every tree is covered whatever
+   layer wrote its line; it wraps each talent's text once. */
+const ATK_SAID = /(\d+(?:\.\d+)?)% damage\b(?! taken)/g;
+const atkSay = s => typeof s === 'string' && s.indexOf('% damage') >= 0 ? s.replace(ATK_SAID, '$1% attack damage') : s;
+(function () {
+  const wrap = tree => { if (!tree || !tree.list) return; for (const t of tree.list) { if (!t || t._atkSaid || typeof t.pro !== 'function') continue; const pro = t.pro; t._atkSaid = 1; t.pro = function () { return atkSay(pro.apply(this, arguments)); }; } };
+  if (typeof FORCES !== 'undefined') for (const f in FORCES) { const T = FORCES[f] && FORCES[f].talents; if (T) for (const s in T) wrap(T[s]); }
+  if (typeof CHAMPS !== 'undefined') for (const h in CHAMPS) wrap(CHAMPS[h] && CHAMPS[h].tree);
 })();
 
 /* ================= SPELL FX: the look of every unit ability and commander spell =================
@@ -78590,7 +78958,10 @@ function towerMesh(type, tier) {
 }
 
 /* ---------- tower dynamic parts ---------- */
-function dynMesh(key, fn) { key = 'd_' + key; if (!MESH[key]) { const g = new Geo(key.length * 13); fn(g); MESH[key] = g.finish(); } return MESH[key]; }
+/* a mesh built while MESH_NOBASE is set (the unit sheet) is kept apart: a unit's base built there is empty, and kept under the
+   battlefield's key it took every platform of that unit off the maze (owner, 28 Nov 2026: "unit platforms dissapear after opening them
+   in the character pane") */
+function dynMesh(key, fn) { key = 'd_' + key + (MESH_NOBASE ? '_nb' : ''); if (!MESH[key]) { const g = new Geo(key.length * 13); fn(g); MESH[key] = g.finish(); } return MESH[key]; }
 const DYN = {
   ballista: tier => dynMesh('ballista' + tier, g => {
     const k = 1.35 + tier * .2;
@@ -105578,7 +105949,7 @@ function drawTexts() {
     if (!t) { if (el.__on) { el.style.opacity = '0'; el.__on = false; } continue; }
     const s = toScreen(t.x, t.h, t.z);
     if (el.textContent !== t.s) el.textContent = t.s;
-    const cls = t.cue ? 'ft cue' : t.d ? (t.d === 3 ? 'ft dmg crit' : t.d === 2 ? 'ft dmg big' : 'ft dmg') : 'ft';   // (cue: a boss's 1-3 word tell, bosscues.js) if (el.className !== cls) el.className = cls;
+    const cls = t.cue ? 'ft cue' : t.d ? (t.d === 3 ? 'ft dmg crit' : t.d === 2 ? 'ft dmg big' : 'ft dmg') : 'ft'; if (el.className !== cls) el.className = cls;   // (cue: a boss's 1-3 word tell, bosscues.js)
     const col = t.col || ''; if (el.__c !== col) { el.__c = col; el.style.color = col; }
     // the biggest numbers always sit on top (owner, 25 Nov 2026): stacking by the amount, not by age or crit
     const zi = t.d ? String(10 + Math.min(9000, Math.round(Math.log2(1 + (t.v || 0)) * 300))) : ''; if (el.__z !== zi) { el.__z = zi; el.style.zIndex = zi; }
@@ -111185,6 +111556,13 @@ if (typeof pauseMenu === 'function') {
    - The swirl (MVS, mvSwirl; owner: "more swirling pink/red in her movements"): crimson and pink ribbons off the blades that
      curl round her as she spins, pink and red wisps spiralling up round her in a strike and a flash-step, a crisp crescent of
      the cutting blade's colour across the foe on a blow. Kept short-lived and thin (the owner's rule: foes and the map stay seen).
+   - The dart (MVD, mvDart; owner, 28 Nov 2026: "her attacks to look more like spellblades as they dart to the enemy and
+     attack, marens should look like a swirling mass that darts around doing damage"): every cut of hers is a dart. Over the
+     last fifth of a second of the wind-up she leaves her post, whirling a full turn with the sword whirled a turn in her
+     fist, and is beside her foe when the game deals the blow; she cuts there, and sweeps back to her post in a slower
+     curve through her pirouette (out on one side, home on the other: a loop), or straight on to the next foe when the next
+     cut is already due. Drawn only: the game's own strike, its damage and its timing are untouched, and her rune-slate
+     stays at her post. Echoes of her own sword (its model drawn again where it was a moment ago, fading) trail the whirl.
    - She stands on the code-built body's rune-slate (its base), and its blink (chargeAt) moves her out and back. Drawn from
      umDraw (forces.js drawForceUnit: the Champions take the Grove's layered path). */
 const MV_UNIT = 'ch_maren';
@@ -111212,6 +111590,14 @@ const MV_GLOW = .15;   // (it.sec: the blades' glow over the emissive group's ow
 const MVS = { xf: .26, dashW: 26, ramp: .22, folMax: .95, spinW: 13, twW: 16, twistW: 15, clrW: 26, clrWin: 42, coil: .6, twist: .34, twT: .95, twSway: .32, rib: .2, str: .4, curl: 1.6, rise: .35, ribIn: .42, wisp: 26, wispMax: 16, slash: .2, gain: 1, clK: .0045, off: 0, n: 0 };
 // each blade's colours for the swirl: blade A crimson, blade B pink (over 1: light added on the bloom)
 const MVS_COL = [{ body: [.95, .04, .3], rim: [1.3, .2, .48], hot: [1.5, .78, .9], add: .25 }, { body: [1, .24, .78], rim: [1.25, .45, 1.05], hot: [1.4, .78, 1.25], add: .55 }];   // (add: how much is added to the scene; crimson added over sunlit grass reads orange, so it is mostly laid over)
+/* the dart: lead s before the blow she leaves (she follows her mark through a damped spring: wOut on the way out, wBack
+   on the way home, so she arrives on the blow and never starts or stops with a jolt); hang s she stays on the foe after
+   it; gap how far short of the foe's middle she stops (cells); bow, bowMax how far her path curves aside (of its length;
+   cells at most); lean radians she leans into it at full speed (vFull cells a second); turn the whole turns she whirls on
+   the way in. The echoes of her sword: echo of them, echoDt s apart, each echoT s long, echoA their strength. rib: how
+   much longer the ribbons last in the whirl. The coil round her in the whirl: coil strands, coilA their strength, coilW how fast they
+   turn (radians a second), coilLag s of her way they are smeared back over. on: 0 and she stands and swings as before (sim/mv_game.js's before shots). */
+const MVD = { on: 1, lead: .2, hang: .12, wOut: 27, wBack: 7, gap: .4, bow: .22, bowMax: .34, lean: .2, vFull: 7, turn: 1, echo: 5, echoDt: .034, echoT: .2, echoA: .5, rib: 1.5, coil: 4, coilA: .5, coilW: 15, coilLag: .09 };
 const mvE = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
 function mvClip(M, clip, f) { const c = UNIT_MDL[M.S.mdl].anim.clips[clip]; return c[0] + Math.max(0, Math.min(c[1] - 1, f)); }
 if (typeof castAbility === 'function') {
@@ -111255,7 +111641,7 @@ function mvCtl(t, live, M) {
   // step, turned half round in her fist through the lunge (the swap kept after: t._mvTb, the twirl every move adds to)
   const B = t.ccBlink, bu = B && B.at != null ? (now - B.at) / Math.max(.15, B.T || .3) : 9;
   const s = t.shotT == null ? 9 : t.shotT, w = t.windup || 0, sh = t.shots | 0;
-  if (bu >= 0 && (bu < 1.15 || bu < 1.35 && !(w > 0 && t.tg))) {
+  if (bu >= 0 && B && !B.dart && (bu < 1.15 || bu < 1.35 && !(w > 0 && t.tg))) {
     if (t._mvBlAt !== B.at) { t._mvBlAt = B.at; t._mvBlN = (t._mvBlN | 0) + 1; t._mvTb0 = t._mvTb || 0; t._mvTb = t._mvTb0 + Math.PI; mvSnd(t, B.at, 'blink', .9); }
     const tw = t._mvTb0 + Math.PI * mvE(bu / .32) - t._mvTb, key = 'bl' + B.at;   // (relative to the new swap, which the pose adds)
     // (on the way back she spins round once with the cut, the blades sweeping a ring round her, the turn spread from the
@@ -111277,7 +111663,10 @@ function mvCtl(t, live, M) {
        her shoulders further than her hips) and unwinds into it at the end, the shoulders leading; the coil carries on the
        way the last cut's follow-through was turning, so one cut flows into the next (A pirouettes one way, B the other) */
     const sg = k === 'A' ? 1 : -1, coil = mvE(Math.min(1, w / .72)) * (1 - mvE((w - .72) / .28));
-    return { f: mvClip(M, 'slash', C.wind + (C.cut - C.wind) * ec), rate: 70, xf: MVS.xf, glow: .2 + unb, spin: -sg * MVS.coil * coil, tw: k === 'B' ? Math.PI * e : 0, act: 1, trail: w > .2, twist: sg * MVS.twist * (.45 * mvE((w - .8) / .2) - coil), wisp: w > .6 ? .5 : 0, key: 'c' + (sh + 1) };
+    /* the dart in (mvDart): as she leaves for the foe she whirls a whole turn the way the cut goes, the sword whirled a
+       turn in her fist with it, both come round as the blow lands (wh: -1 turn as she leaves, 0 on the blow, still turning) */
+    const D = t._mvD, dq = MVD.on && D && D.out ? Math.max(0, Math.min(1, D.dq)) : 0, wh = MVD.on ? TAU * MVD.turn * (dq * dq * (2.4 - 1.4 * dq) - 1) : 0;
+    return { f: mvClip(M, 'slash', C.wind + (C.cut - C.wind) * ec), rate: 70, xf: MVS.xf, glow: .2 + .5 * dq + unb, spin: -sg * MVS.coil * coil + sg * wh, tw: (k === 'B' ? Math.PI * e : 0) + wh, act: 1, trail: w > .2, twist: sg * MVS.twist * (.45 * mvE((w - .8) / .2) - coil), wisp: dq > 0 ? 1 : w > .6 ? .5 : 0, key: 'c' + (sh + 1) };
   }
   // (the follow-through fills the time to the next wind-up, so the blade flows from one cut into the next and never stops
   // dead; a pirouette too quick to read as a turn, under .35 s, is left out)
@@ -111285,7 +111674,7 @@ function mvCtl(t, live, M) {
   // (a strike that flash-stepped made its cut in the step: when the step ended, .37 s in, the ordinary follow-through took
   // over three-quarters of the way through its pirouette, her whole body thrown 260 degrees round in one frame. After a
   // step she goes back to her guard)
-  const stepped = B && B.at != null && B.at > now - s - .08;
+  const stepped = B && B.at != null && !B.dart && B.at > now - s - .08;
   if (s < fol && sh > 0 && !stepped) {
     const k = sh % 2 ? 'A' : 'B', C = MV_CUT[k], u = s / fol, e = mvE(u);
     if (k === 'A' && s > .06) mvSnd(t, sh, 'spin', .7);   // (the pirouette)
@@ -111445,7 +111834,7 @@ function mvBladeMark(M) {
   for (let k = em[0]; k < em[0] + em[1] && k < m.count; k += 3, q++) { const b = side[q]; for (let j = 0; j < 3; j++) { const d = Math.abs(m.pos[(k + j) * 3 + 2] - gz), f = Math.max(0, Math.min(1, (d - lo[b]) / Math.max(1e-4, hi[b] - lo[b]))); m.ext[(k + j) * 2] = (b ? -2 : -3) - .4 * f; } }
   if (m.gl && m.gl.clear) m.gl.clear();   // (re-uploaded with the marks, should it have been drawn already)
 }
-const _mvA = new Float32Array(16), _mvB = new Float32Array(16), _mvC = new Float32Array(16), _mvS = new Float32Array(16);
+const _mvL = new Float32Array(16), _mvA = new Float32Array(16), _mvB = new Float32Array(16), _mvC = new Float32Array(16), _mvS = new Float32Array(16);
 // (from umDraw: the Champions take the Grove's layered path; x, z are her place on a flash-step, chargeAt)
 function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) {
   const M = umModel(MV_UNIT); if (!M || !M.R || !M.R.anim || !M.mesh.tex.complete || !M.mesh.tex.naturalWidth) return false;
@@ -111457,12 +111846,19 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   const base = typeof chCcGround === 'function' ? dynMesh('mv_base' + tr, g => withPal(MV_UNIT, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => ccWith(MV_UNIT, () => chCcGround(g, tr, () => ccEm(g, .85, () => { for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + .4, c = Math.cos(a), sn = Math.sin(a); g.seg([c * .15, .051, sn * .15], [c * .36, .051, sn * .36], .008, CP.glow); } })))))) : null;
   if (base) { M4.trs(_mvA, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); item(base, _mvA, opts); }
   const s = Math.max(.3, full.max[1]) / M.h * M.S.k * (1 + .025 * Math.max(0, tr - 2));
-  const on = Math.hypot(x - t.x, z - t.y) < .05, lift = base && on ? MV_BASE_H * K : 0;
-  // (the flash-step's dash, out to the foe and back, starts and stops at full speed: her drawn place follows it through a
-  // damped spring, so she sets off and arrives smoothly; owner: "super smooth and fluid")
-  if (live && !(typeof inGp !== 'undefined' && inGp)) { const dtd = t._mvDt == null ? 0 : Math.max(0, Math.min(.1, G.time - t._mvDt)); t._mvDt = G.time; if (dtd > 0 || t._mvSox == null) { x = t.x + mvSpring(t, 'ox', x - t.x, MVS.dashW, dtd); z = t.y + mvSpring(t, 'oz', z - t.y, MVS.dashW, dtd); } else { x = t.x + t._mvSox.x; z = t.y + t._mvSoz.x; } }
+  let D = null;
+  // (her place: the dart to her foe and back, or a flash-step's dash, chargeAt's x and z; followed through a damped spring,
+  // so she sets off and arrives smoothly; owner: "super smooth and fluid")
+  if (live && !(typeof inGp !== 'undefined' && inGp)) { D = mvDart(t, x, z); x = t.x + D.px; z = t.y + D.pz; }
+  const lift = base ? MV_BASE_H * K * (1 - mvE(Math.hypot(x - t.x, z - t.y) / .3)) : 0;   // (she steps down off her slate as she leaves it)
   const P = mvCtl(t, live, M), o = mvPose(M, t, P, live);
-  M4.trs(_mvA, x, lift * sy, z, ang + wob + (live ? t._mvSp || 0 : 0), 0, 0, sx, sy, sz); M4.trs(_mvB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_mvC, _mvA, _mvB);
+  M4.trs(_mvA, x, lift * sy, z, ang + wob + (live ? t._mvSp || 0 : 0), 0, 0, sx, sy, sz);
+  // (she leans into the dart: tipped about her feet toward the way she is going, by her speed)
+  const dv = D ? Math.hypot(D.vx, D.vz) : 0, ln = D && MVD.on ? MVD.lean * mvE(dv / MVD.vFull) : 0;
+  if (ln > 1e-3) { const r = UMX.rot(D.vz, 0, -D.vx, ln); _mvL.fill(0); for (let c = 0; c < 3; c++) for (let q = 0; q < 3; q++) _mvL[c * 4 + q] = r[c * 3 + q]; _mvL[12] = x; _mvL[13] = lift * sy; _mvL[14] = z; _mvL[15] = 1; _mvA[12] = _mvA[13] = _mvA[14] = 0; M4.mul(_mvA, _mvL, _mvA); }
+  M4.trs(_mvB, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_mvC, _mvA, _mvB);
+  // (the whirl: how much she is a swirl now, 1 out on a dart or off her post, eased; the echoes and the ribbons go by it)
+  if (live && D && D.wt !== G.time) { const dtw = D.wt == null ? 0 : Math.max(0, Math.min(.1, G.time - D.wt)); D.wt = G.time; D.wh += ((D.out || D.k > .15 ? 1 : 0) - D.wh) * (1 - Math.exp(-dtw * (D.out ? 30 : 7))); }
   const it = item(M.mesh, _mvC, opts);
   // her turn throws the robe and mantle the other way (unitmodels_cloth.js clothItem: it.clX, a world offset added to the
   // cloth's lag): the front of her body's travel, reversed
@@ -111472,7 +111868,7 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   it.sec = [(MV_GLOW + .06 * Math.max(0, tr - 2) + .3 * t._mvG) * pulse, 0];   // (VS_STY: the blades' extra glow)
   it.bones = itemBones(it, o);
   const SW = umModel(MV_UNIT + '~sword');
-  if (SW && SW.mesh.tex.complete && SW.mesh.tex.naturalWidth) { mvBladeMark(SW); const its = item(SW.mesh, _mvC, typeof hwTint === 'function' ? hwTint(t, opts) : opts);   /* (her hero weapon's stage glow: forces_zzzzzzzzzzzzzzzz_heroweapons.js) */ its.sec = it.sec; its.bones = it.bones; }
+  if (SW && SW.mesh.tex.complete && SW.mesh.tex.naturalWidth) { mvBladeMark(SW); const its = item(SW.mesh, _mvC, typeof hwTint === 'function' ? hwTint(t, opts) : opts);   /* (her hero weapon's stage glow: forces_zzzzzzzzzzzzzzzz_heroweapons.js) */ its.sec = it.sec; its.bones = it.bones; if (live && !icon && D) mvEcho(t, SW, D, o, it.sec); }
   const T4 = mvTips(M, o).map(p => M4.xf(_mvC, p[0], p[1], p[2]));
   // the blades' bloom (the concept's, kept tight: the owner's rule, effects never hide a unit or a foe): a soft magenta
   // halo close round each blade narrowing to its point, a brighter line of its own colour at its heart (red on one blade, pink on the other); a gentle pulse, brighter in her spells and while Unbound Blade lasts
@@ -111498,6 +111894,53 @@ function mvDraw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts, L, full) 
   }
   M4.trs(_mvS, T4[0][0], T4[0][1] - .38 * K, T4[0][2]); FX_PM.root = FX_PM.torso = _mvC; FX_PM.main = FX_PM.sword = _mvS;   // (ABANIM's tip on 'main' [-.2, .38, .92] lands near her blade)
   return true;
+}
+/* her place on a dart (offsets from her post in D.px, D.pz): from lead s before the blow her mark is beside her foe (short
+   of it by gap, following it as it walks), and stays there hang s after the blow; then it is her post again. She follows
+   the mark through a damped spring, quick out and slower home, and her path bows aside by how far out she is, one side going
+   and the other coming back. x, z: chargeAt's place (a flash-step of Rift Chain or a talent's moves her as before). */
+function mvDart(t, x, z) {
+  const now = G.time, D = t._mvD || (t._mvD = { gx: 0, gz: 0, len: 0, out: 0, dq: 0, side: 1, sd: 0, n: -1, px: 0, pz: 0, vx: 0, vz: 0, k: 0, wh: 0, at: null });
+  const dt = D.at == null ? 0 : Math.max(0, Math.min(.1, now - D.at));
+  if (D.at != null && !(dt > 0)) return D;   // (drawn again at the same moment: held, or a second pass)
+  D.at = now;
+  let tx = x - t.x, tz = z - t.y, w = MVS.dashW; const chg = Math.hypot(tx, tz) > 1e-3;
+  if (chg || !MVD.on) { D.out = 0; D.dq = 0; }
+  else {
+    const c = t.tg, wu = t.windup || 0, s = t.shotT == null ? 9 : t.shotT, sh = t.shots | 0;
+    const iv = Math.max(.2, (t.st && t.st.rate) || 1.2), wl = Math.min(.6, iv * .6), left = (1 - wu) * wl;
+    const aim = () => { const dx = c.x - t.x, dz = c.y - t.y, L = Math.hypot(dx, dz) || 1, r = (c.def && c.def.r) || .25, reach = Math.max(0, L - Math.max(MVD.gap, r + .3)); D.gx = dx / L * reach; D.gz = dz / L * reach; D.len = reach; D.c = c; };
+    if (c && !c.dead && wu > 0 && left < MVD.lead) { aim(); if (!D.out || D.n !== sh + 1) { D.n = sh + 1; D.side = D.n % 2 ? 1 : -1; } D.out = 1; D.dq = 1 - left / MVD.lead; }
+    else if (D.out && D.n === sh && s < MVD.hang) { if (c && !c.dead && c === D.c) aim(); D.dq = 1; }
+    else { D.out = 0; D.dq = 0; }
+    if (D.out) { const e = mvE(D.dq / .4); tx = D.gx * e; tz = D.gz * e; w = MVD.wOut; } else w = MVD.wBack;   // (her mark slides out to the foe over the first of the lead: she gathers speed, no jolt)
+  }
+  const ox = mvSpring(t, 'ox', tx, w, dt), oz = mvSpring(t, 'oz', tz, w, dt);
+  const k = D.len > .05 ? Math.min(1, Math.hypot(ox, oz) / D.len) : 0;
+  D.sd += ((chg || !MVD.on ? 0 : D.out ? D.side : -D.side) - D.sd) * (1 - Math.exp(-dt * 9));
+  const b = D.len > .05 ? Math.min(MVD.bowMax, MVD.bow * D.len) * Math.sin(Math.PI * k) * D.sd / D.len : 0, px = ox - D.gz * b, pz = oz + D.gx * b;
+  if (dt > 0) { const a = 1 - Math.exp(-dt * 18); D.vx += ((px - D.px) / dt - D.vx) * a; D.vz += ((pz - D.pz) / dt - D.vz) * a; }
+  D.px = px; D.pz = pz; D.k = k;
+  return D;
+}
+/* the echoes: her own sword's model drawn again where it was a moment ago (its place and her pose kept, echoDt apart),
+   see-through and fading over echoT, tinted to its blades' light: in the whirl of a dart the two blades read as many.
+   Nothing is built: it is the sword she holds. */
+function mvEcho(t, SW, D, o, sec) {
+  const now = G.time, E = t._mvE || (t._mvE = []);
+  if (E.length && (now < E[0].at || now - E[0].at > .5)) E.length = 0;
+  if (!MVD.on || !MVD.echo || MVS.off) { E.length = 0; return; }
+  if (D.wh > .05 && (!E.length || now - E[0].at >= MVD.echoDt)) {
+    const e = E.length > MVD.echo ? E.pop() : { m: new Float32Array(16), b: new Float32Array(o.length) };
+    if (e.b.length !== o.length) e.b = new Float32Array(o.length);
+    e.at = now; e.a = D.wh; e.m.set(_mvC); e.b.set(o); E.unshift(e);
+  }
+  const busy = G.creeps && G.creeps.length > 20 ? .7 : 1;
+  for (const e of E) {
+    const f = (now - e.at) / MVD.echoT; if (f <= .12 || f >= 1) continue;   // (the newest lies on the sword itself)
+    const its = item(SW.mesh, e.m, { alpha: MVD.echoA * e.a * (1 - f) * busy, shadow: false, tint: [1.35, .45, .95, .45] });
+    its.sec = sec; its.bones = itemBones(its, e.b);
+  }
 }
 // violet mist and embers drifting off the blades: a few a second at rest, many more on a swing (by the blades' speed)
 function mvMist(t, T4, s, g) {
@@ -111561,7 +112004,8 @@ function mvSwirl(t, T4, P, hw, cx, cz) {
     MVS.sp = sp / hw;
     H.unshift({ at: now, p: [T4[0].slice(), mid(T4[0], T4[1]), T4[2].slice(), mid(T4[2], T4[3])], k, cx, cz, dir: Math.sign(t._mvSv || 0) || 1 });
   }
-  while (H.length && (now - H[H.length - 1].at > MVS.str || H.length > 40)) H.pop();
+  const rbk = 1 + (MVD.rib - 1) * (t._mvD && MVD.on ? t._mvD.wh : 0), RIB = MVS.rib * rbk, STR = MVS.str * rbk;   // (longer-lived in the whirl of a dart)
+  while (H.length && (now - H[H.length - 1].at > STR || H.length > 48)) H.pop();
   const busy = G.creeps && G.creeps.length > 20 ? .5 : 1;   // (the owner: never cloud the field; thinned in busy waves)
   // the wisps
   const W = t._mvW || (t._mvW = []), wd = t._mvWt == null ? 0 : Math.max(0, Math.min(.1, now - t._mvWt)); t._mvWt = now;
@@ -111576,7 +112020,7 @@ function mvSwirl(t, T4, P, hw, cx, cz) {
   for (let i = W.length - 1; i >= 0; i--) if (now - W[i].at > W[i].life || now < W[i].at) W.splice(i, 1);
   // the crescent: on a strike's blow (shots just counted; the forehand A cuts with blade B, pink, the backhand with blade A),
   // and on a flash-step's cut
-  const B = t.ccBlink, Bt = B && B.at != null ? now - B.at : 9;
+  const B = t.ccBlink && !t.ccBlink.dart ? t.ccBlink : null, Bt = B && B.at != null ? now - B.at : 9;
   if (t.tg && !t.tg.dead && (t.shots | 0) > 0 && t.shotT != null && t.shotT < .06 && t._mvSlN !== t.shots && !(Bt < 1)) { t._mvSlN = t.shots; mvSlashAt(t, t.tg, (t.shots % 2 ? 1 : 0) ^ mvSwapped(t), hw, cx, cz, t.shots % 2 ? 1 : -1); }
   else if (B && Bt > .3 * (B.T || .38) && Bt < .5 * (B.T || .38) && t._mvSlB !== B.at && t.tg && !t.tg.dead) { t._mvSlB = B.at; mvSlashAt(t, t.tg, 1 ^ mvSwapped(t), hw, cx, cz, 1); }
   if (!ok) return;
@@ -111590,7 +112034,7 @@ function mvSwirl(t, T4, P, hw, cx, cz) {
       out[0] = q.cx + (dx * c - dz * sn) * gr; out[2] = q.cz + (dx * sn + dz * c) * gr; out[1] = p[1] + MVS.rise * hw * a; return out;
     };
     // (smoothed through the samples, a Catmull-Rom curve five steps a frame, so a spin draws a curve and not a polygon)
-    const steps = Math.min(60, (n - 1) * 5), Po = new Array(n * 3), Pm = new Array(n * 3), o3 = [0, 0, 0], m3 = [0, 0, 0];
+    const steps = Math.min(72, (n - 1) * 5), Po = new Array(n * 3), Pm = new Array(n * 3), o3 = [0, 0, 0], m3 = [0, 0, 0];
     for (let b = 0; b < 2; b++) {
       const C = MVS_COL[b], ti = b * 2, mi = b * 2 + 1;
       for (let j = 0; j < n; j++) { drift(H[j], H[j].p[ti], _mvP); drift(H[j], H[j].p[mi], _mvQ); for (let c = 0; c < 3; c++) { Po[j * 3 + c] = _mvP[c]; Pm[j * 3 + c] = _mvQ[c]; } }
@@ -111599,7 +112043,7 @@ function mvSwirl(t, T4, P, hw, cx, cz) {
       if (VX.room((steps + 1) * 4, steps * 18)) {
         let prev = -1;
         for (let k = 0; k <= steps; k++) {
-          const u = k / steps, [qa, qk] = at(u), old = (now - qa) / MVS.rib; if (old > 1) break;
+          const u = k / steps, [qa, qk] = at(u), old = (now - qa) / RIB; if (old > 1) break;
           const a = qk * Math.pow(1 - old, 1.3) * g; vfxCR(Po, n, u, o3); vfxCR(Pm, n, u, m3);
           const inr = .15 + .8 * Math.pow(old, .8);   // (the sheet narrows to the point's path behind the blade)
           const gx = m3[0] + (o3[0] - m3[0]) * inr, gy = m3[1] + (o3[1] - m3[1]) * inr, gz = m3[2] + (o3[2] - m3[2]) * inr;
@@ -111617,7 +112061,7 @@ function mvSwirl(t, T4, P, hw, cx, cz) {
       for (let pass = 0; pass < 2; pass++) {
         vfxRb.begin(VX, VT.GLOW, pass ? 1 : C.add + .2, 0);
         for (let k = 0; k <= steps; k++) {
-          const u = k / steps, [qa, qk] = at(u), old = Math.min(1, (now - qa) / MVS.str), a = qk * Math.pow(1 - old, 1.4) * g; vfxCR(Po, n, u, o3);
+          const u = k / steps, [qa, qk] = at(u), old = Math.min(1, (now - qa) / STR), a = qk * Math.pow(1 - old, 1.4) * g; vfxCR(Po, n, u, o3);
           vfxRb.pt(o3[0], o3[1], o3[2], hw * (pass ? .012 : .045) * Math.pow(1 - old, .6), pass ? C.hot : C.rim, a * (pass ? .7 * Math.max(0, 1 - old * 2) : .3), u);
         }
         vfxRb.end();
@@ -111634,6 +112078,24 @@ function mvSwirl(t, T4, P, hw, cx, cz) {
       vfxRb.pt(q.x + Math.cos(an) * r, h, q.z + Math.sin(an) * r, hw * .036 * q.sz * (1 - j / 5), j ? C.rim : C.hot, env * .85 * g * (1 - j / 5), j / 4);
     }
     vfxRb.end();
+  }
+  /* the whirl of a dart: thin strands of both colours wound round her from her shoulders out to her feet, turning the way
+     she turns and smeared back along her way, so she reads as a swirl with a tail as she darts; gone as she comes to
+     rest. Thin and see-through (the owner's rule: she, the foes and the map stay seen). */
+  const D = t._mvD, wh = D && MVD.on ? D.wh : 0;
+  if (wh > .04 && MVD.coil) {
+    const dir = Math.sign(t._mvSv || 0) || 1, ph = now * MVD.coilW * dir, N = 12;
+    for (let q = 0; q < MVD.coil; q++) {
+      const C = MVS_COL[q % 2];
+      for (let pass = 0; pass < 2; pass++) {
+        vfxRb.begin(VX, pass ? VT.GLOW : VT.SOLID, pass ? 1 : C.add, 0);   // (its body mostly laid over the scene, as the ribbons: crimson added over sunlit grass is lost)
+        for (let k = 0; k <= N; k++) {
+          const u = k / N, an = ph + q * TAU / MVD.coil - dir * u * 4.2, r = hw * (.2 + .17 * u) * (1 + .2 * Math.sin(q * 2.3 + now * 6 + u * 3)), lag = u * MVD.coilLag, e = Math.sin(Math.PI * u);
+          vfxRb.pt(cx - D.vx * lag + Math.cos(an) * r, hw * (.8 - .64 * u), cz - D.vz * lag + Math.sin(an) * r, hw * (pass ? .014 : .05) * (.25 + .75 * e), pass ? C.hot : C.body, wh * g * busy * (pass ? .55 : MVD.coilA) * e, u);
+        }
+        vfxRb.end();
+      }
+    }
   }
   // the crescent
   const Sl = t._mvSl;
@@ -111667,6 +112129,16 @@ if (typeof umDraw === 'function') {
   umDraw = function (t, u) {
     if (u !== MV_UNIT || !NEWMODELS) return _mvDrawBase.apply(this, arguments);
     const r = mvDraw.apply(this, arguments); if (!r && t) t._mvOn = null; return r;
+  };
+}
+// a cut beyond arm's reach flash-steps her (chVeyCut: ccBlinkTo, as the blow lands); on her sculpt the dart has already
+// carried her there, so that step's move and its rift seams are dropped (drawn things only: the blow is the game's own)
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK.chVeyCut) {
+  const _mvCut = FORCE_ATTACK.chVeyCut;
+  FORCE_ATTACK.chVeyCut = function (t) {
+    const r = _mvCut.apply(this, arguments), B = t && t.ccBlink;
+    if (B && MVD.on && NEWMODELS && B.at === G.time && t.chg && t.chg.at === G.time && t._mvOn != null && G.time - t._mvOn < .3) { t.chg = null; B.dart = 1; B.cut = false; }
+    return r;
   };
 }
 // her strike is never held still on its blow (forces_zz_life.js lfHitStop, every force unit's few-frame hold on the hit):
@@ -115525,7 +115997,7 @@ const OWL2 = (() => {
         if (typeof druidMesh === 'function') druidMesh(U, 0);
         GT = GT || { _ghost: true, ang: 0, tier: 0 }; GT.x = x; GT.y = zz; GT.def = TOWERS[ty];
         const opts = { alpha: .55, shadow: false, tint: ok ? [.9, 1.15, .9, .05] : [1.3, .6, .55, .05] };
-        if (!draw(GT, U, 0, K, { y: 0 }, x, zz, 0, 0, 0, 1, 1, 1, opts, (typeof FSPLIT !== 'undefined' && FSPLIT[U + 0]) || null, m)) return m;
+        if (!draw(GT, U, 0, K, { y: 0 }, x, zz, 0, 0, 0, 1, 1, 1, opts, (typeof FSPLIT !== 'undefined' && FSPLIT[fsKey(U, 0)]) || null, m)) return m;
         if (!EMPTY) EMPTY = new Geo(1).finish();
         return EMPTY;
       } catch (e) { return m; }
