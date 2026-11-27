@@ -1,4 +1,4 @@
-const BUILD_TAG = 'a1abd7e3@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '5473a4b8@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -143669,7 +143669,7 @@ const GV2 = (() => {
      - its trail: a short tapered ribbon along the way it actually came (a sixth of a second of it: a cell or two), gold thinning to
        nothing, in place of the game's straight threads from strike to strike;
      - no glow to speak of: a hand's breadth of warm light under it, a soft shadow on the road. */
-  const _f4 = new Float32Array(16), _f5 = new Float32Array(16), TRAIL_N = 7, BITE = .22;
+  const _f4 = new Float32Array(16), _f5 = new Float32Array(16), TRAIL_N = 12, TRAIL_T = .34, BITE = .22; let _trC = null; const _trQ = [0, 0, 0], _trQ2 = [0, 0, 0];
   function discAt(x, y, z, yaw, pitch, bank, spin, sc) {
     const C = MK.ctrR; M4.trs(_f1, x, y, z, yaw, pitch, bank, sc, sc, sc); M4.trs(_f4, 0, 0, 0, 0, -Math.PI / 2, spin); M4.mul(_f5, _f1, _f4);
     M4.trs(_f2, -C[0], -C[1], -C[2]); M4.mul(_f3, _f5, _f2);
@@ -143702,11 +143702,36 @@ const GV2 = (() => {
     QADD.ground(x, z, h + .004, RR * 1.02, RR * 1.02, wbgA(gold, .11), 4, .12, p.spin * 1.25);   // the rim's blur: it reads as spinning
     QADD.bill(RD, x, h, z, RR * 1.5, RR * 1.5, wbgA(gold, .07), 1, 0);
     QG.ground(x, z, .03, RR * .85, RR * .85, [0, 0, 0, .22], 2, 0);
-    // the trail: the way it came, a sixth of a second of it, tapering to nothing
+    // the trail: the way it actually came, a third of a second of it, as smooth ribbons through the places it was drawn
+    // (Catmull-Rom, so a bowed leg leaves a curved wake and a ricochet a bent one, never a chain of straight pieces):
+    // - a soft wake lying flat in the disc's own plane, as wide as the disc where it leaves it and tapering to a point;
+    // - two fine pale streaks peeling off the rim's two sides and drawing together behind it (the blade's edges cutting air).
+    // Low and warm: nothing a foe can hide behind. Without the toolkit (Graphics on Low) a plain tapered streak.
     const tr = p._gvTr || (p._gvTr = []);
     if (!tr.length || now > tr[tr.length - 1][3] + .012) { tr.push([x, h, z, now]); if (tr.length > TRAIL_N) tr.shift(); }
-    for (let i = 0; i + 1 < tr.length; i++) {
-      const k = (i + 1) / tr.length, a = tr[i], b = tr[i + 1]; if (now - a[3] > .24) continue;
+    const nT = tr.length;
+    if (nT >= 3 && typeof vfxRb !== 'undefined' && typeof vfxCR === 'function' && typeof VX !== 'undefined' && typeof VFX_OK !== 'undefined' && VFX_OK > 0 && !(typeof vfxLite === 'function' && vfxLite())) {
+      if (!_trC || _trC.length < TRAIL_N * 3) _trC = new Float32Array(TRAIL_N * 3);
+      for (let i = 0; i < nT; i++) { _trC[i * 3] = tr[i][0]; _trC[i * 3 + 1] = tr[i][1]; _trC[i * 3 + 2] = tr[i][2]; }
+      const span = Math.max(.05, now - tr[0][3]), SEG = 18, gc = wbgRGB(gold), ic = wbgRGB(iv), big2 = p.big ? 1.15 : 1;
+      const fade = s_ => { const age = (1 - s_) * span; return Math.max(0, 1 - age / TRAIL_T); };   // (by its age too: a caught glaive's wake dies away)
+      const head = s_ => s_ < .78 ? 1 : 1 - .85 * (s_ - .78) / .22;   // (thinning out just behind the disc: nothing piles up on it)
+      // the wake
+      vfxRb.begin(VX, VT.GLOWS, 1, 0, 1);
+      for (let k = 0; k <= SEG; k++) { const s_ = k / SEG, q_ = vfxCR(_trC, nT, s_, _trQ), e = s_ * s_ * (3 - 2 * s_), f = fade(s_);
+        vfxRb.pt(q_[0], q_[1] + .004, q_[2], RR * 1.25 * big2 * Math.pow(s_, .8), gc, .60 * e * f * head(s_), s_ * 1.6 - now * 1.4); }
+      vfxRb.end();
+      // the rim's two streaks
+      for (const sd of [-1, 1]) {
+        vfxRb.begin(VX, VT.GLOWS, 1, 0, 0);
+        for (let k = 0; k <= SEG; k++) { const s_ = k / SEG, q_ = vfxCR(_trC, nT, s_, _trQ), q2 = vfxCR(_trC, nT, Math.min(1, s_ + .04), _trQ2);
+          let tx = q2[0] - q_[0], tz = q2[2] - q_[2]; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl; if (s_ > .96) { tx = vx; tz = vz; }
+          const off = RR * .93 * (.25 + .75 * s_ * s_) * sd, f = fade(s_);
+          vfxRb.pt(q_[0] - tz * off, q_[1] + .006, q_[2] + tx * off, RR * .30 * (.3 + .7 * s_), ic, .95 * Math.pow(s_, 1.1) * f * head(s_), s_); }
+        vfxRb.end();
+      }
+    } else for (let i = 0; i + 1 < nT; i++) {
+      const k = (i + 1) / nT, a = tr[i], b = tr[i + 1]; if (now - a[3] > TRAIL_T) continue;
       QADD.beam(RD, [a[0], a[1], a[2]], [b[0], b[1], b[2]], RR * .85 * k, wbgA(gold, .46 * k * k));
       if (k > .5) QADD.beam(RD, [a[0], a[1], a[2]], [b[0], b[1], b[2]], RR * .22 * k, wbgA(iv, .58 * k * k, 1.15));
     }
