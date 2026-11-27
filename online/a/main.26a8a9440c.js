@@ -1,4 +1,4 @@
-const BUILD_TAG = '01f23c68@2026-11-27';   // the play log's build version (playlog.js)
+const BUILD_TAG = '8572822b@2026-11-27';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -7862,7 +7862,7 @@ const FORCES = {
     ascend: [1.1, 1.25, 1.4],   // tiers IV-VI hit this much harder than a tower's (the Grove has no tier IV paths: its abilities and this instead)
     // build order (the bar, the hotkeys), and the units open from the start (one more opens at random, as a school does)
     order: ['glaive', 'arrow', 'frost', 'arcane', 'storm', 'earth', 'cannon', 'holy', 'wall'],
-    start: ['glaive', 'arrow', 'frost'],
+    start: ['glaive', 'arrow'],   // (owner, 27 Nov 2026: "reduce the starting roster to 3 units instead of 4": two here and the commander's favoured unit, game.js newGame)
     units: {
       glaive: { id: 'thornguard', name: 'Thornguard Spears', short: 'Spears', key: '1', proj: 'thrust', elem: null, dmgType: 'phys', air: false, ground: true, top: [.85, .9, .95],
         blurb: 'Spear-and-shield infantry with living thorn-shields. Thrusts hard at a foe on the cells beside it, piercing the one behind; every 4th thrust roots its foe for 1s, and a rooted foe fills its Growth faster. Line your lanes with them. Cannot reach flyers.',
@@ -13081,7 +13081,7 @@ const CC_Q_MAX = 5, CC_Q_K = .35;   // Arcane Charge: the most a unit holds, and
 /* ---------- the force ---------- */
 FORCES.conclave = { name: 'The Conclave', title: 'Scholars of the Drifting College', hue: '#9a7cff',
   order: ['glaive', 'arrow', 'frost', 'arcane', 'storm', 'earth', 'cannon', 'holy', 'wall'],
-  start: ['glaive', 'arrow', 'frost'],
+  start: ['arrow', 'frost'],   // (owner, 27 Nov 2026: three units to start, and "spell blades can be marens starting unit instead of pyro": the Spellblades are left out so Maren's favoured unit is her third; Maelis's is the Pyroclasts, Aurel's the Chronomancers)
   units: {
     glaive: { id: 'cc_spellblade', name: 'Spellblades', short: 'Spellblade', key: '1', proj: 'force', attack: 'cc_blade', elem: null, dmgType: 'phys', strongVs: ['Magic-resistant', 'Cloth casters'], air: false, ground: true, ccSchool: 'arcane', visTiers: 6,
       top: [.95, 1, 1.05, 1.1, 1.16, 1.22],
@@ -16002,7 +16002,7 @@ const IH_COL = { forge: '#ff8a2a', ember: '#ffb050', steam: '#e8e4dc', iron: '#5
 
 FORCES[IH_ID] = { name: 'Ironhold', title: 'Clanhost of the Iron Peaks', hue: '#e0883a',
   order: ['glaive', 'arrow', 'frost', 'arcane', 'storm', 'earth', 'cannon', 'holy', 'wall'],
-  start: ['glaive', 'arrow', 'frost'],
+  start: ['glaive', 'arrow'],   // (owner, 27 Nov 2026: "reduce the starting roster to 3 units instead of 4": two here and the commander's favoured unit, game.js newGame)
   units: {
     glaive: { id: 'ironbreaker', name: 'Ironbreakers', short: 'Breakers', key: '1', proj: 'force', attack: 'ironbreaker', elem: null, dmgType: 'phys', air: false, ground: true, top: [.82, .88, .95],
       blurb: 'Axe-and-shield dwarves in riveted plate, very sturdy. They chop the foe beside them, each blow stripping its armour, and every chop heats their war-boilers. At full heat the next chop vents: a crushing blow that stuns its foe for 1s and removes 2 more armour (about every 4th chop). Every 5th chop is a shield shove that throws it back down the path. Cannot reach flyers.',
@@ -18978,7 +18978,7 @@ function shSlamFx(t, K, bigK) {
 const SO_ID = 'silver';
 FORCES.silver = { name: 'The Silver Order', title: 'Oathbound Host of the River Kingdoms', hue: '#cfdcf0',
   order: ['glaive', 'arrow', 'frost', 'arcane', 'storm', 'earth', 'cannon', 'holy', 'wall'],
-  start: ['glaive', 'arrow', 'frost'],
+  start: ['glaive', 'arrow'],   // (owner, 27 Nov 2026: "reduce the starting roster to 3 units instead of 4": two here and the commander's favoured unit, game.js newGame)
   units: {
     glaive: { id: 'oathsworn', name: 'Oathsworn Shieldbearers', short: 'Shields', key: '1', proj: 'force', attack: 'so_shield', elem: null, dmgType: 'phys', air: false, ground: true, top: [.95, 1, 1.05],
       blurb: 'Sword and great shield: they cut at the foe on the cells beside them, and every third blow is a shield bash that drives it back along the road, stuns it (1s, 1.5s if it carries Judgement) and lays Judgement on it. They hold the line. Cannot reach flyers.',
@@ -21233,7 +21233,7 @@ function soSentence(hp) {
 const SB_ID = 'stormborn';
 FORCES.stormborn = { name: 'The Stormborn', title: 'Storm Callers of the High Plateaus', hue: '#8fb4e8',
   order: ['glaive', 'arrow', 'frost', 'arcane', 'storm', 'earth', 'cannon', 'holy', 'wall'],
-  start: ['glaive', 'arrow', 'frost'],
+  start: ['glaive', 'arrow'],   // (owner, 27 Nov 2026: "reduce the starting roster to 3 units instead of 4": two here and the commander's favoured unit, game.js newGame)
   units: {
     glaive: { id: 'sb_wolfguard', name: 'Wolfguard', short: 'Wolfguard', key: '1', proj: 'force', attack: 'sbWolf', elem: null, dmgType: 'phys', air: false, ground: true, top: [.95, 1, 1.05],
       blurb: 'Spear warriors in wolf-pelt hoods, each with a spirit wolf at heel. The spear thrusts at a ground foe beside it; every third thrust the wolf lunges at a passing foe and drags it down into the mud (stunned 1s and wet 3s, and the Storm gathers 1); lightning that strikes it while it is down holds it 0.5s longer. Cannot reach flyers.',
@@ -23583,7 +23583,7 @@ const WB_ID = 'wardbound';
 const WB_COL = { gold: '#f0c050', goldL: '#ffe8a8', steel: '#c8ccd6', teal: '#bff4ec', ivory: '#efe6d0', black: '#16141a', iron: '#3a3a44', frost: '#bfe6ff', sigil: '#d8b8ff', storm: '#e8d08a', stone: '#d89a50', pin: '#ff9a5a', vow: '#fff2c8', blood: '#c04a3a' };
 FORCES.wardbound = { name: 'The Wardbound', title: 'Rune-Knights of the Last Roads', hue: '#e0b048',
   order: ['glaive', 'arrow', 'frost', 'arcane', 'storm', 'earth', 'cannon', 'holy', 'wall'],
-  start: ['glaive', 'arrow', 'frost'],
+  start: ['glaive', 'arrow'],   // (owner, 27 Nov 2026: "reduce the starting roster to 3 units instead of 4": two here and the commander's favoured unit, game.js newGame)
   units: {
     glaive: { id: 'wb_oathbound', name: 'Oathbound', short: 'Oathbound', key: '1', proj: 'force', attack: 'wbOath', elem: null, dmgType: 'phys', air: false, ground: true, top: [1.05, 1.1, 1.15],
       blurb: 'Hooded veterans in black plate, sworn to hold. A heavy greatsword cut on the ground foe beside it carves an oath rune into the road: the next ground foe to step on it springs it: it is slowed and Exposed, so Wardbound spells hit it harder. Cannot reach flyers.',
@@ -99082,7 +99082,8 @@ function heroRGB(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16 & 255
    first school (game.js newGame). The work is done in heroAffStats (from heroStats), heroAffFire (fire), heroAffHit
    (onHit) and heroAffKill (heroOnKill). Never write "+X% damage" for these. (No affinity names the holy slot in a force run:
    it holds the commander's Champion.) One exception: a commander whose own Champion fights as one of the army's units may
-   favour that unit though the run starts with it (favStart: Maren Vey and her Spellblades). */
+   favour that unit though the run starts with it (favStart: Varic and his Oathbound). Maren Vey's Spellblades are not in
+   the Conclave's start (owner, 27 Nov 2026), so they are her favoured third unit. */
 const AFF_MODS = {
   // ---- the keep's own heroes (classic towers) ----
   marshal: { fav: 'holy', sig: { name: 'Muster', t: 'A Holy Shrine’s blessing reaches 0.3 cells further, and a full cell further again while Rally sounds.' },
@@ -99109,7 +99110,7 @@ const AFF_MODS = {
     up: { arrow: { k: 'range', v: .2 }, glaive: { k: 'crit', v: .05 } }, dn: { earth: { k: 'rate', v: -.05 }, storm: { k: 'range', v: -.2 } } },
   cc_chrono: { fav: 'arcane', sig: { name: 'Echoed Moment', t: 'Every 5th Chronomancer strike happens again a quarter-second later.' },
     up: { frost: { k: 'rate', v: .06 }, storm: { k: 'range', v: .2 } }, dn: { cannon: { k: 'range', v: -.2 }, glaive: { k: 'rate', v: -.05 } } },
-  cc_maren: { fav: 'glaive', favStart: true, sig: { name: 'Ghost Edge', t: 'A Spellblade that cuts a stunned foe cuts it again a moment later with a ghost of its blade.' },
+  cc_maren: { fav: 'glaive', sig: { name: 'Ghost Edge', t: 'A Spellblade that cuts a stunned foe cuts it again a moment later with a ghost of its blade.' },
     up: { frost: { k: 'slow', v: .15, T: 1 }, arrow: { k: 'crit', v: .05 } }, dn: { storm: { k: 'range', v: -.2 }, cannon: { k: 'rate', v: -.05 } } },
   // ---- Ironhold ----
   ih_thane: { fav: 'earth', sig: { name: 'Shoulder to Shoulder', t: 'A Steam Hammer strikes 6% faster for each unit standing beside it (up to four).' },
