@@ -1,4 +1,4 @@
-const BUILD_TAG = '31e4a617@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'a4864d89@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -16929,6 +16929,8 @@ FORCES[IH_ID].talents = IH_TALENTS; FORCES[IH_ID].talFlavor = IH_TAL_FLAVOR; FOR
 const IH_ABK = (st, m, K) => abD(st) * m * (K || 1);
 const ihPick = (t, st, r, filt) => abFoes(t, st, r, filt);
 // Rattlegun (ih_rollingvolley): a spin-up, then a stream of small bullets into one foe, each a little armour off and a little heat
+// a spell card's Heat sentence: only once the player has taken Heat (the Force tab's capstone; owner: mechanic words only when specced)
+const ihHeatSay = s => (typeof ftMechShown === 'function' && ftMechShown('ironhold') ? s : '');
 const IH_GAT = { spin: .28, mult: .35, heat: .25 };   // seconds of spin-up; each bullet's hit (x the strike) and heat (x a strike's)
 const ihGatIv = n => Math.min(.15, Math.max(.1, 1.7 / n));   // seconds between bullets: a burst of about 1.5-2s
 const ihGatDur = n => IH_GAT.spin + n * ihGatIv(n);
@@ -16999,7 +17001,7 @@ const IH_KITS = {
     { id: 'ih_rollingvolley', name: 'Rattlegun', short: 'Rattle', glyph: 'missiles', hue: '#ffc070', mana: 75, cd: 9, research: { cost: 45, time: 20 }, anim: 2.2, noLock: 1,   // (id kept from Rolling Volley: talents, items and saves bind to it)
       by: { n: [10, 10, 12, 12, 14, 14], strip: [6, 6, 8, 8, 10, 10] },   // bullets in a burst; the most armour one burst strips
       auto: 'the most armoured foe in range (else the toughest)',
-      text: (t, st, ab) => `Fires ${byT(ab.by.n, t)} bullets into one foe over about ${+ihGatDur(byT(ab.by.n, t)).toFixed(1)}s: ${xD(st, IH_GAT.mult)} each, each removing 1 armour (up to ${byT(ab.by.strip, t)}). Each bullet adds Heat; its attacks go on meanwhile.`,
+      text: (t, st, ab) => `Fires ${byT(ab.by.n, t)} bullets into one foe over about ${+ihGatDur(byT(ab.by.n, t)).toFixed(1)}s: ${xD(st, IH_GAT.mult)} each, each removing 1 armour (up to ${byT(ab.by.strip, t)}). Its attacks go on meanwhile.${ihHeatSay(' Each bullet adds Heat.')}`,
       pick(t, st, ab) { const L = ihPick(t, st, abReach(t, st, ab)); if (!L.length) return null; const a = L.filter(c => ihArmor(c) > 0).sort((p, q) => ihArmor(q) - ihArmor(p) || abByTough(p, q))[0]; return a || abToughest(L); },
       cast(t, st, c, ab, K) {
         const n = Math.max(1, Math.round(byT(ab.by.n, t))), cap = byT(ab.by.strip, t), iv = ihGatIv(n), M = typeof spLive === 'function' ? spLive(t, ab.id) : null;
@@ -39372,7 +39374,7 @@ function ihcSlugAim(t, st, ab) {
 ihcPatch('ih_slug', { name: 'Breaching Slug', short: 'Breach', glyph: 'beam', hue: '#ffb060', anim: .9,
   by: { strip: [3, 3, 4, 4, 5, 5], b: [0, 0, 0, 0, 0, 0], len: [0, 0, 0, 0, 0, 0] },
   auto: 'the shot, of those aimed at each foe in range, that passes through the most foes (two or more), the most armoured first',
-  text: (t, st, ab) => `Fires a slug ${gNf(ihcSlugLen(t, st))} cells through every foe in line: ${xD(st, IHC_RS.mult)} to each, removing ${byT(ab.by.strip, t)} armour, and adds Heat. Each armour removed makes it hit ${Math.round(IHC_RS.carry * 100)}% harder further on (up to ${Math.round(IHC_RS.carryMax * 100)}%).`,
+  text: (t, st, ab) => `Fires a slug ${gNf(ihcSlugLen(t, st))} cells through every foe in line: ${xD(st, IHC_RS.mult)} to each, removing ${byT(ab.by.strip, t)} armour. Each armour removed makes it hit ${Math.round(IHC_RS.carry * 100)}% harder further on (up to ${Math.round(IHC_RS.carryMax * 100)}%).${ihHeatSay(' Adds Heat.')}`,
   pick(t, st, ab, man) { const b = ihcSlugAim(t, st, ab); return b && (b.n >= (man ? 1 : 2) || (b.n && abBig(b.c))) ? b.c : null; },
   cast(t, st, c, ab, K) {
     const b0 = ihcSlugAim(t, st, ab), ux = b0 ? b0.ux : abDir(t, c)[0], uz = b0 ? b0.uz : abDir(t, c)[1];
@@ -54020,23 +54022,23 @@ function tchUlt(id, o) {
     ['Armourbreaker', 5, 2, { req: [4, 2] }],
   ]);
   tchTree(FORCES["ironhold"].talents["arrow"], [   // ironhold.arrow
-    ['Quick Reload', 0, 0],
-    ['Concussion Rounds', 0, 1],
-    ['Sighting In', 0, 2],
-    ['Rattlegun', 1, 1, { req: [0, 1] }],
-    ['Range-Finder', 1, 2],
-    ['Long Belt', 2, 1, { req: [1, 1] }],
-    ['Breaching Slug', 2, 2, { req: [1, 2] }],
-    ['Quick Swab', 2, 3],
-    ['Called Volley', 3, 1, { req: [2, 1], max: 2, pro: n => `Rattlegun's last target takes ${5 * n}% more from every unit for 5s.`, sp: n => ({ ab: 'ih_rollingvolley', rider: { burstMark: [.05 * n, 5] } }) }],
-    ['Kneecapper', 3, 2, { req: [2, 2] }],
-    ['Powder Tally', 3, 3, { req: [2, 3] }],
-    ['Pinning Rounds', 4, 1, { req: [3, 1] }],
-    ['Case-Hardened', 4, 2, { req: [3, 2], max: 2, pro: n => `When Breaching Slug strips a foe bare, ground foes beside it lose ${1 + n} armour.`, sp: n => ({ ab: 'ih_slug', rider: { spall: 1 + n } }) }],
-    ['Hard Kick', 4, 3, { req: [3, 3], max: 2, pro: n => `Above 75% heat, its shots knock ground foes back ${gNf(.075 * n)} cells.` }],
-    ['Thunder Belt', 5, 1, { req: [4, 1] }],
-    ['Called Shot', 5, 2, { req: [4, 2] }],
-    ['Gatling Crank', 5, 3, { req: [4, 3] }],
+    ['Called Volley', 0, 0, { max: 2 }],
+    ['Range-Finder', 0, 1],
+    ['Concussion Rounds', 0, 2],
+    ['Hard Kick', 1, 1, { req: [0, 1], max: 2 }],
+    ['Rattlegun', 1, 2],
+    ['Sighting In', 1, 3],
+    ['Breaching Slug', 2, 0],
+    ['Powder Tally', 2, 1, { req: [1, 1] }],
+    ['Case-Hardened', 2, 2, { req: [1, 2], max: 2 }],
+    ['Quick Reload', 3, 0, { req: [2, 0] }],
+    ['Kneecapper', 3, 1, { req: [2, 1] }],
+    ['Quick Swab', 3, 2, { req: [2, 2] }],
+    ['Thunder Belt', 4, 0, { req: [3, 0], max: 2 }],
+    ['Long Belt', 4, 1, { req: [3, 1] }],
+    ['Pinning Rounds', 4, 2, { req: [3, 2] }],
+    ['Called Shot', 5, 1, { req: [4, 1] }],
+    ['Gatling Crank', 5, 2, { req: [4, 2] }],
   ]);
   tchTree(FORCES["ironhold"].talents["frost"], [   // ironhold.frost
     ['Third Wrap', 0, 1],
@@ -61992,11 +61994,11 @@ function ftPlainPassive(s, M) {
 // whose text is it: the unit's, the item's, else the run's (or the Forces page's: FORCE_NOW)
 const ftTextForce = (fn, a) => { try {
   if ((fn === 'abText' || fn === 'unitTipHTML') && a[0] && a[0].def) return a[0].def.force || null;
-  if (fn === 'spellTipHTML' && a[1] && a[1].def) return a[1].def.force || null;
+  if ((fn === 'spellTipHTML' || fn === 'spellBrief') && a[1] && a[1].def && (fn === 'spellTipHTML' || a[1].def.force)) return a[1].def.force || null;
   if ((fn === 'itemCardHTML' || fn === 'gearText') && a[0]) { const it = a[0], d = (it.leg && LEGENDS[it.leg]) || (it.base && GEAR_BASES[it.base]) || (it.shop && SHOP[it.shop]); if (d && d.force) return d.force; }
 } catch (e) {} return (typeof FORCE_NOW !== 'undefined' && FORCE_NOW) || (typeof G !== 'undefined' && G && G.force) || null; };
 function ftLatePlain() {
-  for (const fn of ['abText', 'talTipHTML', 'itemCardHTML', 'gearText', 'unitTipHTML', 'spellTipHTML', 'wpnCardHTML']) {
+  for (const fn of ['abText', 'talTipHTML', 'itemCardHTML', 'gearText', 'unitTipHTML', 'spellTipHTML', 'spellBrief', 'wpnCardHTML']) {   // (spellBrief: the spell bar's card and a talent's spell card read it bare)
     const f0 = globalThis[fn]; if (typeof f0 !== 'function' || f0._fth) continue;
     const w = function () { return ftPlain(f0.apply(this, arguments), ftTextForce(fn, arguments)); };
     w._fth = 1; globalThis[fn] = w;
@@ -65365,7 +65367,8 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 {
   const F = 'ironhold';
   ezLayout(F, 'glaive', [[2,0],[0,3],[3,3],[1,0],[0,1],[2,3],[5,2],[1,1],[5,3],[4,2],[3,2],[4,0],[5,1],[3,1],[2,2],[3,0],[0,2]], [[14,10,9,6],[1,5,2],[4,7]]);   /* rows 3 2 3 4 2 3; chains: Hooked Beard > Brace and Shove > Breaker's Blow > Anvil Strike | Bearded Axe > Spinning Shield > Hot Hands | Bowling Shove > Shield Rush */
-  ezLayout(F, 'arrow', [[0,0],[0,1],[2,3],[5,0],[1,3],[1,2],[3,1],[5,1],[5,2],[2,1],[2,0],[4,3],[4,2],[0,2],[3,0],[2,2],[3,2]], [[0,10,14,3],[1,9,6],[4,2]]);   /* rows 3 2 4 3 2 3; chains: Concussion Rounds > Quick Swab > Powder Purse > Called Shot | Range-Finder > Breaching Slug > Both Barrels | Rattlegun > Through-Ball */
+  ezLayout(F, 'arrow', [[0,1],[0,2],[4,1],[5,1],[1,2],[0,3],[3,3],[4,0],[5,2],[2,0],[3,2],[1,1],[2,2],[3,0],[2,1],[4,2],[0,0]], [[11,14,2,3],[12,10,15,8],[9,13,7]]);   /* (28 Nov 2026, the Thunderguns' two fantasies, forces_..._easy_zzthundergun.js: the Marksman in column 2, the Gatling Crew in column 3, Breaching Slug in column 1; rows 4 2 3 3 3 2; chains: Long Iron > True Aim > Through-Ball > Called Shot | Belt-Fed > Quick Swab > Ricochet > Gatling Crank | Breaching Slug > Plate-Splitter > Splintering Slug) */
+  if (0)  ezLayout(F, 'arrow', [[0,0],[0,1],[2,3],[5,0],[1,3],[1,2],[3,1],[5,1],[5,2],[2,1],[2,0],[4,3],[4,2],[0,2],[3,0],[2,2],[3,2]], [[0,10,14,3],[1,9,6],[4,2]]);   /* rows 3 2 4 3 2 3; chains: Concussion Rounds > Quick Swab > Powder Purse > Called Shot | Range-Finder > Breaching Slug > Both Barrels | Rattlegun > Through-Ball */
   ezLayout(F, 'frost', [[2,0],[0,2],[3,0],[0,1],[1,1],[3,2],[5,0],[5,2],[2,2],[5,1],[1,3],[4,0],[4,1],[2,3],[4,3],[2,1],[4,2],[0,0]], [[8,5,16,7],[3,4,15],[10,13]]);   /* rows 3 2 4 2 4 3; chains: Harpoon Winch > Double Wrap > Trapper's Rhythm > Trap Hound | Tangle > Tripwire > Two Bolas | Wide Nets > Wing Cords */
   ezLayout(F, 'arcane', [[2,3],[0,2],[4,3],[0,0],[5,2],[3,1],[1,3],[4,2],[5,0],[2,0],[2,1],[2,2],[5,1],[0,1],[3,0],[1,2]], [[3,9,14,8],[7,4],[1,15,11],[10,5]]);   /* rows 3 2 4 2 2 3; chains: Flying Sparks > Two Brands > Anvil's Due > Forgelord | Unmaking Blow > Anvil Storm | Deep Brand > Anvil of Ages > Ringing Strokes | Glowing Anvil > Hot Iron */
   ezLayout(F, 'storm', [[1,2],[0,1],[5,1],[2,3],[0,2],[1,3],[2,1],[4,1],[5,3],[5,2],[3,3],[4,0],[3,0],[1,0],[3,2]], [[5,3,10,8],[6,7,2],[4,0]]);   /* rows 2 3 2 3 2 3; chains: Grapnel Shot > Cluster Shell > Second Burst > Hook the Sky | Quick Traverse > Starshell > Proximity Fuse | Sky Shatter > Torn Wings */
@@ -66559,6 +66562,313 @@ if (typeof ezSpell === 'function') {
     if (t) t.spBonus = kind;   // (tools/check_talent_trees.js: a spell bonus talent sits on row III or below; check_spell_crit.js tests each kind)
     else if (typeof console !== 'undefined') console.warn('spell crit talents: not set', f, slot, name);
   }
+}
+
+/* ================= THE THUNDERGUNS' TREE: two fantasies (owner, 28 Nov 2026) =================
+   The owner, of the old capstone "Gatling Crank: Rattlegun comes 2s sooner": "isnt very exciting". The tree is rebuilt round
+   two themes, each with its own capstone on a different spell, and a few Breaching Slug talents (the owner approved the plan):
+     THE MARKSMAN (column 2: Long Iron > True Aim > Through-Ball > Called Shot)
+       Range-Finder, Long Iron      long-range bonuses (kept)
+       True Aim                     Long Shot crit 20/40/60% (kept: the owner likes these)
+       Through-Ball                 the ball tears on into the foe behind (kept; tagged Damage now, it was "Spell")
+       Coup Shot                    more on badly hurt foes (kept: kills feed Called Shot)
+       capstone CALLED SHOT         Long Shot punches through the whole line; each foe it kills on the way makes it hit
+                                    harder on the next (a clean line of five ends in a huge final hit)
+     THE GATLING CREW (column 3: Belt-Fed > Quick Swab > Ricochet > Gatling Crank)
+       Belt-Fed (was Spotter's Call)   Rattlegun fires more bullets (the same effect, a name that says it)
+       Quick Swab                      Rattlegun comes sooner and its barrels spin up faster (was: Long Shot's mana)
+       Ricochet                        each attack and Rattlegun bullet glances into the next foe (was: the outer third of the reach)
+       Quick Ramrod                    each attack quickens the next (kept)
+       capstone GATLING CRANK          Rattlegun is no burst now: the crew cranks the barrels up (slow to full rate over
+                                       0.5s), then a stream of about 10 bullets a second for 4s, the barrel sweeping
+                                       across the foes in reach and hitting every foe it passes over, ground or flying;
+                                       a bullet that kills its foe ricochets once. About twice a burst's damage, the same
+                                       cooldown, pure damage; its autocast waits for 3 foes in reach
+     BREACHING SLUG (column 1: Breaching Slug > Plate-Splitter > Splintering Slug)
+       Plate-Splitter (was Quick Reload)    more armour off, harder on bosses and elites
+       Splintering Slug (was Thunder Volley) each foe the slug hits sprays splinters into the foes round it
+     Kept as they were: Concussion Rounds (the owner's mini-stun), Sighting In.
+   Thunder Volley ("every 5th attack") was the tree's one counted talent: there is none now. Saves keep their picks (each
+   talent is changed in its place; a renamed one's ranks follow it through TAL_ALIAS, its painting through TAL_ART_ALIAS).
+   Loads after forces_..._easy_zvariety.js (the old Called Shot) and forces_..._easy_zzcrit.js (True Aim). The layout:
+   forces_..._easy_ironhold.js ezLayout(F, 'arrow', ...). Art: docs/talent_art_needed.md, "Thunderguns, 28 Nov rework". */
+const TGR = {
+  CS_K: .5, CS_MAX: 5, CS_W: .38, CS_MORE: 1.5, CS_SPEED: 14,                         // Called Shot: +50% a kill (up to 5), its line
+  CS_FLARE: .2, CS_END: .34, CS_END_K: .07,                                           // its look: the widest flare while its hits land; the one flash on its last foe (+ a kill before it)
+  GC_DUR: 4, GC_CRANK: .5, GC_PER: .2, GC_W: .42, GC_SWEEP: 2.6, GC_NEED: 3, GC_HEAT: .5, GC_RICO_R: 1.5,   // Gatling Crank
+  RICO_K: .45, RICO_R: 1.5,                                                           // Ricochet, a rank
+  SWAB_CD: 1, SWAB_SPIN: .25,                                                         // Quick Swab, a rank
+  SPLIT_STRIP: 1, SPLIT_BIG: .15,                                                     // Plate-Splitter, a rank
+  SPL_K: .4, SPL_R: .8,                                                               // Splintering Slug, a rank
+};
+(function () {
+  if (typeof FORCES === 'undefined' || !FORCES.ironhold || !FORCES.ironhold.talents || typeof ezClear !== 'function') return;
+  const T = FORCES.ironhold.talents.arrow; if (!T || !T.list) return;
+  const find = n => { const t = T.list.find(q => q.name === n && !q.spell); if (!t && typeof console !== 'undefined') console.warn('thundergun tree: no talent', n); return t || null; };
+  const P = v => String(Math.round(v * 100)), N = v => String(+(+v).toFixed(2));
+  const M = (t, n) => Math.max(1, Math.min(n | 0 || 1, t.max));
+  const rename = (t, name) => {
+    if (!name || name === t.name) return;
+    const was = t.name;
+    if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[name]) TAL_ART_ALIAS[name] = TAL_ART_ALIAS[was] || was;
+    if (typeof TAL_ALIAS !== 'undefined') { for (const k in TAL_ALIAS) if (TAL_ALIAS[k] === was) TAL_ALIAS[k] = name; if (!TAL_ALIAS[was]) TAL_ALIAS[was] = name; }
+    t.oldName = t.oldName || was; t.name = name;
+  };
+  // the force tree's plain passives keyed by these names (forces_..._ftree.js FT_TAL_BASE) are not theirs any more
+  if (typeof FT_TAL_BASE !== 'undefined') for (const n of ['Called Shot', 'Gatling Crank', 'Quick Swab', 'Quick Reload']) if (FT_TAL_BASE[n] && FT_TAL_BASE[n].force === 'ironhold') delete FT_TAL_BASE[n];
+  // a talent of this file's own: its rule reads st.caps[cap] (the rank)
+  const own = (old, o) => {
+    const t = find(old); if (!t) return null;
+    ezClear(t); rename(t, o.name);
+    t.tag = o.tag || 'Damage'; t.cap = o.cap; t.capK = 1; t.capAt = 0; t.ez = 'plain'; t.atkPlain = true; delete t.ezLadder;
+    if (o.max) t.max = o.max; if (o.icon) t.icon = o.icon;
+    if (o.sp) t.sp = o.sp;
+    t.pro = n => o.pro(M(t, n));
+    return t;
+  };
+  // ---- the Marksman ----
+  own('Called Shot', { cap: 'tgCalled', tag: 'Spell', max: 1, icon: 'target', sp: () => ({ ab: 'ih_longshot' }),
+    pro: () => `Long Shot punches through every foe in its line. Each foe it kills makes it hit ${P(TGR.CS_K)}% harder on the next, up to ${P(TGR.CS_K * TGR.CS_MAX)}%.` });
+  const tb = find('Through-Ball'); if (tb) tb.tag = 'Damage';   /* (its attacks, not a spell) */
+  // ---- the Gatling Crew ----
+  own('Gatling Crank', { cap: 'tgCrank', tag: 'Spell', max: 1, icon: 'missiles', sp: () => ({ ab: 'ih_rollingvolley' }),
+    pro: () => `Rattlegun cranks up into a ${TGR.GC_DUR}s stream of about 10 bullets a second, sweeping across the foes in reach for twice the damage. Kills ricochet within ${N(TGR.GC_RICO_R)} cells.` });
+  own('Quick Swab', { cap: 'tgSwab', tag: 'Spell', max: 2, icon: 'quick',
+    sp: n => ({ ab: 'ih_rollingvolley', cd: -TGR.SWAB_CD * n / ((typeof ABIL !== 'undefined' && ABIL.ih_rollingvolley && ABIL.ih_rollingvolley.cd) || 9) }),
+    pro: n => `Reduces the cooldown of Rattlegun by ${N(TGR.SWAB_CD * n)} sec, and Rattlegun's barrels spin up ${P(TGR.SWAB_SPIN * n)}% faster.` });
+  const bf = find("Spotter's Call"); if (bf) { rename(bf, 'Belt-Fed'); bf.icon = 'missiles'; }   /* (Rattlegun fires 2 more bullets a rank: forces_..._easy_ironhold.js) */
+  own('Ricochet', { cap: 'tgRico', tag: 'Damage', max: 2, icon: 'arrows2', sp: () => ({ ab: 'ih_rollingvolley' }),
+    pro: n => `The Thundergun's attacks and Rattlegun's bullets ricochet into the nearest other foe within ${N(TGR.RICO_R)} cells for ${P(TGR.RICO_K * n)}% of their damage.` });
+  // ---- Breaching Slug ----
+  own('Quick Reload', { name: 'Plate-Splitter', cap: 'tgSplit', tag: 'Spell', max: 3, icon: 'shieldbreak', sp: n => ({ ab: 'ih_slug', by: { strip: TGR.SPLIT_STRIP * n } }),
+    pro: n => `Breaching Slug removes ${TGR.SPLIT_STRIP * n} more armour from each foe it hits, and deals ${P(TGR.SPLIT_BIG * n)}% more damage to bosses and elites.` });
+  own('Thunder Volley', { name: 'Splintering Slug', cap: 'tgSplinter', tag: 'Spell', max: 2, icon: 'beam', sp: () => ({ ab: 'ih_slug' }),
+    pro: n => `Each foe Breaching Slug hits sprays splinters: other foes within ${N(TGR.SPL_R)} cells of it take ${P(TGR.SPL_K * n)}% of the slug's damage.` });
+})();
+
+/* ---------- the rules ---------- */
+const tgCaps = (t, st) => (st && st.caps) || (t && t.st && t.st.caps) || {};
+const tgGun = t => !!(t && t.def && t.def.unit === 'thundergun');
+const tgAng = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
+const tgFoe = (t, st, q) => q && !q.dead && !q.ent && !q.phased && canTarget(t, st, q);
+// the foes on a line from the unit along (ux, uz), out to len: [foe, distance along], nearest first
+function tgLine(t, st, ux, uz, len, w) {
+  const out = [];
+  for (const q of G.creeps) {
+    if (!tgFoe(t, st, q)) continue;
+    const px = q.x - t.x, pz = q.y - t.y, along = px * ux + pz * uz; if (along < .1 || along > len) continue;
+    if (Math.abs(px * uz - pz * ux) > w + ((q.def && q.def.r) || .3) * .4) continue;
+    out.push([q, along]);
+  }
+  return out.sort((a, b) => a[1] - b[1]);
+}
+// the other foe nearest c within r (not c, not in skip)
+function tgNear(t, st, c, r, skip) {
+  let best = null, bd = r;
+  for (const q of G.creeps) { if (q === c || q === skip || !tgFoe(t, st, q)) continue; const d = Math.hypot(q.x - c.x, q.y - c.y); if (d <= bd) { bd = d; best = q; } }
+  return best;
+}
+
+/* ---- Called Shot: Long Shot through the whole line, harder for each foe it kills on the way ---- */
+/* Its look (owner: spells never too flashy; the map, foes and units stay visible). Five kills inside a quarter of a second
+   each brought the game's own kill pop (game.js fxDeath: a near-white flare 3.4 foe-radii wide, 1.8 cells on a skirmisher,
+   and a ring), a crit's flare (fxMark, 0.9) and, as each body landed, a ragdoll's dust ring (view.js ragThud), all additive
+   and one on another along 2.5 cells: a white wash over the line. So while the line's hits land (TG_QUIET) the game's flares
+   are held to CS_FLARE and its rings dropped, and the bodies it leaves land with dust but no ring. The shot is told by its
+   tracer, small sparks at each foe, and ONE flash and ring on its last foe, bigger for each kill on the way. A look only. */
+let TG_QUIET = 0;
+if (typeof part === 'function') {
+  const _tgPart = part;
+  part = function (o) {
+    if (TG_QUIET && o && !o._tg) { if (o.k === 'ring') return; if (o.k === 'flare' && o.size > TGR.CS_FLARE) o = Object.assign({}, o, { size: TGR.CS_FLARE }); }
+    return _tgPart.call(this, o);
+  };
+}
+// (view.js loads after this file: wrapped on the first Called Shot)
+function tgThudPatch() {
+  if (typeof ragThud !== 'function' || ragThud._tg) return;
+  const f0 = ragThud, f = function (k) {
+    const c = k && k.c; if (!c || c.tgLineAt == null || G.time - c.tgLineAt > 4) return f0.apply(this, arguments);
+    TG_QUIET++; try { return f0.apply(this, arguments); } finally { TG_QUIET--; }
+  };
+  f._tg = 1; ragThud = f;
+}
+function tgCalledCast(t, st, c, ab, K) {
+  t.ihAimAt = G.time; t.cd = Math.max(t.cd, .5); tgThudPatch();
+  const m = byT(ab.by.mult, t) * K, x0 = c.x, z0 = c.y;
+  G.delayed.push({ t: .35, fn: () => {   // (the breath held, then the shot)
+    if (!abLive(t)) return;
+    const s = t.st || st, tg = c.dead ? null : c, ax = tg ? tg.x : x0, az = tg ? tg.y : z0;
+    const dx = ax - t.x, dz = az - t.y, D = Math.hypot(dx, dz) || 1, ux = dx / D, uz = dz / D, len = abReach(t, s, ab) + TGR.CS_MORE;
+    t.ang = Math.atan2(ux, uz);
+    const L = tgLine(t, s, ux, uz, len, TGR.CS_W);
+    if (tg && !L.some(p => p[0] === tg)) { L.push([tg, D]); L.sort((a, b) => a[1] - b[1]); }
+    const mz = ihMuzzle(t), S = { kills: 0 }, last = L.length - 1;
+    rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], x1: t.x + ux * len, h1: .45, z1: t.y + uz * len, col: '#ffe08a', w: .06, trav: len / TGR.CS_SPEED, life: len / TGR.CS_SPEED + .25, _hit: 1 });   // (_hit: no flash where the line ends: the foes' own hits show)
+    ihFlash(mz[0], mz[2], mz[1], .6, '#fff0c0'); ihSmokePuff(mz[0], mz[2], mz[1], 6);   // (a small muzzle flash: nothing blooms round the gunner)
+    G.shake = Math.max(G.shake, .08); sfx('tgLong');
+    L.forEach(([q, along], i) => G.delayed.push({ t: along / TGR.CS_SPEED, fn: () => {
+      if (q.dead || !abLive(t)) return;
+      const s2 = t.st || s, n = Math.min(TGR.CS_MAX, S.kills), k = 1 + TGR.CS_K * n, ap = s2.armorPen;
+      TG_QUIET++; s2.armorPen = 1;   // (the game's own kill pop, crit flare and rings held small while this hit lands: see TG_QUIET)
+      try { abHit(t, s2, q, m * (q.fly ? 1.25 : 1) * k, 'phys', null); } finally { s2.armorPen = ap; TG_QUIET--; }
+      if (q === tg && !q.dead) ihPin(q, .6, t);
+      const h = hitH(q), end = i === last, big = end && n >= 2;
+      ihSparks(q.x, q.y, h, 4 + n, '#fff0c0');
+      if (q.dead) { S.kills++; if (!end) q.tgLineAt = G.time; ihSparks(q.x, q.y, h, 3 + S.kills, '#ffd070'); sfx('block', 1); }   // a kill: the round carries on, hotter
+      // one flash for the line, on its last foe (a warm one, bigger for each kill on the way); a foe hit on the way that lives shows a glint
+      const fs = end ? (q.dead || big ? TGR.CS_END + TGR.CS_END_K * n : .16) : q.dead ? 0 : .12;
+      if (fs) part({ k: 'flare', x: q.x, z: q.y, h, life: end ? .18 : .14, max: end ? .18 : .14, size: fs, col: n ? '#ffc860' : '#ffe08a', _tg: 1 });
+      if (big) part({ k: 'ring', x: q.x, z: q.y, h: .05, life: .35, max: .35, size: .5, col: '#e8c890', _tg: 1 });
+      if (big) { G.shake = Math.max(G.shake, .13); G.hitStop = Math.max(G.hitStop || 0, .04); sfx('heavyShot', 2); }
+    } }));
+  } });
+  return true;
+}
+// its aim: a boss or elite in reach first (the toughest, as Long Shot always aims), else the line through the most foes
+function tgCalledPick(t, st, ab) {
+  const L = ihPick(t, st, abReach(t, st, ab)); if (!L.length) return null;
+  if (L.some(abBig)) return abToughest(L);
+  const len = abReach(t, st, ab) + TGR.CS_MORE; let best = null, bn = -1;
+  for (const c of L) { const dx = c.x - t.x, dz = c.y - t.y, D = Math.hypot(dx, dz) || 1, n = tgLine(t, st, dx / D, dz / D, len, TGR.CS_W).length; if (n > bn || (n === bn && abByTough(c, best) < 0)) { bn = n; best = c; } }
+  return best;
+}
+
+/* ---- Gatling Crank: a cranked-up stream swept across the crowd ---- */
+// the arc it sweeps: round the foes in reach, re-read as they move (eased, so the barrel never jumps)
+function tgArc(t, s, S, reach) {
+  const now = G.time, dt = Math.max(0, Math.min(.3, now - (S.at || now))); S.at = now;
+  if (now - (S.read || -9) >= .25) {
+    S.read = now; const F = ihPick(t, s, reach);
+    if (F.length) { let sx = 0, sz = 0; for (const q of F) { const a = Math.atan2(q.x - t.x, q.y - t.y); sx += Math.sin(a); sz += Math.cos(a); }
+      const mid = Math.atan2(sx, sz); let spread = 0; for (const q of F) spread = Math.max(spread, Math.abs(tgAng(Math.atan2(q.x - t.x, q.y - t.y), mid)));
+      S.mid = mid; S.wT = Math.max(.22, Math.min(.85, spread + .12)); }
+  }
+  if (S.c == null) { S.c = S.mid; S.w = S.wT; }
+  S.c += tgAng(S.mid, S.c) * Math.min(1, dt * 3); S.w += (S.wT - S.w) * Math.min(1, dt * 3);
+  S.ph += dt * 2 * Math.PI / TGR.GC_SWEEP;
+  return S.c + S.w * Math.sin(S.ph);
+}
+function tgBullet(t, st, ab, S, k, K) {
+  if (!abLive(t)) return;
+  const s = t.st || st, reach = abReach(t, s, ab) + .3, a = tgArc(t, s, S, reach), ux = Math.sin(a), uz = Math.cos(a), C = tgCaps(t, s);
+  t.ang = a; t.ihGatAt = G.time;
+  let o = null, bd = 1e9;   // the first foe on the line of fire
+  for (const q of ihPick(t, s, reach)) {
+    const px = q.x - t.x, pz = q.y - t.y, along = px * ux + pz * uz; if (along <= .05) continue;
+    if (Math.abs(px * uz - pz * ux) > TGR.GC_W + ((q.def && q.def.r) || .3) * .5) continue;
+    if (along < bd) { bd = along; o = q; }
+  }
+  sfx('gatling', 0);
+  if (!o) {   // the stream rakes the road between foes: a thin tracer and a kick of dirt where it lands
+    const mz = ihMuzzle(t), r = reach * .9;
+    rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], x1: t.x + ux * r, h1: .05, z1: t.y + uz * r, col: '#ffd070', w: .026, life: .12 });
+    if (k % 2 === 0) part({ k: 'chunk', x: t.x + ux * r, z: t.y + uz * r, h: .04, vx: R(-.4, .4), vz: R(-.4, .4), vh: R(.6, 1.2), g: 7, life: .3, max: .3, size: .03, col: '#7a654b' });
+    return;
+  }
+  const per = TGR.GC_PER * K;
+  abHit(t, s, o, per, 'phys', null);
+  if (C.ihConc && !o.dead && Math.random() < .05 * C.ihConc) { abHit(t, s, o, per, 'phys', null); if (!o.dead) stun(o, .1, .5); }   // Concussion Rounds: a heavy round, twice the hit and a jolt
+  if (!o.dead && (o.armor || 0) > 0) { const was = o.shredT > 0 ? o.shred : 0; o.shred = Math.max(was, Math.min(S.cap, was + 1)); o.shredT = Math.max(o.shredT || 0, 5); }   // (a little armour a bullet, as a burst's)
+  if (typeof ihHeatAdd === 'function') ihHeatAdd(t, s, (s.heat || .25) * IH_GAT.heat * TGR.GC_HEAT * (typeof ihHeatRate === 'function' ? ihHeatRate(t, s) : 1));
+  if (typeof ihGatShotFx === 'function') ihGatShotFx(t, o, k, S.n);   // muzzle flicker, thin tracer, strike, a brass casing kicked out (spellfx.js)
+  { const mz = ihMuzzle(t); rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c: o, col: '#ffd070', w: .026, life: .12 }); }   // (and a tracer that lingers a moment longer: the stream reads as a moving fan)
+  if (o.dead) {   // a kill: the bullet ricochets once, to the nearest foe within 1.5 cells
+    const q = tgNear(t, s, o, TGR.GC_RICO_R);
+    if (q) { TG_IN++; try { abHit(t, s, q, per, 'phys', null); } finally { TG_IN--; }
+      rfx({ k: 'streak', x0: o.x, h0: hitH(o), z0: o.y, c: q, col: '#ffd890', w: .016, trav: .05, life: .12 }); part({ k: 'spark', x: o.x, z: o.y, h: hitH(o), vx: 0, vz: 0, vh: .6, g: 2, life: .15, max: .15, size: .06, col: '#fff0c8' }); }
+  }
+}
+function tgStreamCast(t, st, c, ab, K) {
+  const C = tgCaps(t, st), n = Math.max(1, Math.round(byT(ab.by.n, t))), sw = Math.max(0, 1 - TGR.SWAB_SPIN * (C.tgSwab || 0));
+  const spin = IH_GAT.spin * sw, crank = TGR.GC_CRANK * sw, rate = n;   // (about 10 a second: a burst's bullets, every second)
+  const at = [];   // each bullet's time: slow to full rate over the crank, then steady
+  for (let u = 0; u < TGR.GC_DUR && at.length < 400;) { at.push(spin + u); u += 1 / (rate * Math.min(1, .25 + .75 * u / Math.max(.05, crank))); }
+  const end = spin + TGR.GC_DUR, a0 = c && c.x != null ? Math.atan2(c.x - t.x, c.y - t.y) : t.ang || 0;
+  const S = { n: at.length, cap: byT(ab.by.strip, t), mid: a0, wT: .4, ph: -Math.PI / 2, at: G.time };
+  t.ang = a0; t.ihGatOn = G.time; t.ihGatEnd = G.time + end; t.tgStream = { at: G.time, spin: spin + crank, end };
+  sfx('gatReload', 0);   // (the crank's ratchet)
+  at.forEach((u, k) => G.delayed.push({ t: u, fn: () => tgBullet(t, st, ab, S, k, K) }));
+  for (let u = spin + crank; u < end - .2; u += 2) { const len = Math.min(2.1, end - u); G.delayed.push({ t: u, fn: () => { if (abLive(t)) sfx('tgRattle', len); } }); }   /* the owner's machine-gun take, in turns as long as it is */
+  G.delayed.push({ t: end + .05, fn: () => {   // the barrels run down
+    if (!abLive(t)) return; t.ihGatEnd = G.time; sfx('gatReload', 0);
+    const m = ihMuzzle(t); ihSmokePuff(m[0], m[2], m[1], 4);
+  } });
+  return true;
+}
+let TG_IN = 0;
+if (typeof ihcWrapCast === 'function' && typeof ABIL !== 'undefined' && ABIL.ih_rollingvolley && ABIL.ih_longshot) {
+  // (the cast these wrap is the outer one, which spends a rune for K: ihCastWrap, forces_ironhold_c.js; taking the cast over, so do they)
+  const own = (fn, t, st, c, ab, again) => { const K = again && again.K ? again.K : ihPreCast(t, ab), r = fn(t, st, c, ab, K); if (r !== false && !again && typeof ihItemsPostCast === 'function') ihItemsPostCast(t, ab, st, c, K); return r; };
+  ihcWrapCast('ih_longshot', (raw, t, st, c, ab, again) => tgGun(t) && tgCaps(t, st).tgCalled && c && c.x != null ? own(tgCalledCast, t, st, c, ab, again) : raw());
+  ihcWrapCast('ih_rollingvolley', (raw, t, st, c, ab, again) => {
+    const C = tgCaps(t, st);
+    if (tgGun(t) && C.tgCrank) { tgSfxPatch(); return own(tgStreamCast, t, st, c, ab, again); }
+    if (!C.tgSwab) return raw();
+    const sp0 = IH_GAT.spin; IH_GAT.spin = sp0 * Math.max(0, 1 - TGR.SWAB_SPIN * C.tgSwab);   // Quick Swab: the burst's barrels spin up sooner (read as the burst is laid out)
+    try { return raw(); } finally { IH_GAT.spin = sp0; }
+  });
+  const pL = ABIL.ih_longshot.pick, pR = ABIL.ih_rollingvolley.pick;
+  // Rattlegun's card with Gatling Crank: the stream, not the burst (the short card: spellhud.js SPELL_BRIEFS)
+  const tx0 = ABIL.ih_rollingvolley.text;
+  ABIL.ih_rollingvolley.text = function (t, st, ab) {
+    if (!tgGun(t) || !tgCaps(t, st).tgCrank) return tx0.apply(this, arguments);
+    ab = ab || ABIL.ih_rollingvolley;
+    return `Cranks up, then fires about ${byT(ab.by.n, t)} bullets a second for ${TGR.GC_DUR}s, sweeping across the foes in reach: ${xD(st, TGR.GC_PER)} each to the first foe in its path, each removing 1 armour (up to ${byT(ab.by.strip, t)}). A bullet that kills ricochets into a foe within ${TGR.GC_RICO_R} cells.${ihHeatSay(' Each bullet adds Heat.')}`;
+  };
+  ABIL.ih_longshot.pick = function (t, st, ab, man) { return tgGun(t) && tgCaps(t, st).tgCalled ? tgCalledPick(t, st, ab || ABIL.ih_longshot) : pL.apply(this, arguments); };
+  ABIL.ih_rollingvolley.pick = function (t, st, ab, man) {
+    if (tgGun(t) && tgCaps(t, st).tgCrank && !man && ihPick(t, st, abReach(t, st, ab || ABIL.ih_rollingvolley)).length < TGR.GC_NEED) return null;   // (the stream waits for a crowd)
+    return pR.apply(this, arguments);
+  };
+}
+// the barrels' glow while they spin (spellfx.js draws a burst's for its own length: the stream's is longer). spellfx.js loads
+// after this file, so its Rattlegun look is wrapped on the first stream.
+function tgSfxPatch() {
+  if (typeof SFX_CUSTOM === 'undefined' || !SFX_CUSTOM.ih_rollingvolley || SFX_CUSTOM.ih_rollingvolley._tg) return;
+  const f0 = SFX_CUSTOM.ih_rollingvolley;
+  const f = C => {
+    const t = C && C.t, S = t && t.tgStream;
+    if (!S || G.time - S.at > .1 || typeof vfxReady !== 'function' || !vfxReady()) return f0(C);
+    sfxAdd({ k: 'ihgatspin', t, spin: S.spin, end: S.end, life: S.end + .3 * C.T.dur, S: C.S, g: C.T.glow * 1.15, hot: vfxC(sfxHue(IH_GAT_COL.hot, C.T.hue)), white: vfxC(IH_GAT_COL.white, 1.4), seed: R(TAU) });
+  };
+  f._tg = 1; SFX_CUSTOM.ih_rollingvolley = f;
+}
+// Ricochet (each Rattlegun bullet glances on), Plate-Splitter (Breaching Slug on bosses and elites), Splintering Slug
+if (typeof abHit === 'function') {
+  const _tgHit = abHit;
+  abHit = function (t, st, c, mult, type, kb) {
+    if (TG_IN || !tgGun(t) || !c || typeof AB_NOW === 'undefined' || (AB_NOW !== 'ih_rollingvolley' && AB_NOW !== 'ih_slug')) return _tgHit.apply(this, arguments);
+    const C = tgCaps(t, st);
+    if (AB_NOW === 'ih_slug' && C.tgSplit && abBig(c)) mult *= 1 + TGR.SPLIT_BIG * C.tgSplit;
+    const r = _tgHit.call(this, t, st, c, mult, type, kb);
+    TG_IN++;
+    try {
+      if (AB_NOW === 'ih_rollingvolley' && C.tgRico) {
+        const q = tgNear(t, st, c, TGR.RICO_R);
+        if (q) { _tgHit.call(this, t, st, q, mult * TGR.RICO_K * C.tgRico, type, null); rfx({ k: 'streak', x0: c.x, h0: hitH(c), z0: c.y, c: q, col: '#ffd890', w: .012, trav: .04, life: .09 }); }
+      } else if (AB_NOW === 'ih_slug' && C.tgSplinter) {
+        const x = c.x, z = c.y, h = hitH(c); let any = 0;
+        for (const q of G.creeps) if (q !== c && tgFoe(t, st, q) && Math.hypot(q.x - x, q.y - z) <= TGR.SPL_R) { any = 1; _tgHit.call(this, t, st, q, mult * TGR.SPL_K * C.tgSplinter, type, null); }
+        if (any) for (let k = 0; k < 6; k++) part({ k: 'chunk', x, z, h, vx: R(-2, 2), vz: R(-2, 2), vh: R(.2, 1.2), g: 6, drag: 1, life: R(.25, .4), max: .4, size: R(.025, .04), col: k % 2 ? '#c8a070' : '#ffd090' });
+      }
+    } finally { TG_IN--; }
+    return r;
+  };
+}
+// Ricochet on the Thundergun's own attacks: the ball glances on into the nearest other foe
+if (typeof fire === 'function') {
+  const _tgFire = fire;
+  fire = function (t, st, tg, echo) {
+    const r = _tgFire.apply(this, arguments);
+    try {
+      const s = st || (t && t.st), C = tgGun(t) && !echo && tg && tg.x != null ? tgCaps(t, s) : null;
+      if (C && C.tgRico) { const x = tg.x, z = tg.y, h = hitH(tg), k = TGR.RICO_K * C.tgRico;
+        G.delayed.push({ t: .12, fn: () => { if (!G.towers.includes(t) || G.state !== 'play') return; const s2 = t.st || s, q = tgNear(t, s2, tg.dead ? { x, y: z } : tg, TGR.RICO_R, tg);
+          if (!q) return; rfx({ k: 'streak', x0: x, h0: h, z0: z, c: q, col: '#ffd890', w: .014, trav: .05, life: .1 }); ezcHit(t, s2, q, (s2.dmg || 0) * k); } }); }
+    } catch (e) { if (typeof console !== 'undefined') console.warn('thundergun tree:', e); }
+    return r;
+  };
 }
 
 /* ================= FLAK CANNONEERS: two themes and the hook (owner, 28 Nov 2026) =================
@@ -101322,8 +101632,11 @@ const SPELL_BRIEFS = {
   ih_bulwark: 'Throws its shield {len} cells out and back. Out: {d}, removes 1 armour. Back: {d2}, stunned 0.35s. Each hit adds Heat.',
   ih_breakerblow: 'Removes all its armour for 6s, then hits for {d}. Shards hit ground foes within 1.6 cells behind it for {d2}, plus {d3} per armour removed.',
   ih_longshot: 'Hits for {d} through all armour (25% more on flyers), stunned 0.6s (less on bosses). A flyer is knocked down instead: every unit can hit it.',
-  ih_rollingvolley: 'Fires {n} bullets over about 2s: {d} each, each removing 1 armour (up to {strip}). Each bullet adds Heat; its attacks go on meanwhile.',
-  ih_slug: 'Pierces a line: {d} to each foe, removing {strip} armour. Each armour removed makes it hit 6% harder further on (up to 60%). Adds Heat.',
+  // (Heat is named only once the player has it: ihHeatSay, forces_ironhold_c.js. With Gatling Crank, Rattlegun is the stream: forces_..._easy_zzthundergun.js)
+  ih_rollingvolley: ({ t, st, d, v }) => (typeof TGR !== 'undefined' && tgGun(t) && tgCaps(t, st).tgCrank
+    ? `A ${TGR.GC_DUR}s stream of about ${v('n')} bullets a second, swept across the foes in reach: ${d(1)} each, each removing 1 armour (up to ${v('strip')}). A bullet that kills ricochets.`
+    : `Fires ${v('n')} bullets over about 2s: ${d(1)} each, each removing 1 armour (up to ${v('strip')}). Its attacks go on meanwhile.`) + ihHeatSay(' Each bullet adds Heat.'),
+  ih_slug: ({ d, v }) => `Pierces a line: ${d(1)} to each foe, removing ${v('strip')} armour. Each armour removed makes it hit 6% harder further on (up to 60%).` + ihHeatSay(' Adds Heat.'),
   ih_chainnet: 'Foes within 0.9 cells take {d} and are stunned {pin}s (flyers are knocked down instead: every unit can hit them).',
   ih_caltropfield: 'A chain across the road for {dur}s. The first {trips} ground foes across trip: {d}, stunned 0.6s and 2 armour removed.',
   ih_grapple: 'Hits for {d}, removes 2 armour and drags it {pull} cells back. Foes it is dragged through take {d2} and are stunned 0.3s. Bosses are only stunned.',
