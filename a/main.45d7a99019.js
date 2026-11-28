@@ -1,4 +1,4 @@
-const BUILD_TAG = '6567c6ef+@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '86b7aa35@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -85456,14 +85456,15 @@ const SCENE3D_MAPS = {
      The view is the painted one's (the Ember frame, top edge to foot). */
   snowpass: {
     data: 'SNOWPASS3D', asset: 'snowpass3ddata',
+    fwd: { shFloor: 1, shSoft: 1.6, back: '#cfe0ff', backI: .3 },   // (shFloor: the trees' and rocks' shadows read on the snow, blue under the sky fill, as in Ember)
     paintFog: true,   // (the owner's Ember fog layer, as on the painted map)
     re: { floor: /battle ground/i, water: /^water/i, fall: null, sway: null, big: /spruce|fir mid|stunted|gate|rock skin/i, keep: /gate|rock skin|spruce|fir mid|stunted|^water/i },
     // (Ember bakes the ground and rock flat-lit, levelled to a bright white: the game's own sun and shadows light them)
-    K: { by: [[/battle ground/i, .8], [/rock skin/i, .9], [/gate/i, .75], [/snowpads|snowshell/i, 1.05], [/leaves|twigs/i, 1.5], [/trunk/i, .6]], floor: .8, tex: .62, flat: .6 },   // (leaves: their vertex colours carry Tree Forge's per-card tint and shade, darker than Ember draws them through its leaf light)
+    K: { by: [[/battle ground/i, .8], [/rock skin/i, 1.12], [/gate/i, .75], [/snowpads|snowshell/i, 1.05], [/leaves|twigs/i, 1.5], [/trunk/i, .6]], floor: .8, tex: .62, flat: .6 },   // (leaves: their vertex colours carry Tree Forge's per-card tint and shade, darker than Ember draws them through its leaf light)
     water: { flow: .5, rings: 0, mirror: .45, deep: [.008, .05, .07], shal: [.1, .26, .3] },
     under: [-7, '#202833'],   // (the river's channel runs deeper than the usual under-floor)
     // a near-neutral cold day, as Ember's: the slate rock reads grey, the snow white (a blue sky fill turned both navy and cream)
-    light: { sun: '#f3efe6', sunI: 1.3, az: 312, el: 42,   /* (az/el: the owner's Ember sun as the painted map has it, maps.js snowpass sunDir: shadows fall the way they were painted; its warm colour) */
+    light: { sun: '#f3efe6', sunI: 1.3, az: 135, el: 42,   /* (az/el: shadows fall down and to the left, as in the owner's Ember export; el is Ember's sun elevation) */
        rim: .15, fill: .22, sky: '#a9c0e2', skyI: .55, gnd: '#e8ebf0', gndI: .3, fog: '#9aa4b2', fogNear: 1.05, fogFar: 2.6, dap: 0 },
     mood: { top: '#d4dae2', topK: .06, bounce: '#eef0f4', bounceK: .06, key: '#f6f4f0', keyK: .03 },
     tone: { sat: .92, contrast: 1.02, ev: 0, warm: -2 },   // (warm -2: the snow read cream (227,217,198) against Ember's cool white (207,220,233))
