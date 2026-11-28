@@ -1,4 +1,4 @@
-const BUILD_TAG = 'ad9c671a@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'b2f097ab@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -118570,9 +118570,12 @@ const HF2 = (() => {
    owner, 21 Nov 2026: "here you go, get fable 5.2 to rig and animate"): his mesh is the owner's revised
    sculpt, "Torvald Emberbrand - Monocle" (22 Nov 2026; a red-bearded dwarf with a monocle on his left eye, a fur mantle, a
    long dark coat, made in a T-pose; the monocle pinned to the head bone), and his long rifle, "Longshot";
-   tools/make_tv.py -> src/model_tv2.js: 34 bones (the coat below his belt on four panels kept clear of his knees, the
-   beard on a bone of its own so the stock can lay it aside, the rifle on its own bone placed by each clip with both hands
-   posed onto it), 7,900 triangles, 8 clips at 30 fps.
+   tools/make_tv.py -> src/model_tv2.js: 40 bones (the coat below his belt on four panels kept clear of his knees, the
+   beard under his chin on a bone of its own, his head's child; his own fingers on three joints and his thumb on two, a hand;
+   the rifle on its own bone placed by each clip with both hands closed onto its real outline), 8,000 triangles, 8 clips at
+   30 fps. 28 Nov 2026 (owner: "a big gap through his entire mesh, his hands [aren't] grasping the gun properly and his
+   face mesh turns and contorts the face"): the cape is no longer cut from his sleeves (it rides them as a drape, so no
+   hole opens where an arm was), his whole face is his head bone's alone, and his hands close on the rifle.
    ON by default in place of his code-built body; ?tv=old (or the Model Lab's "Torvald rig" row set to Old) draws that.
    His moves, by the game's own cues (nothing in the game is changed):
      idle      no foe in reach: at ease, the rifle at port low across him, breathing, looking down the road
