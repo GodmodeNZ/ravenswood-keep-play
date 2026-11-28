@@ -1,4 +1,4 @@
-const BUILD_TAG = '0def1bcb@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '09630466@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -12467,10 +12467,35 @@ function itipEl() {
 function itipHide() { if (ITIP) { ITIP.hidden = true; ITIP.innerHTML = ''; } itipAnchor = null; }
 // a picked bag cell has its actions open under it: its card goes beside it and upward, clear of them
 const itipUp = el => !!(el && el.matches && el.matches('.bg-cell.on'));
+/* a wide card set (a bag item beside its contenders, itemcompare.js): never over the item itself. It goes right of, left of,
+   below or above the item, whichever side lets it show biggest, scaled down only when no side has room for all of it. */
+function itipAround(T, el) {
+  const M = 8, W = innerWidth, H = innerHeight, r = el.getBoundingClientRect();
+  const cl = (a, lo, hi) => Math.max(lo, Math.min(Math.max(lo, hi), a));
+  // each side: the room it has; the cards wrap to that width (a row of four, or two by two), then scale if still too big
+  const S = [
+    { rw: W - M - (r.right + M), rh: H - 2 * M, at: (w, h, s) => [r.right + M, cl(r.top, M, H - M - h * s)] },
+    { rw: r.left - 2 * M, rh: H - 2 * M, at: (w, h, s) => [r.left - M - w * s, cl(r.top, M, H - M - h * s)] },
+    { rw: W - 2 * M, rh: H - M - (r.bottom + M), at: (w, h, s) => [cl(r.left + r.width / 2 - w * s / 2, M, W - M - w * s), r.bottom + M] },
+    { rw: W - 2 * M, rh: r.top - 2 * M, at: (w, h, s) => [cl(r.left + r.width / 2 - w * s / 2, M, W - M - w * s), r.top - M - h * s] }];
+  let b = null;
+  for (const q of S) {
+    if (q.rw < Math.min(250, W - 2 * M) || q.rh < 80) continue;   // (a side too narrow for a card is skipped: on a phone it goes above or below)
+    T.style.maxWidth = Math.floor(q.rw) + 'px';
+    q.w = T.offsetWidth; q.h = T.offsetHeight; q.s = Math.min(1, q.rw / q.w, q.rh / q.h);
+    if (!b || q.s > b.s + 1e-3) b = q;
+  }
+  if (!b) { b = S[2]; T.style.maxWidth = Math.floor(b.rw) + 'px'; b.w = T.offsetWidth; b.h = T.offsetHeight; b.s = Math.max(.3, Math.min(1, b.rw / b.w, (H - 2 * M) / b.h)); }
+  T.style.maxWidth = Math.floor(b.rw) + 'px';
+  const s = b.s, [L, Y] = b.at(b.w, b.h, s);
+  T.style.transformOrigin = '0 0'; T.style.transform = s < 1 ? `scale(${s.toFixed(3)})` : '';
+  T.style.left = Math.round(L) + 'px'; T.style.top = Math.round(Y) + 'px';
+}
 // place it: beside an element (its right, else its left; clamped top to bottom), or by the cursor (below right, flipped at the edges)
 function itipPlace(el, x, y) {
   const T = itipEl(), M = 8, W = innerWidth, H = innerHeight;
-  T.style.left = '0px'; T.style.top = '0px';
+  T.style.left = '0px'; T.style.top = '0px'; T.style.transform = ''; T.style.maxWidth = '';
+  if (el && el.getBoundingClientRect && T.querySelector('.icmp-m')) { itipAround(T, el); return; }
   const w = T.offsetWidth, h = T.offsetHeight;
   let L, Y; const up = itipUp(el);
   if (el && el.dataset && el.dataset.tipAt === 'above') {   // (a place on the Homeland map: above, below, beside or off a corner of it, whichever covers the fewest place names, owner 26 Nov 2026)
@@ -83720,8 +83745,8 @@ function grPaintBack(cv, C) {
 
 /* ================= 3D BATTLEFIELDS: the owner's scenes as maps (desktop only) =================
    Owner, 25 Nov 2026: "can we try this new 3d map" (the Thornhive), "mobile can just be painted backdrops anyway ... 3d can just
-   be desktop", "would like to see how good it can look on desktop and push it further"; then a second scene (Glowcap Hollow)
-   and, if these please, every map. So one runtime for any of them, and ONE PLACE to say which maps have a 3D scene:
+   be desktop", "would like to see how good it can look on desktop and push it further"; then a second scene (Glowcap Hollow,
+   since removed) and, if these please, every map. So one runtime for any of them, and ONE PLACE to say which maps have a 3D scene:
    SCENE3D_MAPS at the foot of this file. A map there has
      data     its packed scene (tools/make_map3d.py <id>: each mesh once, decimated, textures shrunk, a matrix an object): a
               split asset in the group `map3d`, asked for when the region map opens on a desktop (view.js deskHud: a mouse and a
@@ -83963,38 +83988,8 @@ const SCENE3D_MAPS = {
         [25, 1.0, 13, 10, 4, .32], [28, 1.0, 4, 9, 4, .32], [25, 1.2, -6, 9, 4, .3], [14, 1.6, -11, 9, 4, .24], [-4, 1.6, -11, 9, 4, .24]],
       mistSwirl: [[-14, 1.1, 6, 3.2, 4], [26, 1.1, 8, 3.2, 4]] },
   },
-  /* Glowcap Hollow (owner, 25 Nov 2026: "can we try this as the new map for glowcap hollow with the mushroom people"): the
-     Glowcap Bloom's field, Stagrun Heath and Cinderbrake (region.js; Fernwatch keeps its Fern Brook painting). A hollow log's
-     mouth at the top, giant veilcaps down the left, a spring at the lower right whose rings spread as in the owner's film; a
-     dimmer, greener, mistier light than the Thornhive's, so the Bloom's glow pools show. */
-  glowhollow: {
-    data: 'HOLLOW3D', asset: 'hollow3ddata', name: 'Glowcap Hollow', blurb: 'A mossy hollow under giant veilcaps, a spring rippling at its edge',
-    paint: { asset: 'hollowpaint', prefix: 'HOLLOW', light: { sun: '#ffe6c0', sunI: 1.5, sky: '#9cc8b4', skyI: .6 } },
-    re: { floor: /moss clearing/i, water: /spring/i, fall: null, sway: /sedge/i, big: /oak|veilcap|nursery log|honeycap root|root arch/i, keep: /oak|veilcap|nursery log|honeycap root|root arch|mycelium/i },
-    K: { by: [[/oak/i, .4], [/veilcap/i, .7], [/nursery log/i, .62], [/fern/i, .48], [/mycelium/i, .44]], floor: .6, bake: [.47, .53, .56], tex: .58, flat: .42 },   // (bake: owner, 26 Nov 2026, "too yellow and bright in the middle": dimmer, and less red in it)
-    /* (owner, 26 Nov 2026: "looks like you made the battle map too high up": against their render the log's mouth was off the top and
-       the spring mid-right. The scene lies two rows further down the field now: the mouth's front just above the field's head, where
-       foes step out, about 30% down the whole view as in the render, the spring at the lower right) */
-    refit: { DZ: 5.6, entry: [[-.5, -10], [-.5, -8.6], [-.5, -7.2], [-.5, -5.75]] },
-    edge: [21, 15.5, 8.5],
-    /* The light, to the owner's scene (read from their .blend): not one sun but a weak one (strength 1.1, 8 degrees soft)
-       under a dim blue sky (0.34), and six shadow-casting spot lights; the two that matter rake warm light across the moss
-       from the upper left and behind ("Sunbreak"). The game has one sun: it stands where those two do, warm, with little
-       ambient, and lights the PROPS; the floor carries the owner's own light, baked (K.bake its brightness). */
-    light: { sun: '#ffd9a0', sunI: 1.55, az: -128, el: 44, sky: '#7fa8d8', skyI: .36, gnd: '#4f7a52', gndI: .2, rim: .3, fill: .06, fog: '#3f8478', fogNear: 1.05, fogFar: 2.8, dap: 0 },   // (little distance fog: it washed the baked shadows teal)
-    mood: { top: '#9cc0e0', topK: .1, bounce: '#6cae5c', bounceK: .1, key: '#ffd8a0', keyK: .08 },
-    fwd: { shFloor: .35, shSoft: 2.4, back: '#8fd8d0', backI: .4 },   // (shFloor: how dark a unit's own shadow lies on the baked floor)
-    tone: { sat: .8, contrast: 1.05, ev: 0 },
-    glow: 1.5,
-    water: { flow: 0, rings: .8, mirror: .2, deep: [.004, .1, .11], shal: [.02, .3, .3] },
-    map: { tun: [.3, 2.6] },
-    // mist where the owner's six volumes lie (their places and sizes), mint, and thinner drifts round the rest of the edge
-    /* deskFit (owner, 26 Nov 2026: "the line is too high at the bottom, cant see the entrance for the mobs"): on a desktop the view is
-       fitted from the log's mouth to just past the ward line, not to the whole scene (a zoom out away: view.js fitCamera) */
-    theme: { deskFit: [-4.9, ROWS + .7], viewW: 58 /* (the scene's whole width: at 40 a window wider than 16:9 closed in and cut the log's mouth off the top) */, mistCol: [.46, .88, .76], mistAt: [[-3.9, 1.5, -2.1, 12, 5, .28], [17.9, 1.3, 15.6, 10, 4.4, .28], [-9.4, 1.9, 4.1, 13, 6, .3], [17.5, 2.0, -1.4, 13, 5, .28], [-9, 1.4, 14.4, 11, 5, .28], [21.6, 1.2, 9.7, 10, 5, .15],
-        [-17, 1.1, 10, 10, 4.5, .22], [5, .9, 22.5, 11, 3.6, .17], [28, 1.1, 5, 10, 4.5, .22], [14, 1.7, -9, 9, 4, .19], [-3, 1.7, -9, 9, 4, .19]],   // (thicker than this hid the baked shadows)
-      mistSwirl: [[-10, 1.4, 5, 3.6, 6], [17, 1.6, -1, 3.6, 6], [-9, 1.2, 14, 3.2, 5], [18, 1.1, 15, 3.2, 5]] },
-  },
+  /* (Glowcap Hollow, the second scene, was taken out on 28 Nov 2026, owner: "can you remove the mushroom themed battle map from the
+     game": Stagrun Heath and Cinderbrake fight on Fern Brook and the Thornhive now, region.js; its data and backdrop left the build) */
 };
 // an asset already in (an inline build, or test.html's) runs its callback at once, while this file loads: before view.js's
 // deskHud exists, which threw and stopped the whole script; the setTimeout at the foot applies it again once all is loaded
@@ -84013,7 +84008,7 @@ if (typeof rgOpen === 'function') {
 }
 if (typeof setTimeout === 'function') setTimeout(() => { try { scene3dApply(); } catch (e) {} }, 0);   // (a build with everything inline runs the callbacks above before view.js's deskHud exists)
 /* ---------------- straight into a map: ?trymap=<id>&go=1 (owner, 26 Nov 2026: "can you make it so i load right into it") ----------------
-   ?trymap=<id> also takes a 3D map's id now (glowhollow has no MAPS entry until its backdrop has loaded: scene3dPaint): its
+   ?trymap=<id> also takes a 3D map's id now (a map whose backdrop is the tool's has no MAPS entry until it has loaded: scene3dPaint): its
    backdrop and, on a desktop, its 3D scene are asked for at once (a phone, MAP_LITE, keeps the painted backdrop).
    &go=1 starts a normal run on it as soon as the title is ready, no menus: the commander of ?hero=<id>, else the last one
    picked, else the first force commander. With no go=1 the map is only made the trial map for whatever run is started. */
@@ -102803,7 +102798,7 @@ function openGearPanel(t) {
   for (const b of ovp.querySelectorAll('.gp-act')) b.onclick = () => { const it = acts[+b.dataset.act]; if (!it) return; gpT = null; resumeGame(); useAct(t, it); };
   // every item on the sheet shows its card on hover, or on a long press (itemtip.js)
   const gear = (t.gear || []).filter(Boolean).concat(t.charm ? [t.charm] : []);
-  itipBind(ovp.querySelector('.gp-body'), '.gp-sock[data-i], .gp-act, .gp-it, .gp-bc', el => { if (gpDrag && gpDrag.on) return ''; if (el.dataset.bi != null) { const it = G.loot.find(q => q.id === +el.dataset.bi); if (!it) return ''; const why = gpWhyNot(t, it, gpAutoSlot(t, it)); return itemCardHTML(it, why ? { note: `<p class="itc-no">${why}</p>` } : undefined); } const it = el.dataset.i != null ? (socks[+el.dataset.i] || {}).it : el.dataset.act != null ? acts[+el.dataset.act] : gear[+el.dataset.gi]; return it ? itemCardHTML(it) : ''; });
+  itipBind(ovp.querySelector('.gp-body'), '.gp-sock[data-i], .gp-act, .gp-it, .gp-bc', el => { if (gpDrag && gpDrag.on) return ''; if (el.dataset.bi != null) { const it = G.loot.find(q => q.id === +el.dataset.bi); if (!it) return ''; const why = gpWhyNot(t, it, gpAutoSlot(t, it)); const no = why ? `<p class="itc-no">${why}</p>` : ''; const m = typeof icMultiHTML === 'function' ? icMultiHTML(it, { note: no }) : ''; return m || itemCardHTML(it, why ? { note: no } : undefined); } const it = el.dataset.i != null ? (socks[+el.dataset.i] || {}).it : el.dataset.act != null ? acts[+el.dataset.act] : gear[+el.dataset.gi]; return it ? itemCardHTML(it) : ''; });
   const cv = $('#gpCv');
   cv.onpointerdown = e => { gpDragX = e.clientX; gpDragY = e.clientY; gpSpin = false; cv.setPointerCapture(e.pointerId); };
   /* a drag with either mouse button: across turns the unit, up and down moves along it (owner, 11 Nov 2026: "let me hold right click on mouse to go up and down a 3d model to see it better", "or left click") */
@@ -105121,7 +105116,7 @@ function showOverlay(html, cls) {
 function hideOverlay() { if (titlePanelStop) { titlePanelStop(); titlePanelStop = null; } if (typeof itipHide === 'function') itipHide(); if (typeof hideSpellHud === 'function') hideSpellHud(); talOpen = false; warOpen = false; if (bagOpen) { bagOpen = false; for (const it of G.loot || []) it.isNew = false; }  ov.hidden = true; ovp.innerHTML = ''; ov.className = 'ov'; ovp.className = 'panel'; }
 const fmtPlay = sec => { sec = Math.round(sec || 0); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? `${h}h ${m}m` : m ? `${m}m` : sec ? '<1m' : ''; };
 const fmtDay = t => { try { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; } };
-const mapThumb = k => k === 'glowhollow' ? (typeof HOLLOW_STILL !== 'undefined' ? HOLLOW_STILL : '') : k === 'thornhive' ? (typeof HIVE_STILL !== 'undefined' ? HIVE_STILL : '') : k === 'fernbrook' ? (typeof FERN_STILL !== 'undefined' ? FERN_STILL : '') : k === 'oakmere' ? (typeof OAK_STILL !== 'undefined' ? OAK_STILL : '') : k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : k === 'mistfall' ? (typeof POOL_STILL !== 'undefined' ? POOL_STILL : '') : k === 'greatroot' ? (typeof GR_PAINT !== 'undefined' ? GR_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
+const mapThumb = k => k === 'thornhive' ? (typeof HIVE_STILL !== 'undefined' ? HIVE_STILL : '') : k === 'fernbrook' ? (typeof FERN_STILL !== 'undefined' ? FERN_STILL : '') : k === 'oakmere' ? (typeof OAK_STILL !== 'undefined' ? OAK_STILL : '') : k === 'moonwood' ? (typeof MW_PAINT !== 'undefined' ? MW_PAINT : '') : k === 'clearing' ? (typeof CL_PAINT !== 'undefined' ? CL_PAINT : '') : k === 'mistfall' ? (typeof POOL_STILL !== 'undefined' ? POOL_STILL : '') : k === 'greatroot' ? (typeof GR_PAINT !== 'undefined' ? GR_PAINT : '') : (typeof KM_PAINT !== 'undefined' ? KM_PAINT : '');
 /* The main menu: one stacked column of buttons. Saved games and Top scores are windows over it (owner, 11 Nov 2026:
    "all buttons stacked on one menu with saved games and top scores being their own windows on click"). */
 let titlePanelStop = null;   // closes the open title window, if any (showOverlay and hideOverlay call it)
@@ -134412,10 +134407,23 @@ const RG_PRICE = { life: 6, tend: 40, respec: 80, alms: 40, offering: 30 };
 // the field every region battle is fought on: the game's current one, Mistfall Ledge (a wide map: foes in along the whole
 // top, out along the whole foot, so no reserved cells and no road line while placing). The Marches first named the older
 // painted fields (Greatroot Way, Sunfall Glade, Kingsmeadow, Moonwood), which showed the old red reserved cells and the road
-// line (owner, 19 Nov 2026: "has the old red squares and the line"). Fernwatch fights on its own painting, Fern Brook;
-// Mossford, the Old Weir and Stagrun Heath on Oakmere Glade (both the owner's, both wide: maps.js); a place's field falls back
-// to Mistfall Ledge, then Greatroot Way, if not loaded.
+// line (owner, 19 Nov 2026: "has the old red squares and the line"). Fernwatch and Stagrun Heath fight on Fern Brook;
+// Mossford and the Old Weir on Oakmere Glade; the Thornhive and Cinderbrake on the Thornhive (all the owner's paintings, all
+// wide: maps.js). Stagrun Heath and Cinderbrake were on Glowcap Hollow until it was taken out (owner, 28 Nov 2026: "can you
+// remove the mushroom themed battle map from the game"). A place's field falls back to Mistfall Ledge, then Greatroot Way,
+// if not loaded.
 const rgField = n => { const m = n && n.map; return typeof MAPS !== 'undefined' && MAPS[m] ? m : typeof MAPS !== 'undefined' && MAPS.mistfall ? 'mistfall' : 'greatroot'; };
+// fields taken out of the game (Glowcap Hollow, 28 Nov 2026): a battle saved on one (under way, or its wave checkpoint) fights
+// on its place's field now (a road ambush: the place it set out from, else the one it was bound for, as rgSpec picks)
+const RG_MAP_GONE = { glowhollow: 1 };
+function rgMapNow(m, S) {
+  if (!m || !RG_MAP_GONE[m]) return m;
+  for (const id of S ? [S.from, S.node] : []) { if (!id) continue;
+    for (const k in RG_REGIONS) { const n = (RG_REGIONS[k].nodes || []).find(x => x.id === id); if (n && n.map && !RG_MAP_GONE[n.map]) return rgField(n); } }
+  return rgField(null);
+}
+// a saved battle's field and its region spec's, mended as above (restore, rgRetryCk)
+function rgSaveMapFix(s) { if (!s) return s; if (s.region && s.region.map) s.region.map = rgMapNow(s.region.map, s.region); if (s.map && RG_MAP_GONE[s.map]) s.map = s.region && s.region.map || rgField(null); return s; }
 // the Grove's homeland. kind: town (start: held at the start; else enemy-held, freed by a battle), trouble, lair.
 // w: the waves of its battle; map: its field; x, y on a 1000 x 620 board
 const RG_REGIONS = {
@@ -134430,11 +134438,11 @@ const RG_REGIONS = {
       { id: 'barrows', name: 'Hollowell Barrows', kind: 'trouble', tier: 2, w: [9, 15], map: 'mistfall', x: 300, y: 225, say: 'Old mounds under the trees, broken open from below.' },
       { id: 'weir', name: 'The Old Weir', kind: 'trouble', tier: 2, w: [11, 17], map: 'oakmere', x: 520, y: 520, say: 'The weir holds back the river. Whoever holds the weir holds the lowlands.' },
       { id: 'greywood', name: 'Greywood Crossing', kind: 'trouble', tier: 3, w: [17, 23], map: 'mistfall', x: 480, y: 270, say: 'Four roads meet under grey trees. Every column on the march passes here.' },
-      { id: 'stagrun', name: 'Stagrun Heath', kind: 'trouble', tier: 3, w: [19, 25], map: 'glowhollow', x: 660, y: 410, say: 'Open heath where the white harts ran. Now it is a camp.' },
+      { id: 'stagrun', name: 'Stagrun Heath', kind: 'trouble', tier: 3, w: [19, 25], map: 'fernbrook', x: 660, y: 410, say: 'Open heath where the white harts ran. Now it is a camp.' },
       { id: 'thornhive', name: 'The Thornhive', kind: 'trouble', tier: 3, w: [24, 30], map: 'thornhive', x: 560, y: 90, say: 'A hive of bark and amber in the old wood north of the crossing. It hums.' },   // (its field: the owner's hive painting, maps.js MAPS.thornhive; its foes: the Thornmantis Brood, forces_..._thornmantis.js)
       { id: 'briarfast', name: 'Briarfast', kind: 'town', tier: 3, w: [21, 27], map: 'mistfall', x: 640, y: 175, say: 'A thorn-walled hold, taken from within. Free it and the road to Gloamfen opens.' },
       { id: 'rootdeep', name: 'Rootdeep Hollow', kind: 'trouble', tier: 4, w: [29, 35], map: 'mistfall', x: 800, y: 300, say: 'A hollow under the oldest roots. The warlord’s allies den here.' },
-      { id: 'cinder', name: 'Cinderbrake', kind: 'trouble', tier: 4, w: [32, 38], map: 'glowhollow', x: 800, y: 520, say: 'A burned brake on the fen’s edge. The smoke never clears.' },
+      { id: 'cinder', name: 'Cinderbrake', kind: 'trouble', tier: 4, w: [32, 38], map: 'thornhive', x: 800, y: 520, say: 'A burned brake on the fen’s edge. The smoke never clears.' },
       { id: 'gloam', name: 'Gloamfen Lair', kind: 'lair', tier: 5, w: [44, 50], map: 'mistfall', x: 925, y: 150, say: 'The warlord’s lair in the fen. Strip his helpers before you storm it.' },
     ],
     roads: [['thornwick', 'mossford'], ['thornwick', 'fernwatch'], ['mossford', 'fernwatch'], ['mossford', 'brightwater'], ['fernwatch', 'barrows'],
@@ -135323,6 +135331,7 @@ function rgRetryCk(R, B) {
   if (typeof twStop === 'function') twStop();
   R.at = B.kind === 'waylay' ? B.from : B.node;
   heroPickId = R.hero; try { localStorage.setItem('runehold.hero', R.hero); } catch (e) {}
+  rgSaveMapFix(ck.s);
   if (ck.s.region && ck.s.region.map) { mapPick = ck.s.region.map; setMap(ck.s.region.map); }
   restore(JSON.parse(JSON.stringify(ck.s)));
   const S = G.region; if (!S) return rgRetry(R, B);
@@ -135904,7 +135913,7 @@ function rgEvenWave(g, S) {
   const _ser = serialize;
   serialize = function () { const s = _ser.apply(this, arguments); if (s && G.region) s.region = JSON.parse(JSON.stringify(G.region)); return s; };
   const _res = restore;
-  restore = function (s) { RG_NEXT = s && s.region && s.region.w1 ? s.region : null; const r = _res.apply(this, arguments); RG_NEXT = null; if (G.region) G.maxLives = Math.max(1, G.region.line | 0); return r; };
+  restore = function (s) { rgSaveMapFix(s); RG_NEXT = s && s.region && s.region.w1 ? s.region : null; const r = _res.apply(this, arguments); RG_NEXT = null; if (G.region) G.maxLives = Math.max(1, G.region.line | 0); return r; };
   // a first place's waves (RG_GENTLE): the march's own wave, sorted to the gentle roles, then fielded by the faction as ever
   const _ws = waveSpec;
   waveSpec = function (n) {
@@ -135927,7 +135936,7 @@ function rgEvenWave(g, S) {
   // last: no group trails the wave alone (rgEvenWave)
   const _wsE = waveSpec;
   waveSpec = function (n) { const g = _wsE.apply(this, arguments), S = G && G.region; return S && !G.vs && n >= S.w0 && n <= S.w1 ? rgEvenWave(g, S) : g; };
-  if (typeof kill === 'function') { const _kl = kill; kill = function (c) { const S = G && G.region; if (S && Array.isArray(S.troops) && c && !c.splitCopy && !c.kid) for (const t of S.troops) if (t.cmd && t.type === c.type) (S.cmdDead || (S.cmdDead = {}))[t.from] = 1; return _kl.apply(this, arguments); }; }
+  if (typeof kill === 'function') { const _kl = kill; kill = function (c) { const S = G && G.region; if (S && Array.isArray(S.troops) && c && !c.splitCopy && !c.kid) for (const t of S.troops) if (t.cmd && t.type === c.type && t.w === (c.wv || G.wave)) (S.cmdDead || (S.cmdDead = {}))[t.from] = 1; return _kl.apply(this, arguments); }; }
   const _hp = waveHP;
   waveHP = function () { return _hp.apply(this, arguments) * (G && G.region && !G.vs ? G.region.hpK || 1 : 1); };
   const _mw = makeWave;
@@ -136097,11 +136106,11 @@ const RG_ROLE = {
   barrow: { kind: 'trouble', tier: 2, w: [9, 15], map: 'mistfall', faction: 'hollowthorn', glyph: 'barrows' },
   water: { kind: 'trouble', tier: 2, w: [11, 17], map: 'oakmere', glyph: 'weir' },
   cross: { kind: 'trouble', tier: 3, w: [17, 23], map: 'mistfall', faction: 'hollowthorn', glyph: 'greywood' },
-  heath: { kind: 'trouble', tier: 3, w: [19, 25], map: 'glowhollow', faction: 'glowcap', glyph: 'stagrun' },
+  heath: { kind: 'trouble', tier: 3, w: [19, 25], map: 'fernbrook', faction: 'glowcap', glyph: 'stagrun' },
   hive: { kind: 'trouble', tier: 3, w: [24, 30], map: 'thornhive', faction: 'thornmantis', spec: 'hive', glyph: 'thornhive' },
   town3: { kind: 'town', tier: 3, w: [21, 27], map: 'mistfall', glyph: 'briarfast' },
   den: { kind: 'trouble', tier: 4, w: [29, 35], map: 'mistfall', faction: 'hollowthorn', spec: 'den', glyph: 'rootdeep' },
-  forges: { kind: 'trouble', tier: 4, w: [32, 38], map: 'glowhollow', faction: 'glowcap', spec: 'forges', glyph: 'cinder' },
+  forges: { kind: 'trouble', tier: 4, w: [32, 38], map: 'thornhive', faction: 'glowcap', spec: 'forges', glyph: 'cinder' },
   lair: { kind: 'lair', tier: 5, w: [44, 50], map: 'mistfall', glyph: 'gloam' },
 };
 // a region from its places (each [role, id, name, x, y, say, own fields]) and roads ([id, id]) on the 1000 x 620 board
@@ -136523,6 +136532,42 @@ if (typeof rollDrop === 'function') {
     if (boss && T.plus === 'charm') items.push(rgLootItem('charm', 2, Math.max(1, G.wave | 0)));
     items.filter(Boolean).forEach((it, k) => { it.isNew = true; if (it.rar >= 4) G.legN = (G.legN | 0) + 1; rgDropAt(c, it, k * 2); });
     dropNote();
+  };
+}
+
+/* ---- a commander's loot (owner, 28 Nov 2026: "grakk didnt drop loot?" ... "he was garrisoned") ----
+   An army's commander (the Main Host's is the region's lord: Grakk on the Marches; a band's, its faction's boss) fights in person
+   on the wave before the place's boss (region.js rgTroops), so he is not his wave's boss (renown.js rnBossType: a 5th wave's
+   boss) and the loot panel never opened for him; and as a boss his drop on the field was left to that panel (rollDrop above),
+   so he dropped nothing at all. Slain, a commander now opens his own table's offer as a wave's boss does (rnLootOpen: his
+   signature relic, his themed items, his weapon; the boss's Renown by how far down the road he fell), once a battle each. */
+function rgCmdTroop(c) {
+  const S = typeof G !== 'undefined' && G && G.region;
+  if (!S || G.vs || !Array.isArray(S.troops) || !c || c.splitCopy || c.kid || c.echo || c.sent) return null;
+  const w = c.wv || G.wave;
+  return S.troops.find(t => t.cmd && t.type === c.type && t.w === w) || null;
+}
+if (typeof rnLootFor === 'function') {
+  const _lf = rnLootFor;
+  rnLootFor = function (c) {
+    const t = rgCmdTroop(c);
+    if (t && typeof rnLootOn === 'function' && rnLootOn() && G.state === 'play') return !(G.region.cmdLoot || {})[t.from];
+    return _lf.apply(this, arguments);
+  };
+}
+if (typeof rnOnKill === 'function') {
+  const _ok = rnOnKill;
+  rnOnKill = function (c) {
+    const t = rgCmdTroop(c);
+    if (t && rnLootFor(c)) {
+      const S = G.region, w = c.wv || G.wave; (S.cmdLoot || (S.cmdLoot = {}))[t.from] = 1;
+      if (rnBossType(w) === c.type) rnS().bossW[w] = 1;   // (a commander on the boss's own wave, at a first place: one panel)
+      const f = rnRoadFrac(c), p = rnBossPay(f);
+      if (p[1] > 0) rnGain(p[1], `${p[2]} (${Math.round(f * 100)}% down the road)`);
+      rnLootOpen(c, w);
+      return;
+    }
+    return _ok.apply(this, arguments);
   };
 }
 
@@ -143338,6 +143383,54 @@ function icHTML(it, o) {
 // a new item under the pointer starts its cycle at the weakest
 function icHover(t, it) { const k = icKeyOf(t, it); if (k !== IC.key) { IC.key = k; IC.cyc = 0; } }
 
+/* ---------- a bag item against its contenders (owner, 28 Nov 2026) ----------
+   "when hovering over an item can you show it against the 3 highest contenders for it in terms of equipped items (if the
+   item is for a range of different unit types), if its for one type just compare it against the unit with the highest lvl
+   drop that it might replace" (bag items only; an equipped item's hover is as before).
+   - Contenders: every placed unit that can wear it, each with the item it would replace (icTargets: a free socket, else the
+     weakest relic, the charm, the weapon). A socket tapped on purpose (the Bag opened from one) is that unit's.
+   - Order: the replaced item's level, highest first (a tie: the higher rarity, then the higher tier unit). Units with an
+     empty fitting socket (no weapon: the issued one) are the obvious upgrade, so they only fill in when fewer than 3 hold a
+     filled one, and then come first (the higher tier first).
+   - Made for several unit types ("any unit" too): up to 3 cards. For one type: 1 card, the top one. */
+// how many unit types it is made for (Infinity: any unit)
+function icTypeCount(it) {
+  if (icIsWpn(it)) { const d = wpnDef(it); if (!d || d.leg) return 1; return Object.keys(TOWERS).filter(ty => wpnClassOf(ty) === d.cls).length; }
+  if (isCharm(it)) { const S = typeof fsetOf === 'function' ? fsetOf(it) : null; return S && S.unit ? 1 : Infinity; }
+  const f = gearFor(it); return f ? new Set(f).size : Infinity;
+}
+// [{ t, cur, slot, empty }], the cards to show, in order (pin: { t, slot } a socket tapped on purpose)
+function icContenders(it, pin) {
+  const full = [], empty = [];
+  for (const t of icUnits()) {
+    if (icWhyNot(t, it)) continue;
+    let slot, cur;
+    if (pin && pin.t === t) { slot = pin.slot; cur = slot === 3 ? t.charm || null : (t.gear || [])[slot] || null; }
+    else { const p = icPick(t, it, 0); if (!p) continue; slot = p.slot; cur = p.cur || null; }
+    (cur ? full : empty).push({ t, cur, slot, empty: !cur });
+  }
+  full.sort((a, b) => icIl(b.cur) - icIl(a.cur) || (b.cur.rar | 0) - (a.cur.rar | 0) || (b.t.tier | 0) - (a.t.tier | 0));
+  empty.sort((a, b) => (b.t.tier | 0) - (a.t.tier | 0));
+  const n = icTypeCount(it) > 1 ? 3 : 1;
+  return full.length >= n ? full.slice(0, n) : empty.slice(0, n - full.length).concat(full);
+}
+function icContHTML(c) {
+  const t = c.t, nm = icE(icName(t));
+  let card, lbl;
+  if (c.slot === 'w') { lbl = c.cur ? 'equipped' : 'issued weapon'; card = wpnCardHTML(t.weapon || wpnOf(t), t); }
+  else if (c.cur) { lbl = 'equipped'; card = itemCardHTML(c.cur); }
+  else { lbl = 'empty socket'; card = `<div class="itc icmp-empty"><h5 class="itc-n">Empty socket</h5><p class="itc-k">Nothing in its ${icSockName({ slot: c.slot })} yet.</p></div>`; }
+  return `<div class="icmp-c icmp-eq"><p class="icmp-l">${nm} <span>· ${lbl}</span></p>${card}</div>`;
+}
+/* the bag item's card beside its contenders' (o: price, note, hint; pin), or '' when no placed unit can wear it */
+function icMultiHTML(it, o) {
+  o = o || {};
+  const L = icContenders(it, o.pin); if (!L.length) return '';
+  IC.cur = { it, o, n: 1, t: L[0].t };   // (no Shift cycle here: each card is that unit's own pick)
+  const mine = icCardOf(it, null, { note: (o.note || '') + (o.hint || ''), price: o.price });
+  return `<div class="icmp icmp-m"><div class="icmp-c icmp-new"><p class="icmp-l">This item</p>${mine}</div>${L.map(icContHTML).join('')}</div>`;
+}
+
 /* ---------- double-click to socket ---------- */
 // put it into t: the first free fitting socket, else in place of the compared one. { ok, why, p, replaced }
 function icSocket(t, it, cyc) {
@@ -143381,6 +143474,7 @@ const icHint = () => `<p class="itc-hint">${typeof canHover === 'function' && ca
 function icSheetCard(el) {
   const t = icSheetT(), it = icCellItem(el); if (!t || !it || (typeof gpDrag !== 'undefined' && gpDrag && gpDrag.on)) return '';
   icHover(t, it);
+  const m = icMultiHTML(it, { note: !icIsWpn(it) && typeof setInfo === 'function' ? setInfo(it) : '' }); if (m) return m;   // its contenders (owner, 28 Nov 2026)
   return icHTML(it, { t, only: true, hint: icHint() + `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Or drag it onto a socket' : 'Or tap it, then a socket'}</p>` });
 }
 // a bag cell in the Bag: the Bag's unit (its socket when one was tapped), else the selected one, else the best match
@@ -143394,6 +143488,8 @@ function icBagCard(el) {
     // a socket tapped on purpose: that socket, no cycling
     const slot = bagCtx.slot === 'charm' ? 3 : bagCtx.slot, cur = slot === 3 ? t.charm || null : (t.gear || [])[slot] || null;
     IC.key = icKeyOf(t, it); IC.cyc = 0;
+    const pr0 = it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : `Salvage: ${gearValue(it)} gold`;
+    const m = icMultiHTML(it, { price: pr0, note: typeof setInfo === 'function' ? setInfo(it) : '', pin: { t, slot } }); if (m) return m;   // its contenders, the tapped socket for this unit (owner, 28 Nov 2026)
     const a = icNow(t), b = gpStatsWith(t, slot, it), C = { t, how: 'here', p: { slot, cur, n: 1, i: 0, free: !cur, kind: k }, rows: icDeltas(t, a, b), spells: icSpellDeltas(t, a, b) };
     IC.cur = { it, n: 1, t };
     const price = it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : `Salvage: ${gearValue(it)} gold`;
@@ -143401,6 +143497,7 @@ function icBagCard(el) {
   }
   if (t) icHover(t, it); else { const u = icUnitFor(it, {}); if (u.t) icHover(u.t, it); }
   const price = icIsWpn(it) ? `Salvage: ${WPN_SALVAGE[it.rar | 0]} gold` : it.shop ? (shopOn() ? `Sell: ${shopSellValue(it)} gold` : '') : `Salvage: ${gearValue(it)} gold`;
+  const m = icMultiHTML(it, { price, note: !icIsWpn(it) && typeof setInfo === 'function' ? setInfo(it) : '' }); if (m) return m;   // its contenders (owner, 28 Nov 2026)
   return icHTML(it, { t, price, note: !icIsWpn(it) && typeof setInfo === 'function' ? setInfo(it) : '', hint: t ? icHint() + `<p class="itc-hint">${typeof canHover === 'function' && canHover() ? 'Click or right-click for its actions' : 'Tap or hold for its actions'}</p>` : `<p class="itc-hint">Pick a unit, then double-click to socket it</p>` });
 }
 // a boss's loot offer: what it would do to the selected unit, else the unit it suits best
@@ -143493,7 +143590,15 @@ if (typeof document !== 'undefined' && typeof itipBind === 'function') {
   .icmp-d li.bo b{color:#7be37b}.icmp-d li.neg b{color:#ff7a6a}.icmp-d li.bo{color:#bfe9bf}.icmp-d li.neg{color:#f2c0b8}
   .icmp-h{margin:0 0 2px;color:#f2d27a;font-size:12px}.icmp-s{margin:4px 0 0;color:#9a9ca2;font-size:11.5px}.icmp-k{margin:3px 0 0;color:#9a9ca2;font-size:11.5px}
   .icmp-empty .itc-n{color:#9a9ca2}
-  @media (max-width:560px){.icmp{flex-direction:column}.icmp-c{max-width:none;width:100%}}`;
+  @media (max-width:560px){.icmp{flex-direction:column}.icmp-c{max-width:none;width:100%}}
+  #itip:has(.icmp-m){max-width:calc(100vw - 16px)}
+  .icmp-m{flex-wrap:wrap}.icmp-m .icmp-c{flex:0 1 250px;max-width:250px}.icmp-m .icmp-new{flex-basis:270px;max-width:270px}
+  .icmp-m .icmp-l{text-transform:none;letter-spacing:.02em;font-size:12.5px;color:#f2e6c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .icmp-m .icmp-l span{color:#9a9ca2;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .icmp-m .icmp-new>.icmp-l{text-transform:uppercase;letter-spacing:.06em;font-size:11px;color:#cfc6b4}
+  @media (max-width:560px){.icmp-m{flex-direction:column;flex-wrap:nowrap;gap:4px}.icmp-m .icmp-c,.icmp-m .icmp-new{flex:none;width:100%;max-width:none}
+    .icmp-m .icmp-eq .itc{padding:5px 8px 4px}.icmp-m .icmp-eq .itc-s,.icmp-m .icmp-eq .itc-ab,.icmp-m .icmp-eq .itc-fl,.icmp-m .icmp-eq .itc-bd,.icmp-m .icmp-eq .bg-set,.icmp-m .icmp-eq .itc-pr{display:none}
+    .icmp-m .icmp-eq .itc-n{font-size:15px}.icmp-m .icmp-eq .itc-k{margin:0 0 2px}}`;
   const add = () => { if (document.getElementById('icCss')) return; const s = document.createElement('style'); s.id = 'icCss'; s.textContent = css; document.head.append(s); };
   if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
 }
