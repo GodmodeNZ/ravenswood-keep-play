@@ -1,4 +1,4 @@
-const BUILD_TAG = '1e087004@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '98abe7f9@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -43481,6 +43481,18 @@ const ilRiteNow = () => ilOn() ? Math.max(0, G.rite | 0) : 0;
 const ilClampL = L => Math.max(1, Math.min(IL.max, Math.round(+L || 1)));
 // stamp an item's level (and the Rite it is found at)
 function ilStamp(it, L) { if (!it) return it; it.il = ilClampL(L); it.rf = ilRiteNow(); return it; }
+// fn() as on wave w: a boss table's preview (the forecast's Loot view, the Homeland place card) shows each item as it would
+// drop from that boss, at the level its drop code stamps (the boss's wave + IL.boss) with its stats sized to it and level sync
+// at that wave, not at the wave the preview is opened on (owner, 28 Nov 2026: every item read "Item Level 1" on the place card)
+// (force: the place card's army, when it is drawn outside that force's run)
+function ilAsDrop(w, fn, force) {
+  w = Math.round(+w || 0); if (!(w >= 1) || typeof G === 'undefined' || !G) return fn();
+  const was = G.wave, wf = G.force, wv = G.vs;
+  if (!ilOn() && force) { G.force = force; G.vs = false; }
+  if (!ilOn()) { G.force = wf; G.vs = wv; return fn(); }
+  G.wave = w;
+  try { return fn(); } finally { G.wave = was; G.force = wf; G.vs = wv; }
+}
 // an item's level (one that has none takes the wave's, the first time it is asked)
 function ilOf(it) {
   if (!it) return 1;
@@ -47760,7 +47772,7 @@ if (typeof FORCE_TIPS !== 'undefined') FORCE_TIPS.ironhold = [
      a mark, a slow, extra glaive bounces.
    - Drops, rarer but bigger (owner, 9 Nov 2026): about a dozen a run. The first wave boss always drops one, later wave bosses
      usually, the last elite of an elite wave now and then, a wave's last foe rarely (sure after WPN_DROP.dry dry waves);
-     leaning to the units you field (wpnRoll). Wide steps between rarities (WPN_RAR_M), so a new weapon is a spike. They go
+     leaning to the units you field (wpnRoll). None drops common (white): uncommon up (owner, 28 Nov 2026). Wide steps between rarities (WPN_RAR_M), so a new weapon is a spike. They go
      to the weapon rack (G.wbag), equipped from a unit's Gear sheet (weapons_ui.js).
    - Balance (owner: "increase the difficulty curve so it scales better with weapons added ... it's fun to defeat a level
      easier with a better weapon than the last play through"): the foes' health (wpnHpK, through forceHpK) follows an
@@ -48350,6 +48362,7 @@ function wpnRarW(w, boss) {
   const L = clamp((w - 1) / 34, 0, 1);
   const W = [44 - 26 * L, 34 - 4 * L, 14 + 16 * L, w < EPIC_FROM ? 0 : (4 + 10 * L) * Math.min(1, .4 + .6 * (w - EPIC_FROM) / 5), w < LEG_FROM ? 0 : (.8 + 3.2 * L) * Math.min(1, .4 + .6 * (w - LEG_FROM) / 5)];
   if (boss) { W[0] *= .5; W[3] *= 1.5; W[4] *= 2; }
+  W[1] += W[0]; W[0] = 0;   // no common (white) weapon drops (owner, 28 Nov 2026: "remove white weapon drops"): a roll that would have been one is an uncommon, so as many weapons drop
   return W;
 }
 const wpnLegCap = w => w < LEG_FROM ? 0 : 1 + Math.floor((w - LEG_FROM) / 12);
@@ -48363,6 +48376,7 @@ function wpnTypesW() {
 function wpnRoll(wave, boss, rar, ty) {
   wave = Math.max(1, wave | 0);
   if (rar == null) rar = pickW(wpnRarW(wave, boss).map((v, i) => [i, v]));
+  if (!(rar >= 1)) rar = 1;   // (never a common: wpnRarW above; an older save's commons still load and work, wpnOk)
   if (rar === 4 && (G.wLegN | 0) >= wpnLegCap(wave)) rar = 3;   // legendaries are paced, as relics are
   ty = ty || pickW(wpnTypesW()); if (!ty) return null;
   const c = wpnClassOf(ty), u = TOWERS[ty].unit;
@@ -77016,6 +77030,33 @@ out vec2 vUV; void main(){ vec2 p = vec2(float((gl_VertexID<<1)&2), float(gl_Ver
 const FS_SCR = `#version 300 es
 precision mediump float; in vec2 vUV; uniform sampler2D uT; uniform vec4 uZ; out vec4 o;
 void main(){ vec2 uv = uZ.w > .5 ? ((vUV*2. - 1.)/uZ.x + uZ.yz)*.5 + .5 : vUV; o = texture(uT, uv); }`;   // (uZ: the view's zoom and its centre, for a backdrop that must stay under the world: a map's sky)
+// Fog over a painted map (painted.fog, from Ember Engine's battle-map export): the fog layer lies on the ground over the
+// painting, cut into FOG_GRID x FOG_GRID cells so it bends with the world, and is drawn over everything standing in it
+// (spells draw over it). Its opacity breathes with two layers of soft noise drifting with the map's wind, so it rolls
+// while staying where it was painted. The layer is straight alpha and already display colour (no light or tone curve).
+const FOG_GRID = 48;
+const VS_FOG = `#version 300 es
+uniform mat4 uVP; uniform vec4 uRect; out vec2 vUV; out vec2 vW;
+${BEND_GLSL}
+void main(){
+  int q = gl_VertexID / 6, k = gl_VertexID % 6;
+  vec2 c = vec2(float(q % ${FOG_GRID}), float(q / ${FOG_GRID}));
+  vec2 corner = k==0 ? vec2(0,0) : k==1 ? vec2(1,0) : k==2 ? vec2(1,1) : k==3 ? vec2(0,0) : k==4 ? vec2(1,1) : vec2(0,1);
+  vUV = (c + corner) / float(${FOG_GRID});
+  vW = uRect.xy + vUV * uRect.zw;
+  gl_Position = uVP * vec4(bendW(vec3(vW.x, 0., vW.y)), 1.);
+}`;
+const FS_FOG = `#version 300 es
+precision highp float; in vec2 vUV; in vec2 vW; uniform sampler2D uFog; uniform float uTime, uNoise, uAmount; uniform vec2 uDrift; out vec4 o;
+${NOISE_GLSL}
+void main(){
+  vec4 f = texture(uFog, vUV);
+  vec2 p = vW * uNoise * 2.;
+  // two layers at different speeds and scales, so it billows rather than slides as one sheet
+  float n = fbm(p - uDrift * uNoise * 2. * uTime) * .65 + fbm(p * 2.3 + 11.7 - uDrift * uNoise * 2.9 * uTime) * .35;
+  float a = clamp(f.a * mix(1. - uAmount, 1. + uAmount, n), 0., 1.);
+  o = vec4(f.rgb, a);
+}`;
 
 /* ---- renderer ---- */
 function createRenderer(canvas, opt = {}) {
@@ -77030,6 +77071,7 @@ function createRenderer(canvas, opt = {}) {
     return { p, u };
   }
   const L = prog(VS_LIT, FS_LIT), S = prog(VS_SH, FS_SH), Q = prog(VS_Q, FS_Q), SC = prog(VS_SCR, FS_SCR), scVao = gl.createVertexArray();
+  const FG = prog(VS_FOG, FS_FOG), fogVao = gl.createVertexArray();
   let STY = null;   // the sculpted models' stylised program (built the first time one is drawn)
   const styProg = () => STY || (STY = prog(VS_STY, FS_STY));
   let SSH = null; const sshProg = () => SSH || (SSH = prog(VS_SSH, FS_SH));   // (a rigged model's shadow, posed)
@@ -77462,6 +77504,7 @@ function createRenderer(canvas, opt = {}) {
       }
       if (passes.alpha) this.quads(passes.alpha, 'alpha', true);
       if (passes.add) this.quads(passes.add, 'add', true);
+      if (this.gfog && this.gfog.tex) this.drawFog();
       if (this.vfx) this.vfx.draw(0);   // the spells' textured sprites and ribbons (vfx.js)
       if (this.fg && this.fg.tex) this.screen(this.fg.tex, true);
       if (this.outFB) {   // the post: the spells' top layer and glow first, then the look over the frame, then the bars and marks drawn crisp over it
@@ -77518,6 +77561,17 @@ function createRenderer(canvas, opt = {}) {
         if (!op) { gl.depthMask(true); gl.disable(gl.BLEND); }
       }
       gl.useProgram(L.p); this.litUniforms(L.u);
+    },
+    // the painted map's drifting fog, over everything in it (see VS_FOG)
+    drawFog() {
+      const f = this.gfog, u = FG.u;
+      gl.useProgram(FG.p); gl.uniformMatrix4fv(u.uVP, false, this.vp); gl.uniform3fv(u.uBend, this.bend);
+      gl.uniform4f(u.uRect, f.rect[0], f.rect[1], f.rect[2], f.rect[3]); gl.uniform1f(u.uTime, this.time);
+      gl.uniform2f(u.uDrift, f.drift[0], f.drift[1]); gl.uniform1f(u.uNoise, f.noise); gl.uniform1f(u.uAmount, f.amount);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, f.tex); gl.uniform1i(u.uFog, 0);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
+      gl.bindVertexArray(fogVao); gl.drawArrays(gl.TRIANGLES, 0, FOG_GRID * FOG_GRID * 6);
+      gl.depthMask(true); gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
     },
     quads(b, mode, depth) {
       if (!b.n) return;
@@ -81327,6 +81381,7 @@ const nrm3 = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[
 const LIGHT_DEF = {
   meadow: { sun: '#ffdeb2', sunI: 1.6, az: -68, el: 35, rim: .12, fill: 0, ground: 1, paint: 1, sky: '#b2c9ff', skyI: .44, gnd: '#ffdaaa', gndI: .17, fog: '#2e2c48', fogNear: .9, woods: 0, lamps: 1, expo: 1, rays: 0, ray: '#9ec4ff' },
   clearing: { sun: '#d4daff', sunI: 1.45, az: 165, el: 50, rim: .24, fill: .12, ground: 1, paint: .94, sky: '#a8b4f0', skyI: .6, gnd: '#6c6890', gndI: .2, fog: '#3a4a66', fogNear: .9, woods: 0, lamps: 1, expo: 1.1, rays: 1, ray: '#c8d8ff' },   // a full moon's night: silver-blue moonlight, bright enough to play by, a bluey-purple haze (owner)
+  snowpass: { sun: '#fff2e2', sunI: 1.4, az: 150, el: 42, rim: .2, fill: .25, ground: 1, paint: 1, sky: '#c4d6f4', skyI: .5, gnd: '#e4ecf6', gndI: .28, fog: '#2a3448', fogNear: .9, woods: 0, lamps: 1, expo: 1, rays: 0, ray: '#e8f2ff' },
   moonwood: { sun: '#b8cbf2', sunI: 1.35, az: 153, el: 48, rim: .65, fill: .95, ground: .85, paint: 1, sky: '#4a6290', skyI: .45, gnd: '#1c2636', gndI: .8, fog: '#0e1828', fogNear: .9, woods: .8, lamps: 1.5, expo: .95, rays: 2, ray: '#68b4f0' },
 };
 /* Each map's mood: the light every model on it takes (units, foes, bosses, props, missiles), so a unit stands in its place
@@ -81747,6 +81802,15 @@ function buildClearingPainted() {
   return { ground: gr.finish(), wild: [], deco: d.finish(), trees: et.groups, edgeGiants: et.giants, fx: null };
 }
 
+/* ---------- a map painted in Ember Engine: one painting on the ground, a flat sheet under it until it decodes ---------- */
+function buildEmberPainted(rect, under) {
+  const [x0, z0, wx, wz] = rect, gr = new Geo(1); gr.jit = 0;
+  for (let z = Math.floor(z0 - 6); z < z0 + wz + 6; z += 1) for (let x = Math.floor(x0 - 6); x < x0 + wx + 6; x += 1.5) gr.quad([x, 0, z], [x, 0, z + 1], [x + 1.5, 0, z + 1], [x + 1.5, 0, z], under);
+  return { ground: gr.finish(), wild: [], deco: new Geo(74).finish(), trees: [], fx: null };
+}
+// the Snowy Pass (snowpasspaint.js, tools/embermap.mjs): a snow-bound pass with fog rolling round the field
+if (typeof SNOWPASS_PAINT !== 'undefined') MAPS.snowpass = { name: 'Snowy Pass', blurb: 'Fog rolls through a frozen pass' };
+
 /* ---------- map light: lantern/candle/fire glow baked to a top-down grid ---------- */
 function bakeLightMap(lights, rect) {
   const [x0, z0, x1, z1] = rect, w = 128, h = Math.round(w * (z1 - z0) / (x1 - x0)), K = 4, u8 = new Uint8Array(w * h * 4);
@@ -81820,6 +81884,13 @@ const THEMES = {
     painted: { src: GR_PAINT, rect: GR_PAINT_RECT, shade: GR_SHADE_REF, water: typeof GR_FLOW !== 'undefined' ? GR_FLOW : null, edge: 2.5, glint: false, falls: true },   // (glint: no sun glint on its grass: owner, "remove the glint")
     //   // (edge: it dims toward its sides and sinks into the dark just past them, so its mirrored copy never shows: gl.js uGPE)
     build: () => buildGreatrootPainted(),
+  },
+  // painted in Ember Engine: the painting is the ground and its fog drifts over the field's edges (painted.fog)
+  snowpass: {
+    id: 'snowpass', sunDir: nrm3([.3, .72, -.62]), sunCol: [1.4, 1.32, 1.2], sky: [.3, .36, .5], gnd: [.3, .32, .36], fogHex: '#2a3448',
+    pitch: 57, fitTop: null, h: () => 0, shafts: 'sun', fly: [.85, 1, .45],
+    painted: typeof SNOWPASS_PAINT !== 'undefined' ? { src: SNOWPASS_PAINT, rect: SNOWPASS_PAINT_RECT, fog: SNOWPASS_FOG ? Object.assign({ src: SNOWPASS_FOG }, SNOWPASS_FOG_MOTION) : null } : null,
+    build: () => buildEmberPainted(typeof SNOWPASS_PAINT_RECT !== 'undefined' ? SNOWPASS_PAINT_RECT : [-12, -7, 36, 24], '#d8e0ea'),
   },
   moonwood: {
     id: 'moonwood', sunDir: nrm3([.3, .74, -.6]), sunCol: [.58, .8, .9], sky: [.075, .15, .165], gnd: [.03, .045, .04], fogHex: '#1c3835',
@@ -94460,6 +94531,13 @@ function buildThemeEnv(th) {
       } catch (e) {}
       if (th.farBirds) try { E.farMask = farBirdMask(img, th); } catch (e) {} };   // (where the painting is its far plane: the far birds show only there)
     img.src = th.painted.src;
+    // the painting's fog (painted.fog, from an Ember Engine export): drawn over everything in it, drifting
+    const fog = th.painted.fog;
+    if (fog && fog.src) {
+      const fimg = new Image();
+      fimg.onload = () => { E.gfog = { tex: RD.texture(fimg, false), rect: th.painted.rect, drift: fog.drift || [0, 0], noise: fog.noise || .1, amount: fog.amount == null ? .45 : fog.amount }; if (TH === th) applyLight(); };
+      fimg.src = fog.src;
+    }
     /* A ground that moves (painted.video: Mistfall Ledge, the owner's looping video): the still above shows first, and
        instead of the video on phones and tablets, on Graphics Low, or where a video cannot play. The video plays muted and
        looped off screen and its frame is copied onto the ground's texture whenever it has a new one (groundVideo). */
@@ -94567,6 +94645,7 @@ function applyLight() {
   RD.mood = moodGet(TH.id);   // the map's mood on every model (maps.js MAP_MOOD)
   const E = THENV[TH.id]; RD.gtex = E && E.gtex ? Object.assign(E.gtex, { gain: L.ground }) : null;
   RD.gpaint = E && E.gpaint ? Object.assign(E.gpaint, { gain: L.paint == null ? 1 : L.paint }) : null;
+  RD.gfog = E && E.gfog ? E.gfog : null;
   RD.gpatch = E && E.gpatch || null;   // (a moving patch over the painting: groundPatch)
   const wk = E && E.gwater ? waterK(TH.id) : null; RD.gwater = wk ? Object.assign(E.gwater, { k: wk }) : null;   // (the painting's moving water; gl.js leaves it out on Graphics Low)
   // the painting's sun patches and shade on the units and foes standing in them (maps.js LIGHT_DEF psun: the sun's share in the
@@ -116852,8 +116931,8 @@ const AW2 = (() => {
    and lichen, and her lantern staff of black alder). tools/make_bw2.py -> src/model_bw2.js: her sculpt whole (8,563
    triangles) and the staff (2,000) on one atlas; a 35-bone rig made from scratch (two finger bones and a thumb a hand, the
    rags under each arm on bones kept half plumb, her hair's fall, the skirt on four panels, the staff on a bone of its own
-   in her closed right fist), 7 clips at 30 frames a second. ON by default in place of her code-built stand-in
-   (forces_zs_grove.js FORCE_BUILD.bogwitch); ?bw=old (or the Model Lab's "Bogwitch" row set to Old) draws that.
+   in her closed right fist), 7 clips at 30 frames a second. Her EARLIER sculpt since 28 Nov 2026 (the owner's new one,
+   src/unitmodels_bogwitch3.js, is the default): drawn with ?bw=prev (or that file's Model Lab row); ?bw=old her code-built stand-in.
    Her moves, by the game's own cues (nothing in the game is changed):
      idle    no foe in reach: upright on her planted staff, breathing; she looks down the road and back, her free hand's
              fingers working; once a loop she turns to the lantern and her fingers flutter at it (6 s loop)
@@ -116875,7 +116954,7 @@ const BW2 = (() => {
   const U = 'bogwitch', NAMES = ['idle', 'ready', 'spit', 'swarm', 'body', 'due', 'walk'];
   const MV = { bw_swarm: 'swarm', bw_bogbody: 'body', bw_bogdue: 'due' }, RATE = { idle: 4, ready: 7, move: 30, atk: 45 }, FOLLOW = .1, BASE_H = .04, SINK = .35, TRIM = .26;   // (TRIM: the atlas a little darker under the game's sun, as the other sculpted units')
   const S = { on: true, err: null };
-  try { S.on = !/[?&]bw=old\b/.test(location.search); } catch (e) {}
+  try { S.on = /[?&]bw=prev\b/.test(location.search); } catch (e) {}   // (28 Nov 2026: the owner's new sculpt, src/unitmodels_bogwitch3.js, is the default; this one is ?bw=prev)
   let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .87, MK = null, BI = null;
   const CL = {};
   const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
@@ -117031,7 +117110,7 @@ const BW2 = (() => {
   function labRow() {
     const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
     const old = document.getElementById('bw2Row'); if (old) old.remove();
-    if (L.unit !== U) return;
+    if (L.unit !== U || typeof BW3 !== 'undefined') return;   // (the new model's row picks among all three)
     const box = document.createElement('div'); box.id = 'bw2Row';
     box.innerHTML = '<h3>Bogwitch</h3><div class="row">' + `<button data-b2="0" class="${S.on ? '' : 'on'}" title="The stand-in built in code (?bw=old)">Old (code-built)</button><button data-b2="1" class="${S.on ? 'on' : ''}" title="The owner's sculpted bog witch on her rig (the default)">New (sculpted)</button></div>`;
     const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
@@ -117045,7 +117124,7 @@ const BW2 = (() => {
   if (MESH_ && typeof drawForceUnitPlain === 'function') {
     const _plain = drawForceUnitPlain;
     drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
-      if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked && UM_UNITS[U]) {
+      if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked && UM_UNITS[U] && UM_UNITS[U].mdl === 'bw2') {
         try {
           const K = UNIT_K(U), yaw = t.ang == null ? 0 : t.ang;
           if (draw(t, U, Math.min(5, tier | 0), K, null, t.x, t.y, yaw, yaw, wob, sx, sy, sz, opts)) { forceExtra(t, tier, t.x, t.y, yaw, K); return; }
@@ -117056,10 +117135,251 @@ const BW2 = (() => {
   }
   if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
     let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
-    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('bw2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+    if (lab && typeof BW3 === 'undefined') { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('bw2Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
   }
   });
   return { S, CL, MV, load, hot, ctl, draw, ready, reg, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
+})();
+
+/* The Bogwitches on the owner's NEW sculpted model (28 Nov 2026: "new bogwitch"; "Bogwitch - Moss Horns": a moss-horned fen
+   witch in rags of leaf and lichen, and her staff of twisted root with a caged green orb). tools/make_bm.py ->
+   src/model_bw3.js: her sculpt whole (9,481 triangles) and the staff (2,000) on one atlas; a 34-bone rig made from scratch
+   (two finger bones and a thumb a hand, the rags under each arm on five stations that hang plumb, her hair's fall in two
+   lengths, the skirt drawn between her belt and the ground, the staff on a bone of its own in her closed right fist),
+   8 clips at 30 frames a second. Nothing is built: her hands and fingers are the sculpt's own, turned on its rig.
+   ON by default in place of her earlier sculpt (src/unitmodels_bogwitch2.js, which this sits beside): ?bw=prev (or the
+   Model Lab's "Bogwitch model" row set to Earlier) draws that; ?bw=old her code-built stand-in.
+   Her moves, by the game's own cues (nothing in the game is changed):
+     idle    no foe in reach: upright beside her planted staff, breathing; she looks down the road and back, her free
+             hand's fingers working; once a loop she turns to the orb and her fingers flutter at it (6 s loop)
+     ready   a foe in reach: stooped over the staff, the orb tipped at the road, her free hand a beckoning claw
+     spit    her strike: over the game's wind-up (t.windup) she rears, the staff lifted and drawn back, and near its end
+             thrusts the orb at her foe; on the strike (t.shotT = 0) the orb is out before her and the bolt leaves it
+     swarm   Insect Swarm (bw_swarm): her arms flung wide, head back, as the swarm streams out
+     body    Bog Body (bw_bogbody): leaning on the staff she presses her palm down at the road (as it splits), then
+             draws the hand up, fingers hooking, as the body climbs out
+     due     The Bog Takes Its Due (bw_bogdue): staff and claw raised high as the bog opens, then dragged down hard
+     hit     her health drops: knocked back onto her staff
+     death   wounded (t.wounded): she sags and hangs on her staff, head bowed, her free hand at her side; held between her
+             strikes and spells, which she still looses
+   A spell's clip has its beat (`hit`, seconds): with a cast bar the part before it is played over the bar, however long,
+   and the rest from the moment the game fires the spell; an instant spell enters the clip two frames short of the beat
+   (as a strike does), so the beat lands on the cast either way.
+   ANCHORS (world space, written every frame she is drawn live): t.bwLamp (the orb: t.tipW too, where her bolt and her
+   swarm leave), t.bwPalmL (her free palm), t.bwGrip (her fist on the haft); BW3.anchors(t) returns them or null.
+   The orb glows a faint fen green, a little more as she strikes or casts (kept low: she stays readable).
+   She stands on the Grove's root base, sized by the shared rule (unitmodels_size.js): her head joint at UM_EVEN_HEAD.
+   Checks: `python tools/make_bm.py --check`, `python tools/bm_turn.py <clip:frame> --mark`. Notes: docs/model_pilot/bogwitch3.md. */
+const BW3 = (() => {
+  const U = 'bogwitch', NAMES = ['idle', 'ready', 'spit', 'swarm', 'body', 'due', 'hit', 'death'];
+  const MV = { bw_swarm: 'swarm', bw_bogbody: 'body', bw_bogdue: 'due' }, RATE = { idle: 4, ready: 7, move: 30, atk: 45, hurt: 9 }, FOLLOW = .1, BASE_H = .04, SINK = .35, TRIM = .20, LEAD = 2 / 30;   // (TRIM: the atlas a little darker under the game's sun, as the other sculpted units')
+  const S = { on: true, err: null, wound: false };
+  try { S.on = !/[?&]bw=(prev|old)\b/.test(location.search); } catch (e) {}
+  let D = null, R = null, MESH_ = null, img = null, NB = 0, H = null, PAR = null, HIPS = 0, HEADY = .87, MK = null, BI = null;
+  const CL = {};
+  const b64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; };
+  const newPose = () => ({ q: new Float32Array(NB * 4), t: new Float32Array(3) });
+  function sample(c, sec, P) {
+    const n = c.n; let u = sec * 30, i0, i1, f;
+    if (c.loop) { u = ((u % n) + n) % n; i0 = Math.floor(u); f = u - i0; i0 %= n; i1 = (i0 + 1) % n; }
+    else { u = Math.max(0, Math.min(n - 1, u)); i0 = Math.min(n - 2, Math.floor(u)); f = u - i0; i1 = i0 + 1; }
+    const a = i0 * NB * 4, b = i1 * NB * 4, q = c.q, o = P.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = q[a + k], ay = q[a + k + 1], az = q[a + k + 2], aw = q[a + k + 3]; let bx = q[b + k], by = q[b + k + 1], bz = q[b + k + 2], bw = q[b + k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f, w = aw + (bw - aw) * f, l = 1 / (Math.hypot(x, y, z, w) || 1);
+      o[k] = x * l; o[k + 1] = y * l; o[k + 2] = z * l; o[k + 3] = w * l;
+    }
+    for (let k = 0; k < 3; k++) P.t[k] = c.t[i0 * 3 + k] + (c.t[i1 * 3 + k] - c.t[i0 * 3 + k]) * f;
+    return P;
+  }
+  function follow(A, B, w) {
+    const a = A.q, b = B.q;
+    for (let k = 0; k < NB * 4; k += 4) {
+      const ax = a[k], ay = a[k + 1], az = a[k + 2], aw = a[k + 3]; let bx = b[k], by = b[k + 1], bz = b[k + 2], bw = b[k + 3];
+      if (ax * bx + ay * by + az * bz + aw * bw < 0) { bx = -bx; by = -by; bz = -bz; bw = -bw; }
+      const x = ax + (bx - ax) * w, y = ay + (by - ay) * w, z = az + (bz - az) * w, q = aw + (bw - aw) * w, l = 1 / (Math.hypot(x, y, z, q) || 1);
+      a[k] = x * l; a[k + 1] = y * l; a[k + 2] = z * l; a[k + 3] = q * l;
+    }
+    for (let k = 0; k < 3; k++) A.t[k] += (B.t[k] - A.t[k]) * w;
+  }
+  const _W = new Float32Array(40 * 9), _O = new Float32Array(40 * 3);
+  function toBones(P, out) {
+    const q = P.q;
+    for (let b = 0; b < NB; b++) {
+      const k = b * 4, x = q[k], y = q[k + 1], z = q[k + 2], w = q[k + 3];
+      const r00 = 1 - 2 * (y * y + z * z), r01 = 2 * (x * y - z * w), r02 = 2 * (x * z + y * w), r10 = 2 * (x * y + z * w), r11 = 1 - 2 * (x * x + z * z), r12 = 2 * (y * z - x * w), r20 = 2 * (x * z - y * w), r21 = 2 * (y * z + x * w), r22 = 1 - 2 * (x * x + y * y);
+      const p = PAR[b], o = b * 9, h0 = H[b * 3], h1 = H[b * 3 + 1], h2 = H[b * 3 + 2]; let j0 = h0, j1 = h1, j2 = h2;
+      if (b === HIPS) { j0 += P.t[0]; j1 += P.t[1]; j2 += P.t[2]; }
+      if (p < 0) { _W[o] = r00; _W[o + 1] = r01; _W[o + 2] = r02; _W[o + 3] = r10; _W[o + 4] = r11; _W[o + 5] = r12; _W[o + 6] = r20; _W[o + 7] = r21; _W[o + 8] = r22; }
+      else {
+        const m = p * 9, a00 = _W[m], a01 = _W[m + 1], a02 = _W[m + 2], a10 = _W[m + 3], a11 = _W[m + 4], a12 = _W[m + 5], a20 = _W[m + 6], a21 = _W[m + 7], a22 = _W[m + 8];
+        _W[o] = a00 * r00 + a01 * r10 + a02 * r20; _W[o + 1] = a00 * r01 + a01 * r11 + a02 * r21; _W[o + 2] = a00 * r02 + a01 * r12 + a02 * r22;
+        _W[o + 3] = a10 * r00 + a11 * r10 + a12 * r20; _W[o + 4] = a10 * r01 + a11 * r11 + a12 * r21; _W[o + 5] = a10 * r02 + a11 * r12 + a12 * r22;
+        _W[o + 6] = a20 * r00 + a21 * r10 + a22 * r20; _W[o + 7] = a20 * r01 + a21 * r11 + a22 * r21; _W[o + 8] = a20 * r02 + a21 * r12 + a22 * r22;
+        const x0 = j0, x1 = j1, x2 = j2;
+        j0 = a00 * x0 + a01 * x1 + a02 * x2 + _O[p * 3]; j1 = a10 * x0 + a11 * x1 + a12 * x2 + _O[p * 3 + 1]; j2 = a20 * x0 + a21 * x1 + a22 * x2 + _O[p * 3 + 2];
+      }
+      const o0 = j0 - (_W[o] * h0 + _W[o + 1] * h1 + _W[o + 2] * h2), o1 = j1 - (_W[o + 3] * h0 + _W[o + 4] * h1 + _W[o + 5] * h2), o2 = j2 - (_W[o + 6] * h0 + _W[o + 7] * h1 + _W[o + 8] * h2);
+      _O[b * 3] = o0; _O[b * 3 + 1] = o1; _O[b * 3 + 2] = o2;
+      const g = b * 12;
+      out[g] = _W[o]; out[g + 1] = _W[o + 3]; out[g + 2] = _W[o + 6]; out[g + 3] = o0; out[g + 4] = _W[o + 1]; out[g + 5] = _W[o + 4]; out[g + 6] = _W[o + 7]; out[g + 7] = o1;
+      out[g + 8] = _W[o + 2]; out[g + 9] = _W[o + 5]; out[g + 10] = _W[o + 8]; out[g + 11] = o2;
+    }
+    return out;
+  }
+  // a mark (model space at rest, on bone b) where it is posed in OUT
+  const at = (O, b, m) => { const o = b * 12; return [O[o] * m[0] + O[o + 4] * m[1] + O[o + 8] * m[2] + O[o + 3], O[o + 1] * m[0] + O[o + 5] * m[1] + O[o + 9] * m[2] + O[o + 7], O[o + 2] * m[0] + O[o + 6] * m[1] + O[o + 10] * m[2] + O[o + 11]]; };
+  function load(data) {
+    const R_ = MOBRIG.decode(data, 'bw3', ['body']), nb = R_.bones.length;
+    if (nb > (typeof SKIN_MAX !== 'undefined' ? SKIN_MAX : 40)) throw new Error('bw3: too many bones');
+    const bi = {}; for (const nm of ['hips', 'head', 'staff', 'handL', 'handR']) { if (R_.bix[nm] == null) throw new Error('bw3: no ' + nm); bi[nm] = R_.bix[nm]; }
+    const mk = data.marks; for (const nm of ['orb', 'palmL', 'grip']) if (!mk || !mk[nm]) throw new Error('bw3: no mark ' + nm);
+    const cl = {};
+    for (const nm of NAMES) {
+      const c = data.clips && data.clips[nm]; if (!c) throw new Error('bw3: no clip ' + nm);
+      const q16 = new Int16Array(b64(c.q)), q = new Float32Array(q16.length), t = new Float32Array(b64(c.t));
+      if (q16.length !== c.n * nb * 4 || t.length !== c.n * 3) throw new Error('bw3: bad clip ' + nm);
+      for (let i = 0; i < q16.length; i++) q[i] = q16[i] / 32767;
+      cl[nm] = Object.assign({}, c, { q, t, len: (c.n - (c.loop ? 0 : 1)) / 30 });
+    }
+    D = data; R = R_; NB = nb; MK = mk; BI = bi; Object.assign(CL, cl);
+    H = new Float32Array(NB * 3); PAR = new Int8Array(NB); HIPS = R.bix.hips; HEADY = R.bones[bi.head].h[1];
+    R.bones.forEach((b, i) => { H[i * 3] = b.h[0]; H[i * 3 + 1] = b.h[1]; H[i * 3 + 2] = b.h[2]; PAR[i] = b.p; });
+    const idx = R.groups.body.idx, nc = idx.length;
+    const uv = new Float32Array(nc * 2), bone = new Float32Array(nc * 2), bw = new Float32Array(nc), col = new Float32Array(nc * 3).fill(1), ext = new Float32Array(nc * 2);
+    const m = { pos: new Float32Array(nc * 3), nor: new Float32Array(nc * 3), col, ext, uv, bone, bw, count: nc, min: [0, 0, 0], max: [0, 0, 0], gl: new Map() };
+    const q16 = new Uint16Array(b64(D.groups.body.uv)); if (q16.length !== nc * 2) throw new Error('bw3: bad uv');
+    for (let i = 0; i < q16.length; i++) uv[i] = q16[i] / 65535;
+    MOBRIG.fill(m, idx, R.P, R.N, 0);
+    for (let k = 0; k < nc; k++) { const v = idx[k]; bone[k * 2] = R.bi[v * 2]; bone[k * 2 + 1] = R.bi[v * 2 + 1]; bw[k] = R.W[v]; }
+    m.min = [-.85, -.02, -.85]; m.max = [.85, 1.6, .95]; m._um = 1;   // (room for the staff raised high and flung wide)
+    if (typeof Image !== 'undefined') { img = new Image(); img.decoding = 'async'; img.src = D.tex; m.tex = img; }
+    MESH_ = m;
+  }
+  const hot = url => fetch(url, { cache: 'no-store' }).then(r => r.text()).then(t => { const i = t.indexOf('{', t.indexOf('BW3_MDL')), j = t.lastIndexOf('}'); load(JSON.parse(t.slice(i, j + 1))); return 'bw3: ' + NB + ' bones'; });
+  const ready = () => !!(MESH_ && img && img.complete && img.naturalWidth);
+  const sm = (a, b, x) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+
+  /* what she does now: { c: clip, s: seconds into it, rate (how fast the pose follows; 0 snaps), glow (the orb) } */
+  function ctl(t, live) {
+    if (!live) return { c: S.wound ? 'death' : 'idle', s: S.wound ? CL.death.len : typeof UM_SHOW !== 'undefined' && UM_SHOW != null ? UM_SHOW : 0, rate: 0, glow: 0 };
+    const now = G.time, ph = now + (t.anim || 0) * 3, A = t.ab, hit = n => CL[n].hit || 0;
+    if (t.hp != null) { if (t._b3Hp != null && t.hp < t._b3Hp - 1e-6 && !t.wounded) t._b3HitAt = now; t._b3Hp = t.hp; }
+    /* (wounded, a unit still strikes and casts, at a slower pace: her strikes and spells play as ever, and between them
+       she hangs on her staff, the `death` clip from the wound and then held) */
+    const hurt = !!(t.wounded || S.wound);
+    // a spell with a cast bar: the clip up to its beat over the bar
+    const cast = A && A.cast && MV[A.cast.id] ? A.cast : null;
+    if (cast) { t._b3SpAt = cast.at; const m = MV[cast.id], u = Math.max(0, Math.min(1, (now - cast.at) / Math.max(.05, cast.T))); return { c: m, s: hit(m) * u, rate: RATE.move, glow: sm(.2, .8, u) }; }
+    /* the moment a spell went (while a unit is drawn, forces_zz_casttimes.js castPoseIn moves A.lastAt back by the cast's
+       hold, for the code-built poses: the moment it really went is castOff.at): the clip from its beat; an instant spell
+       (no cast bar before it) enters LEAD short of the beat, as a strike does */
+    const O = A && A.castOff, LA = A && A.lastAt != null ? (O && Math.abs(A.lastAt + O.off - O.at) < 1e-4 ? O.at : A.lastAt) : null;
+    if (A && A.last && LA != null && now >= LA && MV[A.last]) {
+      const m = MV[A.last], c0 = CL[m], inst = t._b3SpAt == null || LA - t._b3SpAt > 4 || LA < t._b3SpAt, rel = hit(m) - (inst ? LEAD : 0), u = rel + (now - LA);
+      if (u < c0.len) { t._b3AbEnd = LA + c0.len - rel; return { c: m, s: u, rate: inst && now - LA < .1 ? 60 : RATE.move, glow: u < hit(m) ? .6 : Math.max(0, 1 - (u - hit(m)) / .8) }; }
+    }
+    const W = CL.spit.wind || .5, s = t.shotT != null ? t.shotT : 9, wind = t.tg && t.windup > 0 ? t.windup : 0;
+    if (s >= 0 && s < CL.spit.len - W && !(wind > 0 && s > FOLLOW)) return { c: 'spit', s: W + s, rate: RATE.atk, glow: Math.max(0, 1 - s / .3) };
+    if (wind > 0 && G.phase === 'wave') return { c: 'spit', s: W * Math.min(1, wind), rate: RATE.atk, glow: .5 * wind };
+    if (hurt) { const sw = t.woundAt != null ? now - t.woundAt : 9; return { c: 'death', s: Math.max(0, sw), rate: RATE.hurt, glow: 0 }; }
+    const h = t._b3HitAt != null ? now - t._b3HitAt : 9; if (h >= 0 && h < CL.hit.len) return { c: 'hit', s: h, rate: RATE.move, glow: 0 };
+    if ((G.phase === 'wave' && t.tg && !t.tg.dead) || s < 1.5) return { c: 'ready', s: ph, rate: RATE.ready, glow: 0 };
+    return { c: 'idle', s: ph, rate: RATE.idle, glow: 0 };
+  }
+  let PT = null, OUT = null;
+  const _a = new Float32Array(16), _b = new Float32Array(16), _c = new Float32Array(16);
+  const mine = t => S.on && MESH_ && t && t.bwAt != null && typeof G !== 'undefined' && G && G.time - t.bwAt < .3 && G.time >= t.bwAt;
+  /* drawn in place of the code-built body (drawForceUnitPlain's): the Grove's root base at her post, she on it, sized by the shared rule */
+  function draw(t, u, tr, K, B, x, z, ang, yaw, wob, sx, sy, sz, opts) {
+    if (!ready()) return false;
+    if (typeof RD !== 'undefined' && RD) RD.sty = NEWMODELS === 2 ? 0 : 1;
+    if (typeof IR !== 'undefined' && IR) IR.sty = NEWMODELS === 2 ? 0 : 1;
+    const icon = typeof inIcon !== 'undefined' && inIcon, live = typeof G !== 'undefined' && G && G.time != null && !icon;
+    const bm = typeof groveBase === 'function' ? dynMesh('bw3_base' + Math.min(tr, 5), g => withPal(U, () => unitGeo(g).with(T(0, 0, 0, 0, 0, 0, K), () => groveBase(g, .3, Math.min(tr, 2))))) : null;
+    M4.trs(_a, t.x, 0, t.y, ang + wob, 0, 0, sx, sy, sz); if (bm) item(bm, _a, opts);
+    const lift = bm ? BASE_H * K * (1 - SINK) * sy : 0;   // (her soles a little into the base's moss, as the Grove's other units)
+    const head = (typeof umHeadAt === 'function' ? umHeadAt(U) : 1.24) * (typeof UM_TIER !== 'undefined' ? UM_TIER[Math.min(5, tr | 0)] : 1 + .056 * tr), s = Math.max(.2, head - lift) / HEADY;
+    M4.trs(_a, x, lift + (B && B.y ? B.y * K * sy : 0), z, yaw + wob, 0, 0, sx, sy, sz); M4.trs(_b, 0, 0, 0, 0, 0, 0, s, s, s); M4.mul(_c, _a, _b);
+    if (!PT || PT.q.length !== NB * 4) { PT = newPose(); OUT = new Float32Array(NB * 12); }
+    const P = ctl(t, live); sample(CL[P.c], P.s, PT);
+    let pose = PT;
+    if (live) {
+      const now = G.time, dt = t._b3T == null ? 1 : Math.max(0, Math.min(.1, now - t._b3T)); t._b3T = now;
+      if (!t._b3P || t._b3P.q.length !== NB * 4) { t._b3P = newPose(); t._b3P.q.set(PT.q); t._b3P.t.set(PT.t); }
+      follow(t._b3P, PT, P.rate ? 1 - Math.exp(-dt * P.rate) : 1); pose = t._b3P;
+    }
+    toBones(pose, OUT);
+    const it = item(MESH_, _c, opts); it.sec = [0, TRIM]; it.bones = OUT.slice();
+    if (typeof FX_PM !== 'undefined') FX_PM.root = FX_PM.torso = _c;
+    S.scale = s; S.lift = lift; S.headY = HEADY * s + lift;
+    const w = (b, m) => { const q = at(OUT, b, m); return M4.xf(_c, q[0], q[1], q[2]); };
+    const lamp = w(BI.staff, MK.orb);
+    if (live) {
+      t.bwLamp = lamp; t.bwPalmL = w(BI.handL, MK.palmL); t.bwGrip = w(BI.staff, MK.grip); t.bwClip = P.c; t.bwClipS = P.s; t.bwAt = G.time;
+      t.tipW = lamp; t.tipYaw = ang; t.tipAt = G.time;
+    }
+    /* the light in the orb: a faint fen-green glow that breathes, a little more as a strike or a spell gathers */
+    if (!icon && typeof QADD !== 'undefined' && typeof RD !== 'undefined') {
+      const now = live ? G.time : 0, pul = .85 + .15 * Math.sin(now * 2.3 + (t.anim || 0) * 5), r = .075 * s * (1 + .25 * (P.glow || 0));
+      QADD.bill(RD, lamp[0], lamp[1], lamp[2], r, r, [.45, 1, .62, (.10 + .2 * (P.glow || 0) + .02 * Math.max(0, tr - 2)) * pul], 1, 0);
+    }
+    return true;
+  }
+  const anchors = t => mine(t) ? { lamp: t.bwLamp, palmL: t.bwPalmL, grip: t.bwGrip, clip: t.bwClip, s: t.bwClipS, at: t.bwAt } : null;
+  /* told to the shared sculpted-unit code (the crown's height, the base's size) while she is on; her earlier sculpt
+     (BW2) tells its own when it is the one drawn */
+  function reg() {
+    if (typeof UM_UNITS === 'undefined') return;
+    if (S.on && MESH_) {
+      UM_UNITS[U] = { mdl: 'bw3', k: 1 };
+      if (typeof UM_EVEN !== 'undefined') UM_EVEN[U] = 1;
+      if (typeof UM_TOPK !== 'undefined') UM_TOPK[U] = 1.16;   // (her horns' tips stand an eighth over her head's joint)
+    } else if (UM_UNITS[U] && UM_UNITS[U].mdl === 'bw3') { delete UM_UNITS[U]; if (typeof UM_EVEN !== 'undefined') delete UM_EVEN[U]; if (typeof UM_TOPK !== 'undefined') delete UM_TOPK[U]; }
+  }
+  /* which of her three bodies is drawn: 2 this sculpt, 1 her earlier sculpt (BW2), 0 her code-built stand-in */
+  function pick(k) {
+    S.on = k === 2; if (typeof BW2 !== 'undefined') { BW2.S.on = k === 1; }
+    reg(); if (typeof BW2 !== 'undefined' && BW2.reg) BW2.reg();
+  }
+  /* the Model Lab's row: which body, a blow, wounded */
+  function labRow() {
+    const L = window.MODELLAB, el = document.getElementById('mlab'); if (!L || !el) return;
+    const old = document.getElementById('bw3Row'); if (old) old.remove();
+    if (L.unit !== U) return;
+    const now = S.on ? 2 : typeof BW2 !== 'undefined' && BW2.S.on ? 1 : 0, b = (k, lab, tip) => `<button data-b3="${k}" class="${now === k ? 'on' : ''}" title="${tip}">${lab}</button>`;
+    const box = document.createElement('div'); box.id = 'bw3Row';
+    box.innerHTML = '<h3>Bogwitch model</h3><div class="row">' + b(0, 'Old (code-built)', 'The stand-in built in code (?bw=old)') + b(1, 'Earlier sculpt', 'Her earlier sculpt, with the lantern staff (?bw=prev)') + b(2, 'New (moss horns)', "The owner's new sculpt (the default)") +
+      `<button data-b3h="1" title="A blow taken">Hit</button><button data-b3w="1" class="${S.wound ? 'on' : ''}" title="Wounded: hanging on her staff">Wounded</button></div>`;
+    const anchor = Array.from(el.querySelectorAll('h3')).find(h => /Stand-in foe/.test(h.textContent));
+    if (anchor) el.insertBefore(box, anchor); else el.appendChild(box);
+    for (const x of box.querySelectorAll('[data-b3]')) x.onclick = () => { pick(+x.dataset.b3); labRow(); };
+    for (const x of box.querySelectorAll('[data-b3h]')) x.onclick = () => { if (L.t && typeof G !== 'undefined' && G) L.t._b3HitAt = G.time; };
+    for (const x of box.querySelectorAll('[data-b3w]')) x.onclick = () => { S.wound = !S.wound; if (L.t) L.t.woundAt = typeof G !== 'undefined' && G ? G.time : 0; labRow(); };
+  }
+  // (the model may arrive after the page: tools/splitassets.mjs GROUP, src/lazyassets.js; what ran at load runs then)
+  assetReady('model_bw3', () => {
+  try { load(typeof BW3_MDL !== 'undefined' ? BW3_MDL : null); } catch (e) { MESH_ = null; if (typeof console !== 'undefined') console.warn('No new Bogwitch model:', e.message); }
+  reg();
+  if (MESH_ && typeof drawForceUnitPlain === 'function') {
+    const _plain = drawForceUnitPlain;
+    drawForceUnitPlain = function (t, tier, sx, sy, sz, wob, opts) {
+      if (S.on && typeof NEWMODELS !== 'undefined' && NEWMODELS && t && t.def && t.def.unit === U && !t.wrecked && UM_UNITS[U] && UM_UNITS[U].mdl === 'bw3') {
+        try {
+          const K = UNIT_K(U), yaw = t.ang == null ? 0 : t.ang;
+          if (draw(t, U, Math.min(5, tier | 0), K, null, t.x, t.y, yaw, yaw, wob, sx, sy, sz, opts)) { forceExtra(t, tier, t.x, t.y, yaw, K); return; }
+        } catch (e) { if (!S.err) { S.err = e.message; if (typeof console !== 'undefined') console.warn('bw3:', e); } }
+      }
+      return _plain.apply(this, arguments);
+    };
+  }
+  if (MESH_ && typeof window !== 'undefined' && typeof renderView === 'function') {
+    let lab = false; try { lab = new URLSearchParams(location.search).get('lab') === '1'; } catch (e) {}
+    if (lab) { const rv0 = renderView; renderView = function () { try { const L = window.MODELLAB; if (L && L.ready && document.getElementById('mlab') && (L.unit === U) !== !!document.getElementById('bw3Row')) labRow(); } catch (e) {} return rv0.apply(this, arguments); }; }
+  }
+  });
+  return { S, CL, MV, load, hot, ctl, draw, ready, reg, pick, anchors, get R() { return R; }, get mesh() { return MESH_; }, get marks() { return MK; } };
 })();
 
 /* The Stag Lancers on the owner's sculpted model (21 Nov 2026: "Stag Lancer": an antler-crowned elf in leaf armour astride a
@@ -131698,17 +132018,18 @@ function lootRowsHTML(rows, sm) {
 // the forecast's rows for a boss on wave n: its table (relics, its legendary when the wave allows) and its weapons, one list
 function rnLootRows(t, n) {
   const T = rnTableAt(t, n), ent = T.items.map(b => ({ k: b, it: rnItem({ b }, true) })).concat(T.leg ? [{ k: 'L:' + T.leg, it: rnItem({ l: T.leg }, true) }] : []);
-  const rel = ent.map(e => ({ attr: `data-ri="${t}|${e.k}"`, img: rnArtURL(e.it), name: gearName(e.it), rar: e.it.rar }));
+  const rel = ent.map(e => ({ attr: `data-ri="${t}|${e.k}${n ? '|' + n : ''}"`, img: rnArtURL(e.it), name: gearName(e.it), rar: e.it.rar }));
   const tys = typeof rnWpnEntries === 'function' ? rnWpnEntries(t) : [];
   const wp = tys.map(ty => { const bw = rnWpnBest(t, ty), b = { b: bw.b, rar: 2 }; let img = ''; try { img = typeof wpIconURL === 'function' ? wpIconURL(b) : ''; } catch (e) {}
     return { attr: `data-wbt="${ty}|${t}"`, img, name: typeof wpnName === 'function' ? wpnName(b) : bw.b, rar: 2, sub: `${RARITY[2].name} weapon · ${TOWERS[ty].name}` }; });
   return lootRowsHTML(rel.concat(wp), false);   // (its 2 or 3 units' weapons, fielded or not: the boss's own set, rnBossWpnTys)
 }
-function rnIconCard(el) { const [, k] = (el.dataset.ri || el.dataset.rb || '').split('|'); if (!k) return ''; const it = rnItem(k.startsWith('L:') ? { l: k.slice(2) } : { b: k }, true), sg = it.base && GEAR_BASES[it.base].bsig; return itemCardHTML(it, { note: `<p class="itc-eq">${sg ? 'Its own relic: found nowhere else' : it.leg ? 'Its signature legendary' : 'From its loot table'}</p>` }); }
+function rnIconCard(el) { const [, k, n] = (el.dataset.ri || el.dataset.rb || '').split('|'); if (!k) return ''; return typeof ilAsDrop === 'function' ? ilAsDrop(+n, () => rnIconCardAt(k)) : rnIconCardAt(k); }   // (n: the wave the boss is fought on: its items' level and stats as they drop then)
+function rnIconCardAt(k) { const it = rnItem(k.startsWith('L:') ? { l: k.slice(2) } : { b: k }, true), sg = it.base && GEAR_BASES[it.base].bsig; return itemCardHTML(it, { note: `<p class="itc-eq">${sg ? 'Its own relic: found nowhere else' : it.leg ? 'Its signature legendary' : 'From its loot table'}</p>` }); }
 if (typeof itipBind === 'function' && typeof document !== 'undefined') { itipBind(document, '.rn-ii[data-ri], .rn-ii[data-rb]', rnIconCard); itipBind(document, '.lrow[data-ri]', rnIconCard); }
 function rnIconsHTML(t, attr, n) {   // (n: the wave it is fought on, when known: no legendary on wave 15 or earlier)
   const T = rnTableAt(t, n), ent = T.items.map(b => ({ k: b, it: rnItem({ b }, true) })).concat(T.leg ? [{ k: 'L:' + T.leg, it: rnItem({ l: T.leg }, true) }] : []);
-  return `<span class="rn-icons">${ent.map(e => `<button type="button" class="rn-ii${e.it.leg ? ' lg' : ''}" style="--rc:${RARITY[e.it.rar].col}" data-${attr === 'fc' ? 'fc' : attr}="${attr === 'fc' ? 'rnit:' + t + ':' + e.k : t + '|' + e.k}" aria-label="${rnEsc(gearName(e.it))}" tabindex="0"><img alt="${rnEsc(gearName(e.it))}" src="${rnArtURL(e.it)}"></button>`).join('')}</span>`;
+  return `<span class="rn-icons">${ent.map(e => `<button type="button" class="rn-ii${e.it.leg ? ' lg' : ''}" style="--rc:${RARITY[e.it.rar].col}" data-${attr === 'fc' ? 'fc' : attr}="${attr === 'fc' ? 'rnit:' + t + ':' + e.k : t + '|' + e.k + (n ? '|' + n : '')}" aria-label="${rnEsc(gearName(e.it))}" tabindex="0"><img alt="${rnEsc(gearName(e.it))}" src="${rnArtURL(e.it)}"></button>`).join('')}</span>`;
 }
 
 /* =====================================================================================================
@@ -132144,11 +132465,11 @@ function fsetOfferSwap(type, n, k, seen, out) {
 // the table's icons: the boss's two pieces after its own
 if (typeof rnIconsHTML === 'function') {
   const _ri = rnIconsHTML;
-  rnIconsHTML = function (t, attr) {
+  rnIconsHTML = function (t, attr, n) {
     const h = _ri.apply(this, arguments); let P = [];
     try { P = fsOn() ? fsetBossPieces(t).filter(id => GEAR_BASES[id]) : []; } catch (e) { P = []; }
     if (!P.length || !/<\/span>$/.test(h)) return h;
-    const add = P.map(b => { const it = rnItem({ b }, true), key = attr === 'fc' ? 'rnit:' + t + ':' + b : t + '|' + b;
+    const add = P.map(b => { const it = rnItem({ b }, true), key = attr === 'fc' ? 'rnit:' + t + ':' + b : t + '|' + b + (n ? '|' + n : '');
       return `<button type="button" class="rn-ii fs-ii" style="--rc:${FSET_COL}" data-${attr === 'fc' ? 'fc' : attr}="${key}" aria-label="${fsE(gearName(it))} (set piece)" tabindex="0"><img alt="${fsE(gearName(it))}" src="${rnArtURL(it)}"></button>`; }).join('');
     return h.replace(/<\/span>$/, add + '</span>');
   };
@@ -133795,7 +134116,12 @@ function rgShuffle(seed, key, a) { const o = a.slice(); for (let i = o.length - 
 // every force may march a homeland for testing (owner, 23 Nov 2026: "allow any set to start homeland not just elves for testing,
 // we can change it once we add more homeland maps"): a force with no region of its own borrows the Grove's map
 const RG_FKEY = 'runehold.region.force';
-function rgEnsure() { if (typeof FORCES === 'undefined' || typeof HEROES === 'undefined') return; for (const f in FORCES) if (!RG_REGIONS[f] && HEROES.some(h => h.force === f && (typeof heroPickable !== 'function' || heroPickable(h)))) RG_REGIONS[f] = RG_REGIONS.grove; }
+// a force without a homeland of its own fights on the Grove's; Ironhold's first battle (Mossford, waves 1-6) is on the
+// Snowy Pass, painted in Ember Engine (owner, 28 Nov 2026: "make it the first map on the dwarf homeland map"); rgField
+// falls back to Mistfall Ledge if that painting is not loaded
+const RG_FIRST_FIELD = { ironhold: { node: 'mossford', map: 'snowpass' } };
+const rgBorrowed = f => { const o = RG_FIRST_FIELD[f], G = RG_REGIONS.grove; return o ? Object.assign({}, G, { nodes: G.nodes.map(n => n.id === o.node ? Object.assign({}, n, { map: o.map }) : n) }) : G; };
+function rgEnsure() { if (typeof FORCES === 'undefined' || typeof HEROES === 'undefined') return; for (const f in FORCES) if (!RG_REGIONS[f] && HEROES.some(h => h.force === f && (typeof heroPickable !== 'function' || heroPickable(h)))) RG_REGIONS[f] = rgBorrowed(f); }
 const rgForces = () => { rgEnsure(); return Object.keys(RG_REGIONS).filter(f => typeof FORCES !== 'undefined' && FORCES[f]); };
 function rgLastForce() { let f = null; try { f = localStorage.getItem(RG_FKEY); } catch (e) {} rgEnsure(); return f && RG_REGIONS[f] ? f : 'grove'; }
 function rgSetForce(f) { try { localStorage.setItem(RG_FKEY, f); } catch (e) {} }
@@ -135550,7 +135876,7 @@ function rgArmyTys(R) {
 function rgLootRowsHTML(force, K, type, w, tys) {
   if (typeof lootRowsHTML !== 'function') return rgPoolHTML({ force }, K, rgBossWpnIcons(type, force, w, tys));
   const ks = K.keys.slice(0, RG_POOL_SHOW), rest = K.keys.length - ks.length;
-  const rel = ks.map(k => { const it = rgKeyItem(k), pt = rgPaint(it), src = pt || rgArt(it); if (!pt) rgArtWant(); return { attr: `data-rgi="${rgEsc(force + '|' + k)}"`, img: src, name: rgItName(it), rar: it.rar }; });
+  const rel = ks.map(k => { const it = rgKeyItem(k), pt = rgPaint(it), src = pt || rgArt(it); if (!pt) rgArtWant(); return { attr: `data-rgi="${rgEsc(force + '|' + k)}" data-rgl="${w | 0}"`, img: src, name: rgItName(it), rar: it.rar }; });
   const B = typeof bossLootTable === 'function' ? bossLootTable(type, force, w, tys) : null, W = B ? B.items.filter(e => e.wpn) : [];
   const wp = W.map(x => { let img = ''; try { img = typeof wpIconURL === 'function' ? wpIconURL({ b: x.base, rar: 2 }) : ''; } catch (e) {}
     return { attr: `data-rgw="${rgEsc(force + '|' + type + '|' + w + '|' + x.ty)}"`, img, name: x.name, rar: x.rar || 2, sub: `${RARITY[x.rar || 2].name} weapon · ${x.unit}` }; });
@@ -135567,7 +135893,9 @@ function rgBossWpnIcons(type, force, w, tys) {
 function rgWpnCard(el) {
   const [force, type, w, ty] = (el.dataset.rgw || '').split('|'), B = typeof bossLootTable === 'function' ? bossLootTable(type, force, +w, [ty]) : null, x = B && B.items.find(e => e.wpn && e.ty === ty); if (!x) return '';
   // the weapon's own card, as in the bag (owner, 27 Nov 2026: "show the actual item on hover")
-  if (typeof wpnCardHTML === 'function') { let h = ''; try { h = wpnCardHTML({ b: x.base, rar: x.rar || 2, oh: x.oh, il: Math.max(1, +w || 1) }, null); } catch (e) {} if (h) return h; }
+  // (at the level the boss's weapon drops at: its wave + IL.boss, wpnRoll's boss stamp; level sync as on that wave)
+  if (typeof wpnCardHTML === 'function') { let h = ''; const L = Math.max(1, +w || 1), card = () => wpnCardHTML({ b: x.base, rar: x.rar || 2, oh: x.oh, il: typeof ilClampL === 'function' && typeof IL !== 'undefined' ? ilClampL(L + IL.boss) : L }, null);
+    try { h = typeof ilAsDrop === 'function' ? ilAsDrop(L, card, force) : card(); } catch (e) {} if (h) return h; }
   return `<div class="rg-tc"><h4 style="color:${RARITY[x.rar || 2].col}">${rgEsc(x.name)}</h4><p class="rg-fx">${RARITY[x.rar || 2].name} weapon · ${rgEsc(x.unit)} only</p><p>A weapon for your ${rgEsc(x.unit)}, made in ${rgEsc(B.name)}’s fashion.${x.ohName ? ` On hit: <b>${rgEsc(x.ohName)}</b>.` : ''}</p></div>`;
 }
 if (typeof itipBind === 'function' && typeof document !== 'undefined') { itipBind(document, '.rg-wp[data-rgw]', rgWpnCard, { tap: () => null }); itipBind(document, '.lrow[data-rgw]', rgWpnCard, { tap: () => null }); }
@@ -135583,10 +135911,14 @@ function rgPoolHTML(T, K, extra) {   // (extra: more icons of the same table, a 
 // its card, as the force's own (made once with the force applied a moment, as rgKitFor)
 function rgIconCard(el) {
   const v = el.dataset.rgi || '', i = v.indexOf('|'), force = v.slice(0, i), k = v.slice(i + 1); if (!k || typeof itemCardHTML !== 'function') return '';
-  if (RG_CARDS[v]) return RG_CARDS[v];
+  // (data-rgl: the wave its boss is fought on: the card shows the item as that boss drops it, at the wave + IL.boss with its
+  // stats sized to that level, as the run's drop code stamps it; owner, 28 Nov 2026: every item read "Item Level 1")
+  const w = +(el.dataset.rgl || 0), at = w >= 1 && typeof ilAsDrop === 'function' && typeof ilStamp === 'function', ck = v + (at ? '@' + w : '');
+  if (RG_CARDS[ck]) return RG_CARDS[ck];
   const was = typeof FORCE_NOW !== 'undefined' ? FORCE_NOW : null, swap = !!force && was !== force && typeof applyForce === 'function' && typeof FORCES !== 'undefined' && !!FORCES[force];
-  let h = ''; try { if (swap) applyForce(force); const it = rgKeyItem(k), p = rgPaint(it); h = (p ? `<img class="rg-ica" alt="" src="${p}">` : '') + itemCardHTML(it); } finally { if (swap) applyForce(was); }
-  return (RG_CARDS[v] = h);
+  const card = () => { const it = rgKeyItem(k), p = rgPaint(it); if (at) ilStamp(it, w + IL.boss); return (p ? `<img class="rg-ica" alt="" src="${p}">` : '') + itemCardHTML(it); };
+  let h = ''; try { if (swap) applyForce(force); h = at ? ilAsDrop(w, card, force) : card(); } finally { if (swap) applyForce(was); }
+  return (RG_CARDS[ck] = h);
 }
 // a place's prize, its card as the force's own, at the level it is won at (the battle's last wave) (owner, 28 Nov 2026: the prize row "doesnt show on hover what it is")
 function rgPrizeCard(el) {
