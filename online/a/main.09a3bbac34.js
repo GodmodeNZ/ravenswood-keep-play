@@ -1,4 +1,4 @@
-const BUILD_TAG = 'b2f097ab@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'daf120ec@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -12370,7 +12370,7 @@ const SP_SHAPE = {
   // ---- Ironhold ----
   ih_bulwark: 'a h2', ih_breakerblow: 'a', ih_rollingvolley: 'h:n', ih_slug: 'a', ih_chainnet: 'a', ih_caltropfield: 'a', ih_grapple: 'a h4', ih_runeofpower: 'x', ih_forgeburst: 'a h3',
   ih_flakscreen: 'a h:dur/.5', ih_grapnel: 'a', ih_airburst: 'a H z.24', ih_pressureslam: 'a', ih_steamvent: 'a h:n', ih_pistondrive: 'a h2', ih_incendiary: 'a', ih_shrapnelround: 'a h2', ih_bombard: 'a',
-  ch_ironwall: 'a', ch_anvil: 'a', ch_oath: 'a', ch_sentry: 'a h26', ch_coil: 'a', ch_barrage: 'a h:passes', ch_rollkeg: 'a', ch_firebrew: 'a h:n', ch_onthehouse: 'a', ch_farshot: 'a', ch_flare: 'x', ch_headsman: '', ch_muster: 'x', ch_oathhammer: 'a', ch_mountaindue: 'a', ch_battery: 'a h4', ch_grudgeshell: 'a', ch_oldgrudge: 'a',
+  ch_ironwall: 'a', ch_anvil: 'a', ch_oath: 'a', ch_sentry: 'a h26', ch_coil: 'a', ch_barrage: 'a h:passes', ch_rollkeg: 'a', ch_firebrew: 'a h:n', ch_onthehouse: 'a', ch_farshot: 'a', ch_powder: 'a h:n', ch_headsman: '', ch_muster: 'x', ch_oathhammer: 'a', ch_mountaindue: 'a', ch_battery: 'a h4', ch_grudgeshell: 'a', ch_oldgrudge: 'a',
   // ---- the Stormborn ----
   sb_packhowl: 'a h:dur/.6', sb_stormspear: 'a h2', sb_galearrow: 'a', sb_crosswind: 'a h:dur/.5', sb_skyshot: 'a', sb_freezingrain: 'a z.5', sb_hailstorm: 'a h:n',
   sb_rimetotem: 'a', sb_spiritchains: 'a', sb_reckoning: 'a', sb_spiritbear: 'h3', sb_thunderbird: 'a', sb_stormtotem: 'a h:dur', sb_stonetotem: 'a h:dur',
@@ -29845,21 +29845,26 @@ function chFarPick(t, st, ab, man) {
   }
   return best && (man || abBig(best) || n >= ab.min) ? { x: best.x, y: best.y } : null;
 }
-// Headsman's Round: a 0.8s settle (a faint glint), then one heavy round; Oathbreaker's End fires once more on a kill
-function chHeadsman(t, c, m, ab, again) {
-  for (let q = 0; q < 4; q++) G.delayed.push({ t: q * .2, fn: () => { if (ihLive(t) && !c.dead) { const mz = ihMuzzle(t); rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: '#c89040', w: .008, life: .12 }); } } });
-  G.delayed.push({ t: .8, fn: () => {
+// Headsman's Round: a 0.8s settle (a faint glint), then one heavy round. Oathbreaker's End (28 Nov 2026, polished): a kill
+// fires it again at once, free, at the strongest foe in reach, after a short 0.35s settle; each round that kills fires
+// the next, up to CH_OATH_N more a cast. Each refire is an ember-red round, and the fallen foe flares where it dropped.
+const CH_OATH_N = 3;
+function chHeadsman(t, c, m, ab, left, settle) {
+  const T = settle == null ? .8 : settle, oath = settle != null;
+  for (let q = 0; q * .2 < T; q++) G.delayed.push({ t: q * .2, fn: () => { if (ihLive(t) && !c.dead) { const mz = ihMuzzle(t); rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: oath ? '#d86a3a' : '#c89040', w: .008, life: .12 }); } } });
+  G.delayed.push({ t: T, fn: () => {
     if (!ihLive(t) || c.dead) return;
     const st = t.st || effStats(t), k = m * (c.hp < c.maxHp * .5 ? 2 : 1);
     t.ang = Math.atan2(c.x - t.x, c.y - t.y); t.shotT = 0; t.recoil = 1;
-    const mz = ihMuzzle(t);
+    const mz = ihMuzzle(t), x = c.x, z = c.y, h = hitH(c);
     abRun(ab.id, () => abHit(t, st, c, k, 'phys'));
-    rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: '#ffe0a0', w: .035, life: .16 }); ihFlash(mz[0], mz[2], mz[1], .55); ihSmokePuff(mz[0], mz[2], mz[1], 4); sfx('heavyShot', 1);
-    if (!c.dead) ihSparks(c.x, c.y, hitH(c), 5, '#ffe0a8');
-    if (c.dead && again && st.caps && st.caps.ihtEnd) {
-      const L = abFoes(t, st, abReach(t, st, ab)), o = L.find(abBig) || L.sort((a, b) => b.hp - a.hp)[0];
-      if (o) chHeadsman(t, o, m, ab, 0);
-    }
+    rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c, col: oath ? '#ff8a4a' : '#ffe0a0', w: .035, life: .16 }); ihFlash(mz[0], mz[2], mz[1], .55); ihSmokePuff(mz[0], mz[2], mz[1], 4); sfx('heavyShot', 1);
+    if (!c.dead) { ihSparks(c.x, c.y, hitH(c), 5, '#ffe0a8'); return; }
+    if (!(left > 0) || !st.caps || !st.caps.ihtEnd) return;
+    // Oathbreaker's End: the fallen foe flares, and the next round is already on its way
+    fxRing(x, z, .45, '#ff6a3a'); part({ k: 'flare', x, z, h, life: .3, max: .3, size: .55, col: '#ff8a4a' }); ihSparks(x, z, h, 8, '#ffb070');
+    const L = abFoes(t, st, abReach(t, st, ab)).filter(o => !o.dead && o !== c), o = L.find(abBig) || L.sort((a, b) => b.hp - a.hp)[0];
+    if (o) { chHeadsman(t, o, m, ab, left - 1, .35); if (typeof chTvEv === 'function') chTvEv('oath'); }
   } });
 }
 IH_MUZZLE.ch_torvald = [1, .72];
@@ -29875,59 +29880,56 @@ champAdd('ih_marksman', { force: 'ironhold', he: 'he', glyph: 'crosshair', k: 1.
       text: (t, st, ab) => `Aims 1.5s at any foe on the field, then fires: ${champQx(t, st, ab, .4)} plus ${champQx(t, st, ab, .05)} per cell between them (up to ${champQx(t, st, ab, .9)}), through every foe on the line (20% less per foe). Bosses take the full hit and are stunned 0.6s. On kill: half the cooldown back, and ranged units attack 15% faster for 4s.`,
       pick: chFarPick,
       anim: chAnim('point', { T: 1.1, tip: ['main', [.02, -.06, .5]], col: [1, .85, .5], size: .3 }) })),
-    ihCastWrap({ id: 'ch_flare', name: 'Spotter\'s Flare', short: 'Flare', glyph: 'flash', hue: '#ffc870', mana: 80, cd: 12, research: CH_IH_RS, school: 'attack', pref: 'grouped',
-      by: { dur: [5, 5, 5, 6, 6, 6], r: [1.1, 1.1, 1.2, 1.2, 1.3, 1.3], amp: [.12, .12, .12, .15, .15, .15] },
-      auto: 'three or more foes bunched in reach, or a boss', blurb: 'A flare over a crowd: foes under it take more damage while it burns.',
-      text: (t, st, ab) => `A flare over the thickest crowd in reach: for ${byT(ab.by.dur, t)}s, foes within ${gNf(byT(ab.by.r, t))} cells take ${Math.round(byT(ab.by.amp, t) * 100)}% more damage.`,
-      pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null; const c = abCrowd(L, byT(ab.by.r, t)); return c && (man || c.n >= 3 || L.some(abBig)) ? { x: c.c.x, y: c.c.y } : null; },
-      cast(t, st, p, ab, K) {
-        if (!p || p.x == null) return false;
-        const r = byT(ab.by.r, t), dur = byT(ab.by.dur, t), z = { k: 'ch_flare', x: p.x, z: p.y, r, amp: byT(ab.by.amp, t) * chIhK(K), until: G.time + dur, tick: 0, every: .5 };
-        abZone(t, z); ABIL.ch_flare.zone(t, st, z);
-        if (st.caps && st.caps.ihtSignal) {   // Signal Fire: the gunline near the flare fires at the foes under it at once
-          const L = G.creeps.filter(c => !c.dead && c.ihFlareBy === t && Math.hypot(c.x - p.x, c.y - p.y) <= r + .2);
-          let q = 0; if (L.length) for (const o of G.towers) if (o.def.unit === 'thundergun' && ihLive(o) && Math.hypot(o.x - p.x, o.y - p.y) <= 3.5) { const c = L[q++ % L.length]; G.delayed.push({ t: .1 + .08 * q, fn: () => { if (ihLive(o) && !c.dead) fire(o, o.st || effStats(o), c, true); } }); }
-        }
-        const mz = ihMuzzle(t); rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], x1: p.x, h1: 1.2, z1: p.y, col: '#ffd890', w: .02, trav: .25, life: .3 });
-        part({ k: 'flare', x: p.x, z: p.y, h: 1.2, life: .5, max: .5, size: .5, col: '#ffe0a0' }); sfx('click');
+    // Powder Charge (owner, 28 Nov 2026, in place of Spotter's Flare: "dont like this spell"): he loads a heavy charge and
+    // his next shots burst where they land (the bursts: chPowderBurst, his fire() below). Pure damage, a crowd answer.
+    ihCastWrap({ id: 'ch_powder', name: 'Powder Charge', short: 'Powder', glyph: 'bomb', hue: '#ff9a40', mana: 80, cd: 12, research: CH_IH_RS, school: 'attack', pref: 'grouped',
+      by: { n: [3, 3, 3, 3, 3, 3], r: [.6, .6, .65, .65, .7, .7], mult: [.8, .85, .9, .95, 1, 1.05] },
+      auto: 'two or more foes bunched in reach, or a boss', blurb: 'He loads a heavy powder charge: his next shots burst where they land, striking every foe round the one they hit.',
+      text: (t, st, ab) => `Torvald loads a heavy powder charge: his next ${byT(ab.by.n, t)} shots burst where they land, striking every foe within ${gNf(byT(ab.by.r, t))} cells for ${xD(st, byT(ab.by.mult, t))}.`,
+      pick(t, st, ab, man) {   // (not while a charge is still loaded: the autocast never wastes one)
+        if ((t.ihPowderN | 0) > 0 && !man) return null;
+        const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null;
+        const c = abCrowd(L, byT(ab.by.r, t) + .2); return man || (c && c.n >= 2) || L.some(abBig) ? t : null;
       },
-      zone(t, st, z) { inSplash(z.x, z.z, z.r, false, c => { if (c.ent || !canTarget(t, st, c)) return; c.markAmp = Math.max(c.markT > 0 ? c.markAmp : 0, z.amp); c.markT = Math.max(c.markT, Math.min(1, z.until - G.time) + .1); c.ihFlareBy = t; }); },
-      anim: chAnim('sky', { T: 1.0, tip: ['main', [.02, -.06, .5]], col: [1, .85, .5], size: .35 }) }),
+      cast(t, st, _, ab, K) {
+        const n = byT(ab.by.n, t); t.ihPowderN = Math.min(2 * n, (t.ihPowderN | 0) + n); t.ihPowderK = chIhK(K);
+        G.delayed.push({ t: 0, fn: () => { if (ihLive(t)) t.shotT = Math.max(t.shotT || 0, .35); } });   // (his rig: the shot clip from the lever on, the charge rammed home)
+        const mz = ihMuzzle(t); ihSmokePuff(mz[0], mz[2], mz[1], 3, '#4a423a'); ihSparks(mz[0], mz[2], mz[1], 3, '#ffb050'); sfx('click');
+      },
+      anim: chAnim('point', { T: .9, tip: ['main', [.02, -.06, .5]], col: [1, .6, .25], size: .25 }) }),
     ihCastWrap({ id: 'ch_headsman', name: 'Headsman\'s Round', short: 'Headsman', glyph: 'skull', hue: '#ffb050', mana: 120, cd: 20, research: CH_IH_RS, school: 'attack', pref: 'high',
       by: { mult: [3.5, 3.8, 4.1, 4.4, 4.7, 5] },
       auto: 'a boss or leader in reach, or three or more foes', blurb: 'He settles on the strongest foe in reach and fires one heavy round; it hits twice as hard on a foe below half its health.',
       text: (t, st, ab) => `Aims 0.8s at the strongest foe in reach, then fires: ${xD(st, byT(ab.by.mult, t))}, doubled on a foe below half health.`,
       pick(t, st, ab, man) { const L = abFoes(t, st, abReach(t, st, ab)); if (!L.length) return null; const c = L.find(abBig) || L.slice().sort((a, b) => b.hp - a.hp)[0]; return man || abBig(c) || L.length >= 3 ? c : null; },
-      cast(t, st, c, ab, K) { if (!c || c.dead || c === t) return false; chHeadsman(t, c, byT(ab.by.mult, t) * chIhK(K), ab, 1); sfx('click'); },
+      cast(t, st, c, ab, K) { if (!c || c.dead || c === t) return false; chHeadsman(t, c, byT(ab.by.mult, t) * chIhK(K), ab, CH_OATH_N); sfx('click'); },
       anim: chAnim('point', { T: 1.1, tip: ['main', [.02, -.06, .5]], col: [1, .75, .4], size: .3 }) }),
   ] },
   tree: { name: 'The Long Watch', hue: '#e0a050', list: [
     CT('Patient Aim', 'eye', 0, 0, 2, n => `Ridgeline Shot aims in ${gNf(Math.max(.6, 1.5 - .25 * n))}s (was 1.5s).`, {}, { cap: 'ihtAim' }),
     CT('Steady Breath', 'quick', 0, 3, 2, n => `After ${gNf(3 - .5 * n)}s on one target (was 3s): +10% range and +20% crit chance.`, {}, { cap: 'ihtBreath' }),
     CT('Through the Ranks', 'crosshair', 0, 2, 2, n => `Ridgeline Shot loses ${20 - 5 * n}% per foe it passes through (was 20%).`, {}, { cap: 'ihtRanks' }),
-    CT('Wide Flare', 'sun', 3, 2, 1, 'Spotter\'s Flare lights 0.15 cells wider.', {}, { sp: { ab: 'ch_flare', by: { r: .15 } } }),
-    GS('ch_flare', 1, 0),
-    CT('Bright Flare', 'flash', 2, 0, 2, n => `Spotter's Flare lasts ${n}s longer.`, {}, { sp: n => ({ ab: 'ch_flare', by: { dur: n } }), req: [1, 0] }),
+    // (the names and words in this list are the old tree's, for the layers between this file and the last one:
+    // forces_..._easy_ztorvald.js turns the whole tree over, 28 Nov 2026, the two themes and their capstones)
+    CT('Wide Flare', 'sun', 3, 2, 1, 'Powder Charge bursts 0.15 cells wider.', {}, { sp: { ab: 'ch_powder', by: { r: .15 } } }),
+    GS('ch_powder', 1, 0),
+    CT('Bright Flare', 'flash', 2, 0, 2, n => `Powder Charge loads ${n} more shot${n > 1 ? 's' : ''}.`, {}, { sp: n => ({ ab: 'ch_powder', by: { n } }), req: [1, 0] }),
     CT('Ridge-Watch', 'spyglass', 2, 3, 2, n => `Ridgeline Shot's damage can climb with distance to ${90 + 5 * n}% (was 90%).`, {}, { cap: 'ihtRidge', sp: n => ({ ab: 'ch_farshot' }) }),
-    CT('Spotter\'s Tally', 'coin', 2, 1, 1, 'Every 3rd Spotter\'s Flare gives its mana back.', {}, { sp: { ab: 'ch_flare', every: 3 } }),
+    CT('Spotter\'s Tally', 'coin', 2, 1, 1, 'Every 3rd Powder Charge gives its mana back.', {}, { sp: { ab: 'ch_powder', every: 3 } }),
     CT('Oathbreaker\'s End', 'skull', 4, 3, 1, 'When Headsman\'s Round kills: +20 mana, and it fires again at once at the strongest foe in reach, free.', {}, { cap: 'ihtEnd', sp: { ab: 'ch_headsman', kill: { mana: 20, cd: 0 } }, req: [3, 3] }),
-    CT('Signal Fire', 'firering', 4, 1, 1, 'Spotter\'s Flare calls the gunline: every Thundergun within 3.5 cells of it fires at once at a foe under it.', {}, { cap: 'ihtSignal', sp: { ab: 'ch_flare' } }),
+    CT('Signal Fire', 'firering', 4, 1, 1, 'His attacks can strike any foe on the map.', {}, { cap: 'ihtSignal' }),
     CT('Punch-Through', 'arrowhead', 3, 0, 2, n => `Every 4th attack (his sure crit) passes through ${1 + n} foes behind (was 1).`, {}, { cap: 'ihtDeep' }),
     CT('Spent Brass', 'gem', 1, 2, 2, n => `Every 4th attack (his sure crit): +${6 * n} mana.`, {}, { cap: 'ihtBrass' }),
     GS('ch_headsman', 3, 3),
     CT('Windage', 'target', 1, 1, 3, n => `Crits on foes 3 or more cells away deal ${gNf(.2 * n)}× more damage.`, {}, { cap: 'ihtWind' }),
   ] },
   flavor: ['Torvald fights in person: one shot, one oathbreaker.', "I've been watching that one since the ridge. He just doesn't know it yet."], emblem: 'Oathbreaker\'s End',
-  fire(t, st, tg, pow, echo) {   // Windage, Spent Brass (Deadeye itself: ihHeroFire)
-    const C = st.caps || {};
-    if (C.ihtWind && Math.hypot(tg.x - t.x, tg.y - t.y) >= 3) st.critM = (st.critM || 2.5) + .2 * C.ihtWind;
-    if (C.ihtBrass && !echo && t.ihDeadN && t.ihDeadN % 4 === 0 && t.ab) t.ab.mana = Math.min((abilKit(t) || { mana: { max: 120 } }).mana.max, t.ab.mana + 6 * C.ihtBrass);
-    return pow;
-  },
-  extra(t, tier, x, z, yaw, K) {   // the flare's light on the road while it burns
-    if (!t.ab || inIcon) return;
-    for (const zn of t.ab.zones) { const left = zn.until - G.time; if (left <= 0 || zn.k !== 'ch_flare') continue; const a = Math.min(1, left * 2);
-      QG.ground(zn.x, zn.z, .02, zn.r, zn.r, [1, .82, .45, .16 * a], 4, .04); }
+  // his talents on a strike, Powder Charge's bursts and Spent Brass's mana on a kill: forces_..._easy_ztorvald.js (Deadeye itself: ihHeroFire)
+  fire(t, st, tg, pow, echo) { return typeof chTvFire === 'function' ? chTvFire(t, st, tg, pow, echo) : pow; },
+  kill(c, src, t) { if (typeof chTvKill === 'function') chTvKill(c, src, t); },
+  extra(t, tier, x, z, yaw, K) {   // a charge loaded: a few embers at the muzzle (small: nothing blooms round a caster)
+    if (inIcon || !(t.ihPowderN > 0) || typeof VLIVE === 'undefined' || !VLIVE || Math.random() > .12) return;
+    const mz = ihMuzzle(t); part({ k: 'spark', x: mz[0], z: mz[2], h: mz[1], vx: R(-.2, .2), vz: R(-.2, .2), vh: R(.2, .6), g: -.2, life: .35, max: .35, size: .035, col: '#ffa040' });
   },
 });
 
@@ -42350,7 +42352,7 @@ if (FORCE_ATTACK.flakgunner) {
     const n0 = t.ihFlakN || 0, r = flak0.apply(this, arguments), C = (st && st.caps) || {};
     if (C.ihCluster && tg && tg.ihcLitT > G.time && (t.ihFlakN || 0) > n0)
       for (let q = 0; q < 4; q++) { const a = q / 4 * TAU + R(.5), x = tg.x + Math.cos(a) * .9, z = tg.y + Math.sin(a) * .9;
-        G.delayed.push({ t: .35 + q * .06, fn: () => { if (ihLive(t)) ihFlakBurst(t, t.st || st, x, z, tg.fly ? 1.15 : .45, .5, null); } }); }
+        G.delayed.push({ t: .35 + q * .06, fn: () => { if (ihLive(t)) ihFlakBurst(t, t.st || st, x, z, tg.fly ? ihBody(tg)[1] : .45, .5, null); } }); }
     return r;
   };
 }
@@ -49474,7 +49476,7 @@ const HW = {
     ult: ['The First Engine', 'a gauntlet with a heart of caged violet lightning', [['hit', 'arc', 2], ['spell', 'ch_sentry', 'echo']]], art: 'the coil crackles violet, brighter each stage; at IV sparks run along the fingers' },
   ch_grenna: { glow: '#ff9a40', n: ['Grenna\'s Great Ladle', 'Great Ladle, Seasoned', 'Great Ladle of the Long Table', 'Last Orders, Grenna\'s Ladle'], fx: [['hit', 'burn', 4], ['spell', 'ch_firebrew', 'burn'], ['spell', 'ch_rollkeg', 'echo']],
     ult: ['The Bottomless Ladle', 'a ladle that never runs dry, fire-brew dripping from it', [['spell', 'ch_firebrew', 'echo'], ['hit', 'burn', 2]]], art: 'the copper warms, then the bowl holds glowing firebrew; at IV flames lick the rim' },
-  ch_torvald: { glow: '#ffc060', n: ['Torvald\'s Long Rifle', 'Long Rifle, Sighted', 'Long Rifle of the Ridge', 'Ridgewatch, Torvald\'s Rifle'], fx: [['crit'], ['spell', 'ch_flare', 'echo'], ['spell', 'ch_headsman', 'reset']],
+  ch_torvald: { glow: '#ffc060', n: ['Torvald\'s Long Rifle', 'Long Rifle, Sighted', 'Long Rifle of the Ridge', 'Ridgewatch, Torvald\'s Rifle'], fx: [['crit'], ['spell', 'ch_powder', 'echo'], ['spell', 'ch_headsman', 'reset']],
     ult: ['The Last Light on the Ridge', 'a rifle whose spyglass catches the last of the sunset', [['spell', 'ch_farshot', 'echo'], ['crit']]], art: 'the brass sight warms, then the barrel glows ember-red along its length; at IV a spark rides the muzzle' },
   ch_hrolf: { glow: '#c8d8f0', n: ['Hrolf\'s Flak Gun', 'Flak Gun, Ranged In', 'Flak Gun of the Long Grudge', 'Grudge-Gun, Hrolf\'s Flak'], fx: [['hit', 'splash', 4], ['spell', 'ch_grudgeshell', 'echo'], ['spell', 'ch_battery', 'echo']],
     ult: ['The Unforgiven', 'a flak gun with every grudge of the hold scratched along its barrel', [['spell', 'ch_oldgrudge', 'echo'], ['hit', 'splash', 2]]], art: 'the steel darkens, then the scratched names glow ember-red along the barrel; at IV smoke curls from the bore' },
@@ -49753,7 +49755,7 @@ const TAL_SPREAD = {
   "champ:ih_thane": {"Locked Shields":[0,0],"Shield-Ring":[0,1],"Wall of the Clan":[4,1],"Thane's Line":[4,0],"Horn of the Hold":[1,0],"Braced Heels":[2,0],"Dented Plate":[3,3],"Shield-Brother":[2,1],"Deep Roots":[5,3],"Shield-Toll":[1,2],"War Cry":[3,2],"Unbroken Line":[5,1],"Rising Peaks":[4,3],"Holds the Pass":[5,2],"Clan Drill":[0,2]},
   "champ:ih_artificer": {"Tally Wheel":[0,3],"Riveting Peal":[0,1],"Scrap Shrapnel":[0,2],"Engine Yard":[4,0],"Lodestone":[1,3],"Stronger Field":[2,3],"Barbed Rivets":[1,0],"Torn Loose":[3,3],"Counterweight":[3,0],"Magnetised":[4,2],"Overpressure":[4,1],"Chain Drive":[5,1],"Wrecking Ball":[2,0],"Restless Stone":[5,2],"Ricochet Rivets":[2,1],"Spare Parts":[3,2]},
   "champ:ih_brewer": {"Leaky Keg":[0,2],"Slick Floor":[1,0],"Heavy Barrel":[1,1],"Open Tap":[3,0],"Firewater Breath":[1,2],"Double Measure":[2,2],"Sticky Stout":[3,1],"Scorching Gust":[4,3],"Brimming Keg":[5,1],"Spilled Pints":[5,2],"Last Call":[3,2],"On the Slate":[2,1],"Last Orders":[4,1],"Topped Up":[0,1]},
-  "champ:ih_marksman": {"Patient Aim":[0,2],"Steady Breath":[1,0],"Through the Ranks":[1,1],"Wide Flare":[3,0],"Spotter's Flare":[1,2],"Bright Flare":[2,2],"Ridge-Watch":[3,1],"Spotter's Tally":[4,3],"Oathbreaker's End":[5,1],"Signal Fire":[5,2],"Punch-Through":[3,2],"Spent Brass":[2,1],"Headsman's Round":[4,1],"Windage":[0,1]},
+  "champ:ih_marksman": {"Patient Aim":[0,2],"Steady Breath":[1,0],"Through the Ranks":[1,1],"Wide Flare":[3,0],"Powder Charge":[1,2],"Bright Flare":[2,2],"Ridge-Watch":[3,1],"Spotter's Tally":[4,3],"Oathbreaker's End":[5,1],"Signal Fire":[5,2],"Punch-Through":[3,2],"Spent Brass":[2,1],"Headsman's Round":[4,1],"Windage":[0,1]},
   "champ:ih_hrolf": {"Ranging Fire":[0,2],"Drilled Crew":[1,0],"Full Racks":[1,1],"Grounding Shell":[3,0],"Grudge Shell":[1,2],"Heavy Charge":[2,2],"Low Angle":[3,1],"Spent Casings":[4,3],"The Long Grudge":[5,1],"Wing-Breaker":[5,2],"Grudge-Fed":[3,2],"Powder Ration":[2,1],"The Old Grudge":[4,1],"Skywarden's Watch":[0,1]},
   "champ:ih_king": {"Long Muster":[0,2],"Old Debts":[1,0],"Muster Drums":[1,1],"Hall-Breaker":[3,0],"Oathhammer":[1,2],"Broad Head":[2,2],"Sworn Shield":[3,1],"Kingsblood":[4,3],"Blood of Kings":[5,1],"The King's Due":[5,2],"Crown of Iron":[3,2],"Royal Tithe":[2,1],"The Mountain's Due":[4,1],"Throne Room":[0,1]},
   "silver.glaive": {"Shield-Ward":[0,1],"Witness the Blow":[1,2],"Staggering Bash":[0,2],"Shield of Faith":[3,0],"Vigil":[5,1],"Edge of Dawn":[0,3],"Rampart of Dawn":[2,2],"Oath of Challenge":[4,0],"Wall of Shields":[5,2],"Oath of Rebuke":[5,0],"Unyielding":[4,3],"Unbroken Oath":[2,3],"Pommel Blow":[1,1],"The Line Held":[4,1],"Dawn Shield":[3,2],"Ringing Rampart":[3,3]},
@@ -50659,7 +50661,7 @@ talPlain('ironhold', 'champ:ih_brewer', {
   'Topped Up': { tag: 'Spell', pro: n => `Her attacks landing in her ale make it last ${n}s longer (up to double).` },
 });
 talPlain('ironhold', 'champ:ih_marksman', {
-  'Patient Aim': { tag: 'Spell' }, 'Steady Breath': { tag: 'Damage' }, 'Through the Ranks': { tag: 'Spell' }, "Spotter's Flare": { tag: 'Spell' },
+  'Patient Aim': { tag: 'Spell' }, 'Steady Breath': { tag: 'Damage' }, 'Through the Ranks': { tag: 'Spell' }, "Powder Charge": { tag: 'Spell' },
   'Bright Flare': { tag: 'Spell' }, 'Wide Flare': { tag: 'Spell' }, "Spotter's Tally": { tag: 'Mana' }, 'Signal Fire': { tag: 'Support' },
   'Ridge-Watch': { tag: 'Damage' }, 'Punch-Through': { tag: 'Damage' }, "Headsman's Round": { tag: 'Spell' }, "Oathbreaker's End": { tag: 'Spell' },
   'Spent Brass': { tag: 'Mana' }, 'Windage': { tag: 'Damage' },
@@ -54171,21 +54173,21 @@ function tchUlt(id, o) {
     ['Brimming Keg', 5, 1, { req: [4, 1] }],
     ['Spilled Pints', 5, 2, { req: [4, 2], on: 'ale' }],
   ]);
-  tchTree(CHAMPS["ih_marksman"].tree, [   // ironhold.champ:ih_marksman
+  tchTree(CHAMPS["ih_marksman"].tree, [   // ironhold.champ:ih_marksman (28 Nov 2026, by hand: chain_layout.js stops on ironhold.glaive's spec; the old names, renamed by forces_..._easy_ztorvald.js)
     ['Windage', 0, 1],
-    ['Patient Aim', 0, 2],
-    ['Steady Breath', 1, 0],
-    ["Spotter's Flare", 1, 2, { req: [0, 2] }],
-    ['Through the Ranks', 1, 3],
-    ['Ridge-Watch', 2, 1],
-    ['Bright Flare', 2, 2, { req: [1, 2] }],
-    ['Spent Brass', 2, 3],
-    ['Punch-Through', 3, 1, { req: [2, 1] }],
-    ['Wide Flare', 3, 2, { req: [2, 2], max: 2, pro: n => `Spotter's Flare lights ${gNf(.075 * n)} cells wider.`, sp: n => ({ ab: 'ch_flare', by: { r: .075 * n } }) }],
-    ["Headsman's Round", 4, 1, { req: [3, 1] }],
-    ["Spotter's Tally", 4, 2, { req: [3, 2], max: 2, pro: n => `Every ${n >= 2 ? '2nd' : '3rd'} Spotter's Flare gives its mana back.`, sp: n => ({ ab: 'ch_flare', every: 4 - n }) }],
-    ["Oathbreaker's End", 5, 1, { req: [4, 1] }],
-    ['Signal Fire', 5, 2, { req: [4, 2] }],
+    ['Spent Brass', 0, 2],
+    ['Patient Aim', 0, 3],
+    ['Through the Ranks', 1, 2],
+    ["Powder Charge", 1, 3, { req: [0, 3] }],
+    ['Steady Breath', 2, 1],
+    ['Bright Flare', 2, 3, { req: [1, 3] }],
+    ['Ridge-Watch', 3, 1, { req: [2, 1] }],
+    ["Spotter's Tally", 3, 2, { req: [1, 2] }],
+    ['Punch-Through', 4, 1, { req: [3, 1] }],
+    ["Headsman's Round", 4, 2, { req: [3, 2] }],
+    ['Wide Flare', 4, 3, { req: [2, 3] }],
+    ['Signal Fire', 5, 1, { req: [4, 1] }],
+    ["Oathbreaker's End", 5, 2, { req: [4, 2] }],
   ]);
   tchTree(CHAMPS["ih_king"].tree, [   // ironhold.champ:ih_king
     ['Throne Room', 0, 1],
@@ -66176,6 +66178,157 @@ if (typeof effStats === 'function') {
       } }); }
 })();
 
+/* Torvald Emberbrand's own tree (owner, 28 Nov 2026, of Spotter's Flare: "dont like this spell ... do the same thing for
+   torvolds talent tree"; and "longshot should be able to pick off foes further so that he can aim on anyone on the map,
+   make that a capstone"). Two fantasies, each with its own capstone on a different part of his kit (owner rules), 14
+   talents in the same list order as before (saves load by name, then place; a renamed talent keeps its painting,
+   TAL_ART_ALIAS). Pure damage: no control anywhere. Spotter's Flare is gone: Powder Charge (ch_powder,
+   forces_zx_champ_ironhold.js) has its place, row II; its learned id follows it (AB_RENAMED).
+
+   THE LONG WATCH (column 2, Windage and Patient Aim): the patient sniper on the ridge, deadly from far off
+     Windage            his crits on foes 3+ cells away hit harder                (kept)
+     Patient Aim        Ridgeline Shot aims sooner                                (kept)
+     Steady Breath      on one target a while: more range and crit chance         (kept)
+     Ridge-Watch        Ridgeline Shot crits 20/40/60% more often                 (was: its distance cap 90 -> 100%)
+     Punch-Through      every 4th attack a sure crit through the foes behind      (kept: the tree's one counted talent)
+     EYE ON THE WHOLE FIELD  his attacks strike any foe on the map               (was Signal Fire)
+   THE HEADSMAN (column 3, and Spent Brass): picks off the wounded and the leaders; kills pay him back
+     Mercy Shot         his attacks hit foes below half health harder             (was Through the Ranks)
+     Spent Brass        each foe he kills gives him mana                          (was mana on every 4th attack)
+     Price on Their Heads  his attacks crit more often on bosses, leaders, elites (was Spotter's Tally)
+     Headsman's Round   his ultimate                                              (kept)
+     OATHBREAKER'S END  a kill fires Headsman's Round again, free, up to 3 times  (kept, polished: it chains now)
+   POWDER CHARGE (column 4): the crowd answer
+     Powder Charge      his next 3 shots burst where they land                    (was Spotter's Flare)
+     Full Horn          it loads more shots                                       (was Bright Flare)
+     Wide Blast         its bursts reach wider                                    (was Wide Flare)
+
+   Eye on the Whole Field: only his attacks reach the whole map (st.skyAll, the Astrologers' rule in
+   forces_..._easy_conclave_skywide.js: acquire and inRange). st.range stays his own reach, so his spells (Powder Charge's
+   pick, Headsman's Round and Oathbreaker's End) still measure from it, and Windage pays on nearly every far shot. A shot
+   past his old reach leaves a long tracer across the field and a glint on the foe. */
+const TVW = { WIND: .2, MERCY: .15, PRICE: .1, KEEN: .2, SPENT: 4, WIDE: .1, CAP: 'ihtWhole', DMG: 1 };
+const chTvEv = k => { if (typeof G !== 'undefined' && G) { const E = G.tvEv || (G.tvEv = {}); E[k] = (E[k] || 0) + 1; } };   // (a count for the tests: sim/tv_tree_test.js)
+(function () {
+  if (typeof CHAMPS === 'undefined' || !CHAMPS.ih_marksman || !CHAMPS.ih_marksman.tree) return;
+  const T = CHAMPS.ih_marksman.tree, N = v => String(+(+v).toFixed(2)), P = v => String(Math.round(v * 100));
+  const M = (t, n) => Math.max(1, Math.min(n | 0 || 1, t.max));
+  // set(old name, new name, fields): the talent in the old one's place, its old effect switched off
+  const set = (old, name, o) => {
+    const t = T.list.find(q => q.name === old && !q.spell); if (!t) { if (typeof console !== 'undefined') console.warn('torvald tree: no talent', old); return null; }
+    if (typeof ezClear === 'function') ezClear(t);
+    if (name !== old) { if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[name]) TAL_ART_ALIAS[name] = old; t.oldName = old; t.name = name; }
+    t.tag = o.tag; t.max = o.max; if (o.icon) t.icon = o.icon;
+    if (o.cap) { t.cap = o.cap; t.capK = 1; }
+    if (o.sp) t.sp = o.sp;
+    t.pro = n => o.pro(M(t, n)); t.con = () => '';
+    delete t.ezLadder; t.ez = null; t.atkPlain = true; t.fresh = true;
+    return t;
+  };
+  // ---- the Long Watch ----
+  set('Windage', 'Windage', { tag: 'Damage', max: 3, cap: 'ihtWind', pro: n => `Torvald's crits on foes 3 or more cells away deal ${N(TVW.WIND * n)}× more damage.` });
+  set('Patient Aim', 'Patient Aim', { tag: 'Spell', max: 2, cap: 'ihtAim', pro: n => `Ridgeline Shot aims in ${N(Math.max(.6, 1.5 - .25 * n))}s (was 1.5s).` });
+  set('Steady Breath', 'Steady Breath', { tag: 'Damage', max: 2, cap: 'ihtBreath', pro: n => `After ${N(3 - .5 * n)}s on one target (was 3s), Torvald gains 10% range and 20% crit chance.` });
+  set('Ridge-Watch', 'Ridge-Watch', { tag: 'Spell', max: 3, cap: 'ihtKeen', sp: () => ({ ab: 'ch_farshot' }), pro: n => `Increases the critical strike chance of Ridgeline Shot by ${P(TVW.KEEN * n)}%.` });
+  set('Punch-Through', 'Punch-Through', { tag: 'Damage', max: 2, cap: 'ihtDeep', pro: n => `Every 4th attack of Torvald is a sure crit that pierces on through ${1 + n} foes behind.` });
+  set('Signal Fire', 'Eye on the Whole Field', { tag: 'Damage', max: 1, cap: TVW.CAP, icon: 'lens', pro: () => "Torvald's attacks can strike any foe on the map." });
+  // ---- the Headsman ----
+  set('Through the Ranks', 'Mercy Shot', { tag: 'Damage', max: 2, cap: 'ihtMercy', icon: 'scythe', pro: n => `Torvald's attacks deal ${P(TVW.MERCY * n)}% more damage to foes below half health.` });
+  set('Spent Brass', 'Spent Brass', { tag: 'Mana', max: 2, cap: 'ihtSpent', pro: n => `Each foe Torvald kills gives him ${TVW.SPENT * n} mana.` });
+  set("Spotter's Tally", 'Price on Their Heads', { tag: 'Damage', max: 2, cap: 'ihtPrice', icon: 'coin', pro: n => `Torvald's attacks crit ${P(TVW.PRICE * n)}% more often on bosses, leaders and elites.` });
+  set("Oathbreaker's End", "Oathbreaker's End", { tag: 'Spell', max: 1, cap: 'ihtEnd', sp: () => ({ ab: 'ch_headsman', kill: { mana: 20, cd: 0 } }),
+    pro: () => `When Headsman's Round kills, Torvald gains 20 mana and fires it again at once, free, at the strongest foe in reach, up to ${typeof CH_OATH_N !== 'undefined' ? CH_OATH_N : 3} times a cast.` });
+  // ---- Powder Charge ----
+  set('Bright Flare', 'Full Horn', { tag: 'Spell', max: 2, icon: 'horn', sp: n => ({ ab: 'ch_powder', by: { n } }), pro: n => `Powder Charge loads ${n} more shot${n > 1 ? 's' : ''}.` });
+  set('Wide Flare', 'Wide Blast', { tag: 'Spell', max: 2, icon: 'burst', sp: n => ({ ab: 'ch_powder', by: { r: TVW.WIDE * n } }), pro: n => `Powder Charge's bursts reach ${N(TVW.WIDE * n)} cells wider.` });
+  // ---- the layout: rows 3 2 2 2 3 2, the capstones in the middle columns; chains Steady Breath > Ridge-Watch > Punch-Through > Eye on the Whole Field |
+  // Mercy Shot > Price on Their Heads > Headsman's Round > Oathbreaker's End | Patient Aim > Powder Charge > Full Horn > Wide Blast
+  const by = n => T.list.find(q => q.name === n || (q.spell && ABIL[q.spell] && ABIL[q.spell].name === n));
+  const CELLS = { 'Windage': [0, 1], 'Spent Brass': [0, 2], 'Patient Aim': [0, 3], 'Mercy Shot': [1, 2], 'Powder Charge': [1, 3], 'Steady Breath': [2, 1], 'Full Horn': [2, 3],
+    'Ridge-Watch': [3, 1], 'Price on Their Heads': [3, 2], 'Punch-Through': [4, 1], "Headsman's Round": [4, 2], 'Wide Blast': [4, 3], 'Eye on the Whole Field': [5, 1], "Oathbreaker's End": [5, 2] };
+  const CHAINS = [['Steady Breath', 'Ridge-Watch', 'Punch-Through', 'Eye on the Whole Field'], ['Mercy Shot', 'Price on Their Heads', "Headsman's Round", "Oathbreaker's End"], ['Patient Aim', 'Powder Charge', 'Full Horn', 'Wide Blast']];
+  let ok = true;
+  for (const n in CELLS) { const t = by(n); if (!t) { ok = false; if (typeof console !== 'undefined') console.warn('torvald tree: no cell for', n); continue; } t.r = CELLS[n][0]; t.c = CELLS[n][1]; t.req = null; t.reqs = null; }
+  if (ok) for (const ch of CHAINS) for (let k = 1; k < ch.length; k++) { const a = by(ch[k - 1]), b = by(ch[k]); b.req = [a.r, a.c]; }
+  T.open = true; T._ezLaid = true;
+  // saves: the flare's spell talent is Powder Charge's; the flare's learned id is Powder Charge's
+  if (typeof TAL_ALIAS !== 'undefined') TAL_ALIAS["Spotter's Flare"] = 'Powder Charge';
+  if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS['Powder Charge']) TAL_ART_ALIAS['Powder Charge'] = "Spotter's Flare";
+  if (typeof AB_RENAMED !== 'undefined') AB_RENAMED.ch_flare = 'ch_powder';
+  // Deadeye (his counted sure crit) is turned on by the trait or Punch-Through now; Spent Brass no longer rides it
+  if (typeof PLAIN !== 'undefined' && PLAIN.nth) PLAIN.nth['ch_torvald:Deadeye'] = (t, st) => (typeof plTrait === 'function' && plTrait('ih_marksman')) || !!(st && st.caps && st.caps.ihtDeep);
+})();
+
+/* ---------- the rules ---------- */
+// his strike (CHAMPS.ih_marksman.fire): Windage, Price on Their Heads, Mercy Shot, a loaded Powder Charge, the whole field's tracer
+function chTvFire(t, st, tg, pow, echo) {
+  const C = st.caps || {}, d = Math.hypot(tg.x - t.x, tg.y - t.y);
+  if (C.ihtWind && d >= 3) st.critM = (st.critM || 2.5) + TVW.WIND * C.ihtWind;
+  if (C.ihtPrice && abBig(tg)) st.crit = Math.min(1, (st.crit || 0) + TVW.PRICE * C.ihtPrice);
+  if (C.ihtMercy && tg.hp < (tg.maxHp || tg.hp) * .5) pow *= 1 + TVW.MERCY * C.ihtMercy;
+  const mz = typeof ihMuzzle === 'function' ? ihMuzzle(t) : [t.x, towerTop(t), t.y];
+  if (st.skyAll && !echo && d > (st.range || 0) + (tg.fly && st.airR ? st.airR : 0)) {   // a shot from past his own reach: it crosses the field
+    // (a long amber tracer that lingers a beat, so the eye can follow it across the map, and a glint where it lands; thin, and
+    // nothing at Torvald himself: the vfx rule)
+    rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c: tg, col: '#ffe2a0', w: .065, trav: Math.min(.25, d / 45), life: Math.min(.25, d / 45) + .45 });
+    G.delayed.push({ t: Math.min(.25, d / 45), fn: () => { if (!tg.dead) { part({ k: 'flare', x: tg.x, z: tg.y, h: hitH(tg) + .05, life: .25, max: .25, size: .45, col: '#fff0c0' }); ihSparks(tg.x, tg.y, hitH(tg), 4, '#ffe8b0'); } } });
+    chTvEv('whole');
+  }
+  if (!echo && t.ihPowderN > 0) {   // Powder Charge: this shot bursts where it lands
+    t.ihPowderN--; chTvEv('powderShot');
+    rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], c: tg, col: '#ffa050', w: .05, life: .2 });
+    ihSmokePuff(mz[0], mz[2], mz[1], 2, '#4a423a');
+    const x = tg.x, z = tg.y;
+    G.delayed.push({ t: .03, fn: () => chPowderBurst(t, tg.dead ? x : tg.x, tg.dead ? z : tg.y) });
+  }
+  return pow;
+}
+// a burst: every foe within its reach of where the round landed, struck as Powder Charge (its Spell Damage and its crits)
+function chPowderBurst(t, x, z) {
+  const ab = typeof ABIL !== 'undefined' && ABIL.ch_powder; if (!ab || G.state !== 'play' || !G.towers.includes(t) || t.wrecked) return;
+  const s = t.st || effStats(t), r = byT(ab.by.r, t), m = byT(ab.by.mult, t) * (t.ihPowderK || 1);
+  let n = 0;
+  abRun('ch_powder', () => abAoe(() => inSplash(x, z, r, false, c => { if (c.ent || c.dead || !canTarget(t, s, c)) return; abHit(t, s, c, m, 'phys'); n++; })));
+  chPowderFx(x, z, r); G.shake = Math.max(G.shake || 0, .05); sfx('boom', 0);
+  chTvEv('burst'); if (n > 1) chTvEv('burstMulti');
+}
+// its look: a black-powder burst the size of its reach, a ring, sparks, a little smoke and a scorch; no light thrown
+// across the field (fxExplode's wash tinted the whole map when three went off in a row: the vfx rule)
+function chPowderFx(x, z, r) {
+  fxRing(x, z, r, '#ffa040');
+  part({ k: 'flare', x, z, h: .3, life: .16, max: .16, size: r * 1.2, col: '#ffb052' });
+  for (let k = 0; k < 10; k++) { const a = R(TAU), s = R(1, 2.4); part({ k: 'spark', x, z, h: .2, vx: Math.cos(a) * s, vz: Math.sin(a) * s, vh: R(1.2, 3), g: 9, drag: .8, life: R(.25, .5), max: .5, size: R(.04, .07), col: '#ffc070' }); }
+  for (let k = 0; k < 5; k++) part({ k: 'smoke', x: x + R(-.2, .2), z: z + R(-.2, .2), h: R(.1, .3), vx: R(-.3, .3), vz: R(-.3, .3), vh: R(.3, .8), drag: 1.2, life: R(.6, 1), max: 1, size: R(.18, .28), col: '#4a423a' });
+  if (typeof decal === 'function') decal('scorch', x, z, r * .6, '#1a120a', 6);
+}
+// a kill (CHAMPS.ih_marksman.kill): Spent Brass
+function chTvKill(c, src, t) {
+  const C = t && t.st && t.st.caps; if (!C || !C.ihtSpent) return;
+  if (src !== t && !(typeof HERO_SRC !== 'undefined' && src === HERO_SRC)) return;
+  if (typeof gainMana === 'function') { gainMana(t, TVW.SPENT * C.ihtSpent); chTvEv('spent'); }
+}
+// Eye on the Whole Field: his attacks reach the whole map (acquire / inRange read st.skyAll)
+if (typeof effStats === 'function') {
+  const _tvEff = effStats;
+  effStats = function (t) {
+    const st = _tvEff.apply(this, arguments);
+    if (st && t && t.def && t.def.unit === 'ch_torvald' && st.caps && st.caps[TVW.CAP] && !st.skyAll) { st.skyAll = 1; if (st.dmg && TVW.DMG !== 1) st.dmg *= TVW.DMG; }
+    return st;
+  };
+}
+// Ridgeline Shot crits (Ridge-Watch): at his own crit chance, plus 20% a rank, at his crit multiple; the whole round
+if (typeof ihFarFire === 'function') {
+  const _tvFar = ihFarFire;
+  ihFarFire = function (z, tg, k0) {
+    const ch = z && z.ch, s = ch && ch.st, C = (s && s.caps) || {};
+    if (ch && s && tg && ch.def && ch.def.unit === 'ch_torvald' && Math.random() < Math.min(1, (s.crit || 0) + TVW.KEEN * (C.ihtKeen || 0))) {
+      k0 *= s.critM || 2.5; tg.critT = G.time + .9; chTvEv('keenCrit');
+      if (typeof fxMark === 'function') fxMark(tg, 'crit');
+    }
+    return _tvFar.call(this, z, tg, k0);
+  };
+}
+
 /* Capstones that were a burst of extra hits or a bare number, and trees with two "hits again" talents (the hub's review of
    talent-variety, 28 Nov 2026: "Capstones must be fantasy-defining (owner rule)"; "trim the extra-hit nodes to at most 1 per
    tree"). After forces_..._easy_zcapstones.js, whose helpers these use (ezcHit, ezcFoes).
@@ -66335,6 +66488,428 @@ if (typeof ezSpell === 'function') {
     if (!t && typeof console !== 'undefined') console.warn('spell crit talents: not set', f, slot, name);
   }
 }
+
+/* ================= FLAK CANNONEERS: two themes and the hook (owner, 28 Nov 2026) =================
+   Owner: "flak talents need a rework, don't like the extra 35% damage talents, seems lazy. want capstone talents that play
+   into the fantasy of the unit and are tied to a theme." His two themes, and "some talents that play around [Grapnel Shot]
+   to improve that particular spell":
+     CLEAR SKIES (nothing flies over the Cannoneers): column 2, Sky Shatter > Torn Wings > High Sights > IRON CEILING
+       Sky Shatter          kept: a flyer it kills crashes onto the foes below
+       Torn Wings           (new rule, the name kept) a flyer its shell hits bursts: the flyers round it take a share
+       High Sights          kept: more reach against flyers
+       capstone IRON CEILING (was Twin Mount)   Flak Screen also hangs a ceiling of flak over the unit's whole reach while
+                            it lasts: every flyer under it is struck every 0.5s (a flyer it kills crashes, with Sky Shatter)
+     HEAVY CALIBRE (one big shell): column 1, Heavy Calibre > Steel-Cored Shells > Starshell > WRECKING ROUND
+       Heavy Calibre (was Fast Fuses)           slower fire, much bigger shells
+       Steel-Cored Shells (was Quick Traverse)  ignores armour
+       Big Game (was Hot Shrapnel, free)        more damage to bosses, leaders and elites
+       capstone WRECKING ROUND (was Proximity Fuse)   Starshell is one huge siege shell instead of a flare: it craters the
+                            road, flattening every ground foe in a wide circle, and the crater hurts the walkers in it a few seconds
+     GRAPNEL SHOT: column 3, Grapnel Shot > Cluster Shell > Point-Blank > HOOK THE SKY
+       Cluster Shell        kept: Grapnel Shot crits 20/40/60% more often (forces_..._easy_zzcrit.js)
+       Biting Hook (new, the 16th talent)       harder hooks: Grapnel Shot hits flyers harder
+       Point-Blank (was Second Burst)           a shell straight into the hooked foe
+       Quick Winch (was Gunner's Tithe, free)   faster hooks: Grapnel Shot comes back sooner when it hooks a flyer
+       capstone HOOK THE SKY kept (forces_..._own_ironhold.js): three hooks at once, flyers first
+   Barbed Shrapnel stays (the tutorial's healer lesson teaches it). Cut: Proximity Fuse and Twin Mount (the owner's "+35%"
+   capstones), Fast Fuses, Quick Traverse, Hot Shrapnel, Second Burst, Gunner's Tithe. A talent rewritten in place keeps
+   its list slot; its saved ranks follow its new name (TAL_ALIAS) and it borrows a painting (TAL_ART_ALIAS) until its own
+   lands (docs/talent_art_needed.md). No stuns, roots or slows in the new talents (a damage unit), no counted procs.
+   After forces_..._easy_zzcrit.js (Cluster Shell's crit) and before the words files (unitnames, zwords), which wrap the text
+   written here. The tree stays open (forces_..._easy.js ezLayout's rules): its three chains are laid out at the foot. */
+const IHFK = {
+  U: 'flakgunner',
+  HEAVY_S: .12, HEAVY_K: .25,          // Heavy Calibre, a rank: fires 12% slower, its shells hit 25% harder
+  STEEL: .25,                          // Steel-Cored Shells, a rank: 25% of armour ignored
+  BIG: .2,                             // Big Game, a rank: 20% more to bosses, leaders and elites
+  SHRAP: .4, SHRAP_R: 1,               // Torn Wings, a rank: 40% of the shell's hit to the other flyers within 1 cell of a flyer it hits
+  CEIL_K: .8, CEIL_EVERY: .5,          // Iron Ceiling: 80% attack damage a flyer every 0.5s, over the unit's whole reach
+  BITE: .15,                           // Biting Hook, a rank: Grapnel Shot 15% harder against flyers
+  POINT: .5,                           // Point-Blank, a rank: a shell of 50% attack damage into the hooked foe
+  WINCH: 1,                            // Quick Winch, a rank: 1s off Grapnel Shot's cooldown when it hooks a flyer
+  WRECK_K: 2.6, WRECK_R: 1.6,          // Wrecking Round: 2.6x Starshell's damage to ground foes within 1.6 cells (the flyers above are spared)
+  CRATER_K: .4, CRATER_T: 4, CRATER_EVERY: .5,   // and its crater: 40% attack damage every 0.5s for 4s
+};
+(function ihfTree() {
+  if (typeof FORCES === 'undefined' || !FORCES.ironhold || !FORCES.ironhold.talents || typeof ezClear !== 'function') return;
+  const T = FORCES.ironhold.talents.storm; if (!T || !T.list) return;
+  const L = T.list, N = v => String(+(+v).toFixed(2)), P = v => String(Math.round(v * 100));
+  const rk = (t, n) => Math.max(1, Math.min(n | 0 || 1, t.max));
+  // a save's ranks follow the talent to its new name, from this name and every older one (talnames.js migrateTal)
+  const alias = (was, now) => {
+    if (typeof TAL_ALIAS === 'undefined' || was === now) return;
+    for (const k in TAL_ALIAS) if (TAL_ALIAS[k] === was) TAL_ALIAS[k] = now;
+    TAL_ALIAS[was] = now;
+  };
+  // rewrite one talent in place: o.name, o.pro (rank => words), o.cap, o.mod, o.sp, o.on, o.tag, o.icon, o.max, o.art (the painting it borrows)
+  const set = (old, o) => {
+    const t = L.find(q => q.name === old && !q.spell);
+    if (!t) { if (typeof console !== 'undefined') console.warn('flak tree: no talent', old); return null; }
+    ezClear(t);
+    for (const k of ['ez', 'ezA', 'ezB', 'ezAb', 'ezLadder']) delete t[k];
+    if (o.name && o.name !== old) {
+      if (typeof TAL_ART_ALIAS !== 'undefined') TAL_ART_ALIAS[o.name] = o.art || TAL_ART_ALIAS[old] || old;
+      t.oldName = old; alias(old, o.name); t.name = o.name;
+    } else if (o.art && typeof TAL_ART_ALIAS !== 'undefined') TAL_ART_ALIAS[t.name] = o.art;
+    if (o.max) t.max = o.max;
+    t.tag = o.tag || 'Damage'; if (o.icon) t.icon = o.icon;
+    t.cap = o.cap || null; t.capK = 1; t.capAt = 1;
+    t.mod = o.mod || (() => ({}));
+    t.sp = o.sp || null;
+    if (o.on) t.on = o.on;
+    t.con = () => ''; t.atkPlain = true; t.fresh = true;
+    t.pro = n => o.pro(rk(t, n));
+    return t;
+  };
+
+  /* ---- Clear Skies ---- */
+  set('Torn Wings', { icon: 'wing', cap: 'ihfShrap',
+    pro: n => `When the Flak Cannoneer's shell hits a flyer, the flyer bursts: other flyers within ${N(IHFK.SHRAP_R)} cell take ${P(IHFK.SHRAP * n)}% attack damage.` });
+  set('Twin Mount', { name: 'Iron Ceiling', art: 'Tracer Rounds', icon: 'cloud', tag: 'Spell', max: 1, cap: 'ihfCeil', on: 'ih_flakscreen',
+    sp: () => ({ ab: 'ih_flakscreen' }),
+    pro: () => `Flak Screen also hangs a ceiling of flak over the Flak Cannoneer's whole reach while it lasts: every ${N(IHFK.CEIL_EVERY)}s, each flyer under it takes ${P(IHFK.CEIL_K)}% attack damage.` });
+
+  /* ---- Heavy Calibre ---- */
+  set('Fast Fuses', { name: 'Heavy Calibre', art: 'Scorched Barrel', icon: 'shell', max: 2, cap: 'ihfHeavy',
+    mod: n => ({ rate: 1 + IHFK.HEAVY_S * n }),
+    pro: n => `The Flak Cannoneer fires ${P(IHFK.HEAVY_S * n)}% slower, but each shell hits ${P(IHFK.HEAVY_K * n)}% harder.` });
+  set('Quick Traverse', { name: 'Steel-Cored Shells', icon: 'shieldbreak', max: 2,
+    mod: n => ({ armorPen: IHFK.STEEL * n }),
+    pro: n => `The Flak Cannoneer's shells and spells ignore ${P(IHFK.STEEL * n)}% of armour.` });
+  set('Hot Shrapnel', { name: 'Big Game', icon: 'target', max: 2, cap: 'ihfBig',
+    pro: n => `The Flak Cannoneer deals ${P(IHFK.BIG * n)}% more damage to bosses, leaders and elites.` });
+  set('Proximity Fuse', { name: 'Wrecking Round', icon: 'mortar', tag: 'Spell', max: 1, cap: 'ihfWreck', on: 'ih_airburst',
+    sp: () => ({ ab: 'ih_airburst' }),
+    pro: () => `Starshell becomes a huge siege shell: ${N(IHFK.WRECK_K)} times its damage to ground foes within ${N(IHFK.WRECK_R)} cells, and its crater deals ${P(IHFK.CRATER_K)}% attack damage every ${N(IHFK.CRATER_EVERY)}s for ${IHFK.CRATER_T}s.` });
+
+  /* ---- Grapnel Shot ---- */
+  set('Second Burst', { name: 'Point-Blank', art: 'Ground Burst', icon: 'crosshair', tag: 'Spell', max: 2, cap: 'ihfPoint', on: 'ih_grapnel',
+    sp: () => ({ ab: 'ih_grapnel' }),
+    pro: n => `When Grapnel Shot hooks a foe, the Flak Cannoneer fires a shell straight into it: ${P(IHFK.POINT * n)}% attack damage.` });
+  set("Gunner's Tithe", { name: 'Quick Winch', art: 'Reel In', icon: 'quick', tag: 'Spell', max: 2, cap: 'ihfWinch', on: 'ih_grapnel',
+    sp: () => ({ ab: 'ih_grapnel' }),
+    pro: n => `Reduces the cooldown of Grapnel Shot by ${N(IHFK.WINCH * n)} sec each time it hooks a flyer.` });
+  // the 16th talent, Biting Hook: a new slot at the end of the list (saves carry names, talnames.js; old saves read 0 ranks here)
+  if (!L.some(q => q.name === 'Biting Hook')) {
+    const proto = L.find(q => q.name === 'Barbed Shrapnel') || L[0];
+    const t = Object.assign({}, proto, { name: 'Biting Hook', icon: 'chain', r: 2, c: 0, max: 2, id: L.length, req: null, reqs: null, req0: null, rc0: [2, 0],
+      art: null, spell: null, mana: null, wound: 0, cap: null, fresh: true, tag: 'Spell', atkPlain: true });
+    for (const k of ['oldName', 'apKey', 'apFx', 'apSee', 'apTh', 'apMax', 'ez', 'ezA', 'ezB', 'ezAb', 'ezLadder', '_unSaid', '_atkSaid', 'on']) delete t[k];
+    t.mod = () => ({}); t.con = () => ''; t.sp = null;
+    L.push(t);
+    if (typeof TAL_ART_ALIAS !== 'undefined') TAL_ART_ALIAS['Biting Hook'] = 'Chain-Fed';
+  }
+  if (typeof ezSpell === 'function') ezSpell('ironhold', 'storm', 'Biting Hook', 'ih_grapnel', { vs: ['flyer', IHFK.BITE], max: 2 });
+
+  /* ---- the layout: three chains straight down, the rest free (rows open by points: an open tree) ----
+     row I    Barbed Shrapnel Heavy Calibre     Sky Shatter      .
+     row II   .               .                 Torn Wings       Grapnel Shot
+     row III  Biting Hook     Steel-Cored       High Sights      Cluster Shell
+     row IV   Big Game        .                 .                Point-Blank
+     row V    Quick Winch     Starshell         .                .
+     row VI   .               Wrecking Round    Iron Ceiling     Hook the Sky */
+  const CELLS = {
+    'Barbed Shrapnel': [0, 0], 'Heavy Calibre': [0, 1], 'Sky Shatter': [0, 2],
+    'Torn Wings': [1, 2], 'Grapnel Shot': [1, 3],
+    'Biting Hook': [2, 0], 'Steel-Cored Shells': [2, 1], 'High Sights': [2, 2], 'Cluster Shell': [2, 3],
+    'Big Game': [3, 0], 'Point-Blank': [3, 3],
+    'Quick Winch': [4, 0], 'Starshell': [4, 1],
+    'Wrecking Round': [5, 1], 'Iron Ceiling': [5, 2], 'Hook the Sky': [5, 3],
+  };
+  const CHAINS = [['Heavy Calibre', 'Steel-Cored Shells', 'Starshell', 'Wrecking Round'], ['Sky Shatter', 'Torn Wings', 'High Sights', 'Iron Ceiling'], ['Grapnel Shot', 'Cluster Shell', 'Point-Blank', 'Hook the Sky']];
+  const by = n => L.find(q => q.name === n);
+  for (const t of L) { const p = CELLS[t.name]; if (!p) { if (typeof console !== 'undefined') console.warn('flak tree: no cell for', t.name); continue; } t.r = p[0]; t.c = p[1]; t.req = null; t.reqs = null; }
+  for (const ch of CHAINS) for (let k = 1; k < ch.length; k++) { const a = by(ch[k - 1]), b = by(ch[k]); if (a && b) b.req = [a.r, a.c]; }
+  { const hs = by('High Sights'); if (hs) hs.tag = 'Damage'; }   /* (it was tagged Mana) */
+  T.open = true; T._ezLaid = true;
+})();
+
+/* ---------- the rules ---------- */
+const ihfkCaps = t => (t && t.def && t.def.unit === IHFK.U && t.st && t.st.caps) || null;
+const ihfkAir = c => !!c.fly && !(c.lowT > G.time);
+// Heavy Calibre: the shells hit harder (the slower fire is the talent's stat change)
+if (typeof FORCE_ATTACK !== 'undefined' && FORCE_ATTACK[IHFK.U]) {
+  const A0 = FORCE_ATTACK[IHFK.U];
+  FORCE_ATTACK[IHFK.U] = function (t, st, tg, pow, echo) {
+    const C = st && st.caps;
+    if (C && C.ihfHeavy) pow *= 1 + IHFK.HEAVY_K * C.ihfHeavy;
+    return A0.call(this, t, st, tg, pow, echo);
+  };
+}
+// Torn Wings: a flyer the burst catches bursts in turn (once a foe a burst); Heavy Calibre's shells burst bigger
+if (typeof ihFlakBurst === 'function') {
+  const B0 = ihFlakBurst;
+  ihFlakBurst = function (t, st, x, z, h, pow, tg) {
+    const C = t && t.def && t.def.unit === IHFK.U && st && st.caps, sp = (st && st.splash) || .55;
+    const F0 = C && C.ihfShrap ? G.creeps.filter(c => c.fly && !c.dead && !c.ent && Math.hypot(c.x - x, c.y - z) <= sp && canTarget(t, st, c)) : null;
+    const r = B0.apply(this, arguments);
+    try {
+      if (F0 && F0.length && ihLive(t)) {
+        const amt = (st.dmg || 0) * (pow || 1) * IHFK.SHRAP * C.ihfShrap, hit = new Set(F0);
+        ihAoe(() => {
+          for (const f of F0) for (const q of G.creeps) {
+            if (hit.has(q) || q.dead || q.ent || !q.fly || Math.hypot(q.x - f.x, q.y - f.y) > IHFK.SHRAP_R || !canTarget(t, st, q)) continue;
+            hit.add(q); ihHit(t, st, q, amt, 'phys', true);
+            rfx({ k: 'streak', x0: f.x, h0: hitH(f), z0: f.y, c: q, col: '#e8c890', w: .018, trav: .07, life: .14 });
+            part({ k: 'spark', x: q.x, z: q.y, h: hitH(q), vx: R(-1, 1), vz: R(-1, 1), vh: R(-.5, .8), g: 3, drag: 2, life: .22, max: .22, size: .045, col: '#ffc070' });
+            if (q.dead && C.ihCrash && typeof ihSkyCrash === 'function') ihSkyCrash(t, st, q, amt);
+          }
+        });
+      }
+      if (C && C.ihfHeavy && pow > 1) {   // (a heavier crump: a wider, darker cloud; restraint on a routine hit)
+        part({ k: 'flare', x, z, h, life: .14, max: .14, size: (.9 + sp) * (1 + .12 * C.ihfHeavy), col: '#ffb060' });
+        for (let k = 0; k < 2 + C.ihfHeavy; k++) part({ k: 'smoke', x: x + R(-.3, .3), z: z + R(-.3, .3), h: h + R(-.1, .1), vx: R(-.6, .6), vz: R(-.6, .6), vh: R(0, .3), drag: 2, life: .9, max: .9, size: R(.2, .3), col: '#2e2a26' });
+      }
+    } catch (e) { if (typeof console !== 'undefined') console.warn('flak tree:', e); }
+    return r;
+  };
+}
+// Big Game: more to bosses, leaders and elites (its attacks and its spells)
+if (typeof forceHook === 'function') {
+  const H0 = forceHook;
+  forceHook = function (k, a0, a1, a2) {
+    const r = H0.apply(this, arguments);
+    if (k !== 'amp' || a2 || !a0 || !a1 || !a1.def || a1.def.unit !== IHFK.U) return r;
+    const C = a1.st && a1.st.caps;
+    if (!C || !C.ihfBig || !(a0.def && (a0.def.boss || a0.def.lead)) && !a0.elite) return r;
+    return (r || 0) + IHFK.BIG * C.ihfBig;
+  };
+}
+
+/* ---------- the capstones' look: built on the spell toolkit when it is there (the node sims load no view) ---------- */
+// run fn(C) as spell id's look; false when the toolkit is out (the caller then draws its plain particles)
+function ihfkFx(id, t, tg, fn) {
+  try { if (typeof ihcFx !== 'function' || typeof ihcReg !== 'function' || !ihcReg() || typeof vfxReady !== 'function' || !vfxReady() || typeof sfxLive !== 'function' || !sfxLive() || !sfxRecipe(id)) return false; } catch (e) { return false; }
+  ihcFx(id, t, tg, fn); return true;
+}
+// where a foe's body is drawn, [x, h, z] (a flyer's own height and bob: view.js creepBody, when the build has it)
+const ihfkBody = c => typeof ihBody === 'function' ? ihBody(c) : c.fly && typeof creepBody === 'function' ? creepBody(c) : [c.x, hitH(c), c.y];
+const ihfkHash = (a, b) => { let h = (Math.imul(Math.floor(a * 16) | 0, 374761393) ^ Math.imul(Math.floor(b * 16) | 0, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+
+/* ---------- Iron Ceiling: Flak Screen hangs flak over the whole reach ---------- */
+const ihfkReach = (t, st) => ((st && st.range) || 1.5) + ((st && st.airR) || 0);
+if (typeof ihcWrapCast === 'function' && typeof ABIL !== 'undefined' && ABIL.ih_flakscreen) {
+  const ab = ABIL.ih_flakscreen, pick0 = ab.pick;
+  // with the ceiling it goes up for any two flyers in reach (or a big one), wherever they fly: the patch lands among them
+  ab.pick = function (t, st, ab2, man) {
+    if (st && st.caps && st.caps.ihfCeil && typeof ihPick === 'function') {
+      const F = ihPick(t, st, abReach(t, st, ab2 || ab)).filter(ihfkAir);
+      if (F.length >= (man ? 1 : 2) || F.some(abBig)) { const k = abCrowd(F, (ab2 || ab).rr || 1.4); if (k && k.c) return { x: k.c.x, y: k.c.y }; }
+    }
+    return pick0.apply(this, arguments);
+  };
+  ihcWrapCast('ih_flakscreen', (raw, t, st, p, ab2, again) => {
+    const r = raw();
+    if (r === false || !st || !st.caps || !st.caps.ihfCeil || !G.towers.includes(t)) return r;
+    const dur = byT(ab2.by.dur, t) * ((again && again.K) || 1);
+    const z0 = G.hazards.find(z => z.k === 'ih_ceiling' && z.src === t && z.t > 0);
+    if (z0) { z0.t = Math.max(z0.t, dur); z0.T = Math.max(z0.T, z0.t); }
+    else if (G.hazards.length < 44) G.hazards.push({ k: 'ih_ceiling', x: t.x, z: t.y, r: ihfkReach(t, st), t: dur, T: dur, tick: .15, ring: 0, src: t, st, abId: 'ih_flakscreen', _sfx: 1 });   /* (_sfx: its own look, not Flak Screen's area look at the whole reach) */
+    return r;
+  });
+}
+if (typeof IH_HAZ !== 'undefined') {
+  IH_HAZ.ih_ceiling = (z, dt) => {
+    const t = z.src;
+    if (!t || !G.towers.includes(t) || t.wrecked) { z.t = Math.min(z.t, 0); return true; }
+    const s = t.st || z.st; z.x = t.x; z.z = t.y; z.r = ihfkReach(t, s);
+    // the look (ihfCeil, below): a canopy of flak bursts high over the reach, popping on the ceiling's own 0.5s beat
+    if (typeof SFX === 'undefined' || !z.fxq || !SFX.list.includes(z.fxq)) {
+      z.fxq = null;
+      ihfkFx('ih_flakscreen', t, null, C => { z.fxq = sfxAdd({ k: 'ihfCeil', zone: 1, Z: z, C, life: 1e9, seed: R(100), flash: ihcC('#ffb050', 1.4), hot: ihcC('#fff0c8', 1.5), dark: ihcC('#3a3531'), grey: ihcC('#7c766e'), lite: ihcC('#b4aea6'), edge: ihcC('#ffb468'), tick: ihfkCeilTick }); });
+    }
+    if (!z.fxq) {   // (no toolkit: the plain look)
+      const lite = typeof vfxLite === 'function' && vfxLite(), fade = Math.min(1, z.t / .4);
+      // the look: a thin, broken ring of shell-smoke along the edge of the reach, and small bursts popping across the sky inside it
+      if ((z.ring -= dt) <= 0) { z.ring = .6; const n = lite ? 6 : 10, a0 = R(TAU); for (let k = 0; k < n; k++) { const a = a0 + k / n * TAU + R(-.15, .15); part({ k: 'smoke', x: z.x + Math.cos(a) * z.r, z: z.z + Math.sin(a) * z.r, h: R(1.15, 1.35), vx: 0, vz: 0, vh: R(0, .1), drag: 2, life: .9, max: .9, size: R(.1, .15), col: '#5a544c' }); } }
+      if (Math.random() < dt * (lite ? 4 : 9) * fade) {
+        const a = R(TAU), d = Math.sqrt(Math.random()) * z.r, px = z.x + Math.cos(a) * d, pz = z.z + Math.sin(a) * d, ph = R(1.05, 1.45);
+        part({ k: 'flare', x: px, z: pz, h: ph, life: .12, max: .12, size: .45, col: '#ffd890' });
+        for (let k = 0; k < (lite ? 2 : 3); k++) part({ k: 'smoke', x: px + R(-.12, .12), z: pz + R(-.12, .12), h: ph + R(-.08, .08), vx: R(-.3, .3), vz: R(-.3, .3), vh: R(0, .15), drag: 2, life: 1.3, max: 1.3, size: R(.14, .22), col: '#4a453f' });   /* (the drifting shell-smoke is the ceiling you see) */
+      }
+    }
+    if (z.tick > 0) return true; z.tick = IHFK.CEIL_EVERY; z.beatN = (z.beatN || 0) + 1; z.beatAt = G.time;   /* (the look pops on this beat) */
+    if (G.state !== 'play') return true;
+    const C = s.caps || {}, a = (s.dmg || 0) * IHFK.CEIL_K;
+    const F = G.creeps.filter(c => !c.dead && !c.ent && ihfkAir(c) && Math.hypot(c.x - z.x, c.y - z.z) <= z.r && canTarget(t, s, c));
+    if (!F.length) return true;
+    ihAoe(() => { for (const c of F) {
+      ihHit(t, s, c, a, 'phys', true);
+      const b = ihfkBody(c), few = F.length > 8;
+      // a burst on the flyer's own body: a fireball flash, a star, sparks and shards, a dark puff left a moment (nothing lingers on it)
+      if (!ihfkFx('ih_flakscreen', t, c, K => {
+        v3Flash(K, b[0], b[1], b[2], .44, VT.EXPLO);
+        sfxAdd({ k: 'vstar', x: b[0], z: b[2], h: b[1], s: .36 * K.T.glow, life: .13, col: ihcC('#fff0c8', 1.5), rot: R(TAU) });
+        v3P(K, 'spark', b[0], b[1], b[2], few ? 4 : 8, { sp: .9 }); if (!few) v3P(K, 'shard', b[0], b[1], b[2], 3, { sp: .7 });
+        vfxBurst({ x: b[0], y: b[1], z: b[2], shape: 'sphere', r: .08, sp: [.15, .55], up: [0, .25], life: [.4, .6], size: [.1, .14], grow: 1.9, c0: ihcC('#2e2a26'), a0: .6, a1: 0, drag: 2, layer: VT.SMOKEF, frames: VT_FB, add: 0 }, few ? 2 : 3);
+      })) {
+        part({ k: 'flare', x: b[0], z: b[2], h: b[1], life: .16, max: .16, size: .65, col: '#ffd890' });
+        for (let k = 0; k < 3; k++) part({ k: 'spark', x: b[0], z: b[2], h: b[1], vx: R(-1.6, 1.6), vz: R(-1.6, 1.6), vh: R(-.6, 1), g: 4, drag: 2, life: .25, max: .25, size: .04, col: '#ffc070' });
+      }
+      if (c.dead && C.ihCrash && typeof ihSkyCrash === 'function') ihSkyCrash(t, s, c, a);   // (with Sky Shatter, what the ceiling shoots down crashes too)
+    } });
+    return true;
+  };
+}
+
+// the canopy. Each slot is one flak burst high over the reach (above the flyers, far above the walkers and the units): an
+// orange flash, then a dark puff that swells, greys and thins away. The slots pop in three turns, one turn a beat (the
+// ceiling's own 0.5s strike), each a hair off the beat so a beat ripples across the sky; a slot moves each time it pops.
+// Thin by design: the puffs are apart, see-through and gone in a beat and a half, a faint shade under each on the road
+function ihfkCeilTick(q) { const Z = q.Z; if (!q.end && (!(Z.t > 0) || !G.hazards.includes(Z))) { q.end = 1; q.life = q.age + .6; } }
+if (typeof IHC_DRAW !== 'undefined') IHC_DRAW.ihfCeil = q => {
+  const Z = q.Z, ev = IHFK.CEIL_EVERY, e = Math.min(1, q.age / .25) * (q.end ? Math.max(0, (q.life - q.age) / .6) : Math.min(1, Z.t / .4)); if (e <= 0) return;
+  const lite = ihcLite(), r = Z.r, N = Math.max(12, Math.min(lite ? 24 : 54, Math.round(r * r * (lite ? 1.1 : 2.2)))), bn = Z.beatN || 0, since = bn ? G.time - Z.beatAt : 0, px = vfxPx();
+  vfxFan(VX, Z.x, .036, Z.z, r * .985, r, 0, TAU, lite ? 24 : 44, q.edge, .3 * e, VT.FAN, 1, 0, 4);   // (how far the ceiling reaches: a faint broken edge on the road)
+  for (let i = 0; i < N; i++) {
+    const g = i % 3, jit = ihfkHash(i, q.seed) * .16; let b = bn - ((bn - g) % 3 + 3) % 3, a = since + (bn - b) * ev - jit;
+    if (a < 0) { b -= 3; a += 3 * ev; } if (b < 1 || a > 1.45) continue;
+    const h1 = ihfkHash(i + b * 7.3, q.seed + 1), h2 = ihfkHash(i + b * 3.1, q.seed + 2), h3 = ihfkHash(i * 1.7 + b, q.seed + 3);
+    const an = h1 * TAU, d = Math.sqrt(h2) * r * .96, x = Z.x + Math.cos(an) * d + a * .06 * (h3 - .5), z = Z.z + Math.sin(an) * d, y = 1.85 + .4 * h3 + a * .05, u = a / 1.45, sz = (.2 + .1 * h1) * (1 + 1.3 * Math.sqrt(u));
+    if (a < .14) { const k = 1 - a / .14; vfxSprite(VX, x, y, z, .5 * (1.2 - .4 * k), .5 * (1.2 - .4 * k), 0, q.flash, .9 * k * e, VT.GLOW, 1); vfxSprite(VX, x, y, z, .3 * px, .3 * px, h1 * 6, q.hot, k * e, VT.STAR, 1); }
+    const al = Math.min(1, a / .05) * Math.pow(1 - u, 1.3) * .66 * e, c = u < .4 ? q.dark : q.grey;
+    vfxSprite(VX, x, y, z, sz, sz, h2 * 6 + a * .3, c, al, VT.PUFF, 0, .1);
+    if (!lite) { vfxSprite(VX, x + sz * .55 * (h3 - .5), y + sz * .35, z, sz * .72, sz * .72, h1 * 6 - a * .2, q.dark, al * .85, VT.PUFF, 0, .1); vfxSprite(VX, x - sz * .5 * (h2 - .3), y - sz * .2, z, sz * .6, sz * .6, h3 * 6, c, al * .8, VT.PUFF, 0, .1); vfxSprite(VX, x - sz * .2, y + sz * .38, z, sz * .5, sz * .5, h2 * 6, q.lite, al * .5, VT.PUFF, 0, .1); if (a < .35) vfxSprite(VX, x, y, z, sz * .9, sz * .9, 0, q.flash, .4 * (1 - a / .35) * e, VT.GLOW, 1); }   // (a paler crown where the light catches it; its fire dying inside it)
+  }
+};
+
+/* ---------- Wrecking Round: Starshell is one huge siege shell that craters the road ---------- */
+function ihfkWreck(t, st, p, ab, K) {
+  t.ihSweepAt = G.time; const x = p.x, z = p.y, d = Math.hypot(x - t.x, z - t.y), trav = .55 + d / 11, R0 = IHFK.WRECK_R;
+  G.delayed.push({ t: .3, fn: () => {
+    if (!abLive(t)) return; t.ang = Math.atan2(x - t.x, z - t.y); const mz = ihMuzzle(t);
+    // the shell: lobbed high from the gun on a trail of smoke, its shadow closing on the road where it will land
+    if (!ihfkFx('ih_airburst', t, p, C => {
+      const m = sfxMuzzle(t) || [mz[0], mz[1], mz[2], 0, 1], T = trav - .3;
+      v2Muzzle(C, m[0], m[2], m[1], m[3], m[4], 1.5); v2Spray(C, 'soot', m[0], m[2], m[1] + .1, 6, { sp: .7, up: 1.6 });
+      sfxAdd({ k: 'ihfShell', C, x0: m[0], h0: m[1], z0: m[2], x1: x, z1: z, T, life: T + .03, peak: 2 + d * .25, r: R0, s: .3 * C.S, col: ihcC('#2a2622'), hot: ihcC('#ffb060', 1.4), smoke: ihcC('#b8b0a4'), acc: 0, tick: ihfkShellTick });
+    })) { rfx({ k: 'streak', x0: mz[0], h0: mz[1], z0: mz[2], x1: x, h1: .15, z1: z, col: '#ffb060', w: .07, trav: trav - .3, life: trav - .2 }); ihFlash(mz[0], mz[2], mz[1], 1, '#ffc070'); ihSmokePuff(mz[0], mz[2], mz[1], 7, '#6e6860'); }
+    t.recoil = 1; sfx('cannon', 2);
+  } });
+  G.delayed.push({ t: trav, fn: () => {
+    if (!abLive(t)) return; const s = t.st || st, m = byT(ab.by.mult, t) * K * IHFK.WRECK_K;
+    abAoe(() => inSplash(x, z, R0, true, c => { if (!c.ent && canTarget(t, s, c)) abHit(t, s, c, m, 'phys', null); }));
+    let Z = null;
+    if (G.hazards.length < 44) G.hazards.push(Z = { k: 'ih_crater', x, z, r: R0 * .8, t: IHFK.CRATER_T, T: IHFK.CRATER_T, tick: IHFK.CRATER_EVERY, src: t, st: s, abId: 'ih_airburst', _sfx: 1 });   /* (_sfx: its own look, not the flare's) */
+    if (!ihfkFx('ih_airburst', t, p, C => ihfkWreckFx(C, x, z, R0, Z))) { fxExplode(x, z, R0 * .75, 1); fxDust(x, z, 10); if (typeof flashLight === 'function') flashLight(x, z, 1.2, [1, .7, .4], 2.4, .3); }
+    G.shake = Math.max(G.shake, .2); sfx('boom', 1); sfx('quake', 1);
+    decal('scorch', x, z, R0 * .6, '#16100a', IHFK.CRATER_T + 3);
+  } });
+}
+if (typeof IH_HAZ !== 'undefined') {
+  IH_HAZ.ih_crater = (z, dt) => {
+    const t = z.src; if (!t || !G.towers.includes(t)) { z.t = Math.min(z.t, 0); return true; }
+    const lite = typeof vfxLite === 'function' && vfxLite(), fade = z.fxq ? 0 : Math.min(1, z.t / .6);   /* (fxq: the toolkit draws the crater, ihfCrater below) */
+    if (Math.random() < dt * (lite ? 3 : 6) * fade) { const a = R(TAU), d = Math.sqrt(Math.random()) * z.r; part({ k: 'smoke', x: z.x + Math.cos(a) * d, z: z.z + Math.sin(a) * d, h: .05, vx: R(-.15, .15), vz: R(-.15, .15), vh: R(.3, .7), drag: 1.2, life: .9, max: .9, size: R(.14, .22), col: '#4a4038' }); }
+    if (Math.random() < dt * (lite ? 2 : 5) * fade) { const a = R(TAU), d = Math.sqrt(Math.random()) * z.r; part({ k: 'ember', x: z.x + Math.cos(a) * d, z: z.z + Math.sin(a) * d, h: .04, vh: R(.3, .8), life: .5, max: .5, size: R(.06, .1), col: Math.random() < .5 ? '#ff8a3a' : '#ffc870' }); }
+    if (z.tick > 0) return true; z.tick = IHFK.CRATER_EVERY;
+    if (G.state !== 'play') return true;
+    const s = t.st || z.st, a = (s.dmg || 0) * IHFK.CRATER_K;
+    let n = 0;
+    ihAoe(() => inSplash(z.x, z.z, z.r, true, c => { if (c.ent || !canTarget(t, s, c)) return; ihHit(t, s, c, a, 'phys', true);
+      if (z.fxq && n++ < 6) ihfkFx('ih_airburst', t, c, K => { v3P(K, 'ember', c.x, .12, c.y, 3, { r: .12, sp: .7 }); v3P(K, 'fire', c.x, .05, c.y, 1, { r: .1 }); }); }));   // (the burn licks at each walker's feet on the crater's own tick)
+    return true;
+  };
+}
+/* the look. The shell: a dark iron shell tumbling over a high arc, a hot glow behind it, grey smoke strung along the whole
+   arc; under it the road darkens where it will land. The landing: one quick bright flash and a fireball, a ring of dust and
+   debris thrown outward along the ground to the blast's edge, rocks and sparks up. The crater: scorched, cracked earth with a
+   rubble rim, its cracks glowing and flaring on each 0.5s burn, small fires, embers and thin smoke for as long as it burns */
+function ihfkShellAt(q, f, o) { o[0] = q.x0 + (q.x1 - q.x0) * f; o[2] = q.z0 + (q.z1 - q.z0) * f; o[1] = q.h0 * (1 - f) + .12 * f + 4 * q.peak * f * (1 - f); return o; }
+const _ihfP = [0, 0, 0], _ihfQ = [0, 0, 0];
+function ihfkShellTick(q, dt) {
+  if (q.age > q.T) return; q.acc += dt * (ihcLite() ? 28 : 55); const n = Math.floor(q.acc); if (n < 1) return; q.acc -= n;
+  for (let k = 0; k < n; k++) { const P = ihfkShellAt(q, Math.max(0, Math.min(1, (q.age - dt * k / n) / q.T)), _ihfP); part({ k: 'xpuff', x: P[0] + R(-.03, .03), z: P[2] + R(-.03, .03), h: P[1], vx: R(-.08, .08), vz: R(-.08, .08), vh: R(0, .12), drag: 2, life: R(.8, 1.1), max: 1.1, size: R(.12, .17), col: '#d8d2c8', rot: R(TAU), al: .85 }); }
+}
+function ihfkWreckFx(C, x, z, R0, Z) {
+  const zk = sfxZk(), r = R0 * C.T.ring;
+  v3Flash(C, x, .5, z, .75, VT.EXPLO);
+  sfxAdd({ k: 'vflash', x, z, h: .5, s: 1.7 * C.T.glow, life: .13 * C.T.dur, col: ihcC('#fff2d0', 1.5), a: .6 * zk });
+  sfxAdd({ k: 'vstar', x, z, h: .45, s: 1.15 * C.T.glow, life: .18 * C.T.dur, col: ihcC('#fff2d0', 1.6), rot: R(TAU) });
+  sfxAdd({ k: 'vburst', delay: .02, x, z, h: .4, s: r * .7 * C.T.glow, life: .5 * C.T.dur, col: ihcC('#ff7a2a'), hot: ihcC('#ffe0a0', 1.5), a: .85 * zk, rot: R(TAU) });
+  sfxAdd({ k: 'vglow', delay: .03, x, z, r: r * 1.1, life: .7 * C.T.dur, col: ihcC('#ff7a2a'), a: .45 * zk });
+  // the ring of dust and debris: thrown outward along the road, low, slowing at the blast's edge
+  vfxBurst({ x, y: .1, z, shape: 'ring', r: .5, sp: [2.4 * R0, 3.2 * R0], flat: 1, up: [.3, .9], life: [.7, 1.1], size: [.22, .32], grow: 2, c0: ihcC('#e4d6b4'), a0: .85, a1: 0, drag: 3, layer: VT.SMOKEF, frames: VT_FB, add: 0 }, 30);
+  vfxBurst({ x, y: .12, z, shape: 'ring', r: .25, sp: [1.2 * R0, 2.2 * R0], flat: 1, up: [.3, .9], life: [.7, 1], size: [.22, .3], grow: 1.8, c0: ihcC('#4a4038'), a0: .7, a1: 0, drag: 3, layer: VT.SMOKEF, frames: VT_FB, add: 0 }, 12);
+  vfxBurst({ x, y: .12, z, shape: 'ring', r: .25, sp: [2.2 * R0, 4 * R0], flat: 1, up: [.8, 2.4], life: [.45, .75], size: [.045, .08], c0: V3_WHITE, drag: 2.2, grav: 9, layer: VT.ROCK, spin: 10, add: 0 }, 16);
+  v3P(C, 'rock', x, .2, z, 14, { sp: 1.5 }); v3P(C, 'spark', x, .3, z, 20, { sp: 1.5 }); v3P(C, 'fire', x, .05, z, 8, { r: .5 });
+  v2Spray(C, 'soot', x, z, .25, 5, { sp: .8 });
+  flashLight(x, z, .7, C.P.light, 3.4, .32);
+  if (Z) Z.fxq = sfxAdd({ k: 'ihfCrater', zone: 1, Z, C, life: 1e9, r: Z.r, seed: R(TAU), ember: ihcC('#ff7a2a', 1.3), hotc: ihcC('#ffd27a', 1.4), rim: ihcC('#7a664c'), rock: ihcC('#b0a48e'), acc: 0, tick: ihfkCraterTick });
+}
+function ihfkCraterTick(q, dt) {
+  const Z = q.Z; if (q.end) return;
+  if (!(Z.t > 0) || !G.hazards.includes(Z)) { q.end = 1; q.life = q.age + 1; return; }
+  q.acc += dt * (ihcLite() ? 9 : 20) * Math.min(1, Z.t / .6); const n = Math.floor(q.acc); if (n < 1) return; q.acc -= n;
+  const pn = SFX_NOW; SFX_NOW = q.C.id;
+  try { for (let k = 0; k < n; k++) {
+    const a = R(TAU), d = Math.sqrt(Math.random()) * q.r * .9, x = Z.x + Math.cos(a) * d, z = Z.z + Math.sin(a) * d, w = Math.random();
+    if (w < .5) v3P(q.C, 'ember', x, .08, z, 1, { r: .08, sp: .6 });
+    else if (w < .8) v3P(q.C, 'fire', x, .05, z, 1, { r: .06 });
+    else part({ k: 'xsmoke', x, z, h: .1, vx: R(-.1, .1), vz: R(-.1, .1), vh: R(.25, .5), drag: 1.4, life: R(.6, .9), max: .9, size: R(.1, .15), col: '#5a5048', rot: R(TAU) });
+  } } finally { SFX_NOW = pn; }
+}
+if (typeof IHC_DRAW !== 'undefined') {
+  IHC_DRAW.ihfShell = q => {
+    if (q.age > q.T) return; const f = q.age / q.T, P = ihfkShellAt(q, f, _ihfP), x = P[0], y = P[1], z = P[2], px = vfxPx();
+    const rr = q.r * (.75 - .35 * f); vfxFlat(VX, q.x1, q.z1, .03, rr * 1.6, rr * 1.6, 0, SFX_INK, .8 * f * f, VT.GLOW, 0);   // (its shadow closing where it will land)
+    vfxRb.begin(VX, VT.GLOWS, 0, .05); for (let j = 0; j <= 9; j++) { const fj = f - j * .035; if (fj < 0) break; const T = ihfkShellAt(q, fj, _ihfQ); vfxRb.pt(T[0], T[1], T[2], (.1 + j * .03) * px, q.smoke, .85 * (1 - j / 10), j * .25 - q.age * 3); } vfxRb.end();
+    const Q = ihfkShellAt(q, Math.max(0, f - .04), _ihfQ);
+    vfxSprite(VX, Q[0], Q[1], Q[2], q.s * 1.1 * px, q.s * 1.1 * px, 0, q.hot, .45, VT.GLOW, 1);
+    const b = q.s * px; vfxSprite(VX, x, y, z, b * 1.15, b * 1.15, 0, SFX_INK, 1, VT.GLOW, 0); vfxSprite(VX, x, y, z, b, b, 0, SFX_INK, 1, VT.GLOW, 0); vfxSprite(VX, x, y, z, b * .8, b * .8, 0, q.col, 1, VT.GLOW, 0); vfxSprite(VX, x - b * .12, y + b * .14, z, b * .3, b * .3, 0, q.smoke, .55, VT.GLOW, 0);   // (a round iron ball, soft-edged, a glint on its top)
+  };
+  IHC_DRAW.ihfCrater = q => {
+    const Z = q.Z, r = q.r, e = Math.min(1, q.age * 6) * (q.end ? Math.max(0, (q.life - q.age) / 1) : 1); if (e <= 0) return;
+    const live = !q.end, pulse = live ? Math.pow(Math.max(0, Math.min(1, Z.tick / IHFK.CRATER_EVERY)), 2) : 0, heat = live ? Math.min(1, Z.t / .8) * (.55 + .45 * pulse) : 0, lite = ihcLite();
+    vfxFlat(VX, Z.x, Z.z, .026, r * 2.1, r * 2.1, 0, SFX_INK, .8 * e, VT.GLOW, 0);                          // scorched earth, soft-edged (the glow card is dense only at its heart)
+    vfxFlat(VX, Z.x, Z.z, .027, r * 1.25, r * 1.25, q.seed, SFX_INK, .6 * e, VT.SMOKE, 0);                   // a ragged, darker floor
+    vfxFlat(VX, Z.x, Z.z, .029, r * 1.5, r * 1.5, q.seed, SFX_INK, .8 * e, VT.CRACK, 0);                     // the cracks
+    if (!lite) vfxFlat(VX, Z.x, Z.z, .03, r * .9, r * .9, q.seed + 2.1, SFX_INK, .8 * e, VT.CRACK, 0);
+    vfxFan(VX, Z.x, .033, Z.z, r * .88, r * 1.1, 0, TAU, lite ? 14 : 24, q.rim, .7 * e, VT.FAN, 0, 0, 2);    // a rim of thrown earth
+    if (heat > 0) {
+      vfxFlat(VX, Z.x, Z.z, .034, r * 1.5, r * 1.5, q.seed, q.ember, (.55 + .45 * pulse) * heat, VT.CRACK, 1);   // the cracks glow, flaring on each burn
+      if (!lite) vfxFlat(VX, Z.x, Z.z, .035, r * .9, r * .9, q.seed + 2.1, q.hotc, (.5 + .5 * pulse) * heat, VT.CRACK, 1);
+      vfxFlat(VX, Z.x, Z.z, .036, r * 1.1, r * 1.1, 0, q.ember, .4 * heat, VT.GLOW, 1);
+    }
+    for (let k = 0; k < (lite ? 5 : 9); k++) { const an = q.seed + k * 2.39996, d = r * (.92 + .14 * ihfkHash(k, q.seed)), s = .06 + .05 * ihfkHash(k, q.seed + 5); vfxSprite(VX, Z.x + Math.cos(an) * d, s * .7, Z.z + Math.sin(an) * d, s, s * .85, an * 3, q.rock, e, VT.ROCK, 0); }   // rubble on the rim
+  };
+}
+if (typeof ihcWrapCast === 'function' && typeof ABIL !== 'undefined' && ABIL.ih_airburst) {
+  const ab = ABIL.ih_airburst, pick0 = ab.pick, text0 = ab.text;
+  // a siege shell wants the thickest crowd on the road, or a boss (it lands on the road: the flyers above are spared)
+  ab.pick = function (t, st, ab2, man) {
+    if (st && st.caps && st.caps.ihfWreck && typeof ihPick === 'function') {
+      const L = ihPick(t, st, abReach(t, st, ab2 || ab)).filter(abWalker), k = abCrowd(L, IHFK.WRECK_R);
+      if (k && k.c && (k.n >= (man ? 1 : 3) || abBig(k.c))) return { x: k.c.x, y: k.c.y };
+      const b = L.find(abBig); return b ? { x: b.x, y: b.y } : null;
+    }
+    return pick0.apply(this, arguments);
+  };
+  ab.text = function (t, st, ab2) {
+    if (st && st.caps && st.caps.ihfWreck) { const a = ab2 || ab; return `Ultimate. One huge siege shell craters the road: ${xD(st, byT(a.by.mult, t) * IHFK.WRECK_K)} to every ground foe within ${IHFK.WRECK_R} cells. Ground foes in the crater take ${xD(st, IHFK.CRATER_K)} every ${IHFK.CRATER_EVERY}s for ${IHFK.CRATER_T}s.`; }
+    return text0.apply(this, arguments);
+  };
+  ihcWrapCast('ih_airburst', (raw, t, st, p, ab2, again) => {
+    if (!st || !st.caps || !st.caps.ihfWreck || !p || p.x == null) return raw();
+    const K = again && again.K ? again.K : (typeof ihPreCast === 'function' ? ihPreCast(t, ab2) : 1);
+    ihfkWreck(t, st, p, ab2, K);
+    if (!again && typeof ihItemsPostCast === 'function') ihItemsPostCast(t, ab2, st, p, K);
+    return true;
+  });
+}
+
+/* ---------- Grapnel Shot: Point-Blank (a shell into the hooked foe), Quick Winch (sooner again after a flyer) ---------- */
+if (typeof ihcWrapCast === 'function' && typeof ABIL !== 'undefined' && ABIL.ih_grapnel) ihcWrapCast('ih_grapnel', (raw, t, st, c, ab, again) => {
+  const r = raw(), C = st && st.caps;
+  if (r === false || !C || !(C.ihfPoint || C.ihfWinch) || !c || c.x == null) return r;
+  const trav = .12 + abDist(t, c) / 13;
+  G.delayed.push({ t: trav + .02, fn: () => {
+    if (!abLive(t)) return; const s = t.st || st, C2 = s.caps || {};
+    if (C2.ihfWinch && !again && c.fly && typeof fsReady === 'function') fsReady(t, 'ih_grapnel', IHFK.WINCH * C2.ihfWinch);
+    if (C2.ihfPoint && !c.dead) G.delayed.push({ t: .1, fn: () => { if (!abLive(t) || c.dead) return; t.ang = Math.atan2(c.x - t.x, c.y - t.y); ihFlakShell(t, t.st || s, c, IHFK.POINT * C2.ihfPoint, false); } });
+  } });
+  return r;
+});
 
 /* ================= THE WARDBOUND'S ASSASSIN: the Oathknives take the Gatewatch Halberdiers' place (27 Nov 2026) =================
    Owner: "a unit to the wardbound that jumps ... behind cloth targets and does bonus damage. it can be their anti caster
@@ -69975,7 +70550,7 @@ SFX_V2_DEF.push(() => {
 const SFX_CH = {
   ch_unravel: ['arcane', 'cc'], ch_mirrorweave: ['arcane', 'cc'], ch_rewind: ['time', 'cc'], ch_hourlead: ['time', 'cc'], ch_riftchain: ['vey', 'cc'], ch_unbound: ['vey', 'cc'],
   ch_rootway: ['nature', 'gv'], ch_oldwood: ['nature', 'gv'], ch_pinarrow: ['nature', 'gv'], ch_huntermoon: ['star', 'gv'], ch_garden: ['nature', 'gv'], ch_fullbloom: ['nature', 'gv'],
-  ch_anvil: ['earth', 'ih'], ch_oath: ['earth', 'ih'], ch_coil: ['storm', 'ih'], ch_barrage: ['steam', 'ih'], ch_firebrew: ['fire', 'ih'], ch_onthehouse: ['fire', 'ih'], ch_flare: ['fire', 'ih'], ch_headsman: ['steel', 'ih'], ch_oathhammer: ['earth', 'ih'], ch_mountaindue: ['earth', 'ih'], ch_grudgeshell: ['steel', 'ih'],
+  ch_anvil: ['earth', 'ih'], ch_oath: ['earth', 'ih'], ch_coil: ['storm', 'ih'], ch_barrage: ['steam', 'ih'], ch_firebrew: ['fire', 'ih'], ch_onthehouse: ['fire', 'ih'], ch_powder: ['fire', 'ih'], ch_headsman: ['steel', 'ih'], ch_oathhammer: ['earth', 'ih'], ch_mountaindue: ['earth', 'ih'], ch_grudgeshell: ['steel', 'ih'],
   ch_fordstandard: ['holy', 'so'], ch_lionsdue: ['holy', 'so'], ch_morningstar: ['holy', 'so'], ch_highnoon: ['holy', 'so'], ch_summons: ['holy', 'so'], ch_verdict: ['holy', 'so'],
   ch_eyestorm: ['storm', 'sb'], ch_stormcall: ['storm', 'sb'], ch_galewall: ['wind', 'sb'], ch_updraft: ['wind', 'sb'], ch_runwolves: ['spirit', 'sb'], ch_thunderdive: ['storm', 'sb'],
   ch_entangle: ['nature', 'gv'], ch_thornvolley: ['nature', 'gv'], ch_sporecloud: ['nature', 'gv'], ch_thousandfold: ['arcane', 'cc'], ch_stoppedhour: ['time', 'cc'], ch_severing: ['vey', 'cc'],
@@ -69993,6 +70568,7 @@ Object.assign(SFX_R, {
   ch_suncharge: ['sun', 'strike', 'line', 'strike', 3, { len: 3 }], ch_blazeglory: ['sun', 'shout', 'none', 'nova', 3, { self: 1, shake: .12 }],
   ch_bindsweep: ['veil', 'strike', 'none', 'nova', 3, { self: 1 }], ch_oathturned: ['veil', 'strike', 'none', 'burst', 3, {}],
 });
+SFX_R.ch_powder = ['fire', 'none', 'none', 'none', 3, { self: 1 }];   // (Powder Charge: no flourish round Torvald; its look is the bursts where his shots land)
 SFX_R.shift = ['nature', 'shout', 'none', 'none', 2, { self: 1 }];
 // the Shifter's form now, and its colours: the hawk's gold-brown, the bear's moss and earth, the sage's moonlight
 const sfxForm = t => (t && t.form) || 'sage';
@@ -100655,7 +101231,7 @@ const SPELL_BRIEFS = {
   ch_rollkeg: ({ d, full }) => { const f = String(full).replace(/<[^>]+>/g, ''), m = /within ([\d.]+) cells/.exec(f); return `Rolls ${/then a second/.test(f) ? 'two kegs' : 'a keg'} back up the road: ground foes hit are pushed back and slowed 40%. At the end it bursts: ${d(1)} within ${m ? m[1] : 1.2} cells, setting them burning.`; },
   ch_firebrew: 'Breathes {n} gouts of flame down a 1.9-cell cone: {d} each, setting foes burning. Ale puddles in it go up: {d2} to ground foes in them, burning 3s.',
   ch_farshot: 'Aims 1.5s at any foe on the field, then fires through every foe on the line: {d} (more the farther it flies), 20% less per foe passed. Bosses are stunned 0.6s. On kill: half the cooldown back, and ranged units attack 15% faster for 4s.',
-  ch_flare: 'For {dur}s, foes within {r} cells take more damage from every unit.',
+  ch_powder: 'His next {n} shots burst where they land: {d} to every foe within {r} cells.',
   ch_headsman: 'Aims 0.8s at the strongest foe in reach, then fires: {d}, doubled on a foe below half health.',
   ch_muster: 'Units within 3 cells attack 25% faster for 6s. When it ends, each one\'s next attack deals double damage.',
   ch_oathhammer: 'One great blow: {d} to his target, half that to ground foes within {r} cells.',
@@ -100819,7 +101395,7 @@ const SPELL_TARGETS = {
   ch_firebrew: 'the cone over the most foes',
   ch_onthehouse: 'the densest group of ground foes',
   ch_farshot: 'a boss or leader anywhere, else the healthiest foe',
-  ch_flare: 'the densest group of foes',
+  ch_powder: 'his own next shots, at a crowd',
   ch_headsman: 'the toughest foe in reach',
   ch_muster: 'Ironhold units near the fight',
   ch_oathhammer: 'the toughest foe in reach',
@@ -138639,7 +139215,7 @@ const SPELL_HELP = {
 
   // Torvald Emberbrand, the Longshot (ih_marksman)
   ch_farshot: { when: "A boss or leader anywhere on the field, or three or more foes on it.", aim: "The boss or leader first, else the foe with the most health left, wherever it is.", tips: ["Post him far back by the gate: the further the round flies, the harder it hits.", "Line it up down a straight stretch of road: it pierces every foe on its line.", "A kill halves its cooldown and quickens every ranged unit for 4s."] },
-  ch_flare: { when: "Three or more foes bunched together in {reach} cells, or a boss or elite in reach.", aim: "The thickest crowd in reach.", tips: ["Every unit hits the marked foes harder: light the crowd your guns are already firing on.", "Light it where the road bends back on itself so the foes stay under it longer."] },
+  ch_powder: { when: "Two or more foes bunched together in {reach} cells, or a boss or elite in reach, and no charge already loaded.", aim: "His own rifle: the next shots he fires, at whoever he is shooting.", tips: ["Each burst strikes every foe round the one his shot hits: set him to shoot the foe nearest the gate, where the road bunches them.", "The charge waits for his next shots: a loaded charge carries into the next wave."] },
   ch_headsman: { when: "A boss, leader or elite in reach, or three or more foes in reach.", aim: "The boss, leader or elite first, else the foe with the most health left.", tips: ["It hits twice as hard on a foe below half health: let the line wear a boss down first.", "Its 0.8s settle shows as a faint glint: cast it before the foe walks out of reach."] },
 
   // Brannoc Goldvein, the Under-King (ih_king)
