@@ -1,4 +1,4 @@
-const BUILD_TAG = '86b7aa35@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '365c060f@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -64392,19 +64392,19 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
    other forces' tree layouts"; tools/open_layout.js conclave; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'conclave';
-  ezLayout(F, 'glaive', [[3,0],[1,2],[3,1],[1,0],[1,1],[2,1],[5,2],[2,2],[4,3],[3,3],[4,2],[1,3],[5,1],[5,0],[0,1],[0,2],[0,0]], [[16,3,0,13],[4,5,2],[9,8]]);   /* rows 3 4 2 3 2 3; chains: Killing Step > Riftsteel Rhythm > Measured Cuts > Rift Dance | Ward-Splitter > Ghost Edge > Lone Duel | Thrown Riftblade > Thousand Edges */
+  ezLayout(F, 'glaive', [[3,0],[1,1],[3,1],[1,0],[1,2],[2,1],[5,3],[2,2],[4,3],[3,3],[4,2],[1,3],[5,1],[5,2],[0,1],[0,2],[0,0]], [[5,2],[9,8,6],[16,3,0],[4,7],[10,13]]);   /* rows 3 4 2 3 2 3; chains: Ghost Edge > Lone Duel | Thrown Riftblade > Thousand Edges > Twin Riftblades | Killing Step > Riftsteel Rhythm > Measured Cuts | Ward-Splitter > Fresh Blood | Rift Wake > Rift Dance; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'arrow', [[0,2],[0,1],[5,2],[3,3],[3,1],[1,0],[4,1],[1,1],[2,3],[5,3],[2,0],[1,2],[2,2],[5,1],[1,3],[0,3],[4,2],[4,0],[5,0]], [[8,3,9],[17,18],[1,7],[5,10]]);   /* rows 3 4 3 2 3 4; chains: Gathering Orb > Charged Recital > Ready Orb | Tidemoon > Missile Storm | Splitting Missile > Skyward Missiles | Tome Familiar > Overflowing Missile */
   ezLayout(F, 'frost', [[0,1],[2,3],[5,2],[4,3],[2,2],[2,1],[1,0],[5,1],[4,1],[3,3],[5,0],[3,2],[1,1],[2,0],[4,2],[0,3],[0,2]], [[6,13,10],[8,7],[0,12,5]]);   /* rows 3 2 4 2 3 3; chains: Ice Coffin > Cold Focus > Coffin Burst | Shatterbloom > Icicle Volley | Chilling Bolts > Absolute Stillness > Long Staff */
-  ezLayout(F, 'arcane', [[2,0],[2,1],[3,2],[2,3],[1,3],[0,3],[0,2],[5,2],[5,1],[0,0],[4,0],[2,2],[1,1],[4,3],[0,1],[4,2],[3,0]], [[14,12,1,8],[0,16,10],[11,2,15,7],[5,4,3]]);   /* (28 Nov 2026, the Chronomancers' own tree, forces_..._easy_conclave_chrono.js: Master of the Clock in columns 1-2, Unmaker in 3-4; rows 4 2 4 2 3 2; chains: The Clock Tolls > Time's Toll > Stored Hour > Midnight | Spare Seconds > Time Rhythm > Recurrence | Hour of Need > Rewound Bolt > Borrowed Time > Paradox | Dead Hour > Backward Hour > Long Way Back) */
+  ezLayout(F, 'arcane', [[2,0],[2,1],[3,3],[2,3],[1,3],[0,3],[0,2],[5,2],[5,1],[0,0],[4,2],[2,2],[1,1],[4,1],[0,1],[4,3],[3,2]], [[4,3,2,15],[14,12,1],[16,10,7],[13,8]]);   /* (28 Nov 2026, the Chronomancers' own tree, forces_..._easy_conclave_chrono.js: Master of the Clock in columns 1-2, Unmaker in 3-4; rows 4 2 4 2 3 2; chains: Backward Hour > Long Way Back > Rewound Bolt > Borrowed Time | The Clock Tolls > Time's Toll > Stored Hour | Time Rhythm > Recurrence > Paradox | Winding Spring > Midnight); (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   if (0) ezLayout(F, 'arcane', [[0,1],[3,2],[2,3],[4,3],[1,3],[2,0],[3,1],[5,2],[5,1],[0,2],[4,0],[2,2],[1,0],[5,0],[0,3],[4,2],[2,1]], [[0,16,6,8],[14,4,2],[12,5],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Spare Seconds > Time Rhythm > Long Hour > Frozen Moment | Pendulum Swing > Backward Hour > Rewound Bolt | Arcane Clockwork > Dead Hour | Recurrence > Endless Hour */
-  ezLayout(F, 'storm', [[0,2],[0,3],[3,2],[0,0],[3,3],[1,3],[0,1],[4,2],[5,2],[5,1],[2,1],[3,1],[2,0],[4,0],[1,2],[1,0],[2,2]], [[6,10,11,9],[3,15,12],[14,16,2],[7,8],[5,4]]);   /* (27 Nov 2026, the Astrologers' own tree, forces_..._easy_conclave_skywide.js: the Seer in columns 1-2, Starfall in 3-4; rows 4 3 3 3 2 2; chains: Busy Sky > Grand Orrery > Omen of Ending > The Whole Sky | Long Lens > Fated Mark > Bright Fourth | Turning Stars > Omen Light > Crater | Zodiac > Starfall Sky | Lodestar > Falling Finish) */
+  ezLayout(F, 'storm', [[0,2],[0,3],[3,2],[0,0],[3,3],[1,3],[0,1],[4,2],[5,2],[5,1],[2,0],[3,1],[2,1],[4,0],[1,2],[1,0],[2,2]], [[5,4],[7,8],[11,9],[14,16,2],[10,13]]);   /* (27 Nov 2026, the Astrologers' own tree, forces_..._easy_conclave_skywide.js: the Seer in columns 1-2, Starfall in 3-4; rows 4 3 3 3 2 2; chains: Lodestar > Falling Finish | Zodiac > Starfall Sky | Omen of Ending > The Whole Sky | Turning Stars > Omen Light > Crater | Grand Orrery > Orrery Moon); (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   if (0) ezLayout(F, 'storm', [[0,2],[0,3],[5,2],[3,2],[3,3],[1,3],[3,1],[4,2],[5,3],[5,1],[2,1],[0,1],[2,0],[4,0],[2,2],[1,0],[3,0]], [[14,3,7,2],[1,5],[11,10,6]]);   /* rows 3 2 3 4 2 3; chains: Turning Stars > Long Lens > Zodiac > Constellation | Star-Chart > Lodestar | Shooting Bolt > Grand Orrery > Busy Sky */
   ezLayout(F, 'earth', [[1,1],[0,2],[3,1],[0,1],[2,1],[5,1],[3,3],[3,2],[4,0],[1,3],[1,0],[5,0],[2,2],[5,2],[1,2],[0,3],[4,1]], [[4,2,16,5],[10,8,11],[15,9]]);   /* rows 3 4 2 3 2 3; chains: Heave > Waking Golem > Stamped Flat > Shatterground | Stone Fists > Living Bulwark > Shockwave | Warden's Command > Fault Line */
-  ezLayout(F, 'cannon', [[0,1],[0,3],[4,3],[1,1],[1,0],[1,3],[2,0],[0,2],[2,3],[3,1],[1,2],[3,0],[4,0],[4,1],[2,2],[5,1],[5,2]], [[7,10,14,16],[9,13,15],[0,3]]);   /* rows 3 4 3 2 3 2; chains: Leaping Cinders > Stoked Fire > Banked Heat > Pyre Bloom | Molten Brand > Flashover > Sunfall | Pyre Scribe > Skipping Flame */
+  ezLayout(F, 'cannon', [[0,1],[0,3],[4,1],[1,1],[1,0],[1,3],[2,1],[0,2],[2,0],[3,1],[1,2],[3,0],[4,0],[4,3],[2,2],[5,1],[5,2]], [[0,3,6,9],[7,10,14,16],[8,11],[2,15]]);   /* rows 3 4 3 2 3 2; chains: Pyre Scribe > Skipping Flame > Twin Fireball > Molten Brand | Leaping Cinders > Stoked Fire > Banked Heat > Pyre Bloom | Phoenix > Bouncing Fireball | Slow-Burning Ink > Sunfall; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'venom', [[0,2],[2,3],[0,1],[4,1],[4,0],[1,1],[2,2],[3,1],[1,3],[2,0],[4,2],[3,3],[0,0],[5,2],[5,1],[5,3]], [[8,1,11,15],[6,10,13],[2,5],[12,9]]);   /* rows 3 2 3 2 3 3; chains: Glancing Crescent > Hunting Crescent > Paired Crescents > Wardbreaker | Splintering > Rend the Veil > Crescent Orbit | Homeward Edge > Returning Crescent | Sever Rhythm > Honed by Spells */
-  ezLayout(F, 'champ:cc_arch', [[0,2],[1,3],[1,1],[3,2],[1,2],[2,1],[1,0],[2,3],[5,0],[4,1],[3,1],[5,2],[4,3],[5,1],[0,1],[3,0]], [[5,10,9,13],[1,7,12],[3,11],[0,4]]);   /* rows 2 4 2 3 2 3; chains: Loose Threads > Snapping Threads > Woven Edge > Rewoven Threads | Open Book > Shared Lesson > Sixfold Loom | Read the Crowd > Spellweaver | Quick Quill > Unravel */
-  ezLayout(F, 'champ:cc_chrono', [[0,2],[0,1],[3,0],[5,1],[1,2],[2,1],[3,2],[1,0],[3,3],[4,1],[3,1],[5,0],[2,3],[5,2],[0,3],[2,0],[4,3]], [[5,10,9,3],[12,8,16],[7,15],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Long Way Back > Second Hand > Late Arrival > Gathered Ghosts | The Hour Strikes > Endless Hour > Leaden Pull | Lent Time > Saved Seconds | Patient Hands > Recall */
-  ezLayout(F, 'champ:cc_maren', [[0,1],[0,2],[1,2],[3,2],[1,1],[2,0],[2,3],[2,2],[5,1],[3,3],[3,0],[5,2],[4,3],[4,0],[3,1],[0,3],[5,0]], [[5,10,13,16],[6,9,12],[7,3],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Long Chain > Flourish > Duelling Ground > Chain to Blade | Opened Guard > Cut the Fallen > Unbound Blade | Shared Edge > Practice Yard | Quick Draw > Rift Chain */
+  ezLayout(F, 'champ:cc_arch', [[0,2],[1,3],[1,1],[3,2],[1,2],[2,1],[1,0],[2,3],[5,3],[4,2],[3,1],[5,1],[4,3],[5,2],[0,1],[3,0]], [[1,7,12,8],[5,10,11],[4,3,9,13]]);   /* rows 2 4 2 3 2 3; chains: Open Book > Shared Lesson > Sixfold Loom > Deeper Loom | Loose Threads > Snapping Threads > Spellweaver | Unravel > Read the Crowd > Woven Edge > Rewoven Threads; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:cc_chrono', [[0,2],[0,1],[3,0],[5,2],[1,1],[2,1],[3,2],[1,2],[3,3],[4,1],[3,1],[5,1],[2,3],[5,3],[0,3],[2,2],[4,3]], [[7,15],[12,8,16,13],[4,5,10,9],[6,3]]);   /* rows 3 2 3 4 2 3; chains: Lent Time > Saved Seconds | The Hour Strikes > Endless Hour > Leaden Pull > Twelve Strokes | Recall > Long Way Back > Second Hand > Late Arrival | Leaden Minutes > Gathered Ghosts; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:cc_maren', [[0,1],[0,2],[1,2],[3,1],[1,1],[2,1],[2,3],[2,2],[5,3],[3,3],[3,0],[5,2],[4,3],[4,0],[3,2],[0,3],[5,1]], [[6,9,12,8],[10,13],[4,5,3,16]]);   /* rows 3 2 3 4 2 3; chains: Opened Guard > Cut the Fallen > Unbound Blade > Bursting Seams | Flourish > Duelling Ground | Rift Chain > Long Chain > Practice Yard > Chain to Blade; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
 }
 
 /* The Chronomancers' own tree (owner, 28 Nov 2026: "can we make chronomancer a little more interesting than just a unit that
@@ -65067,27 +65067,29 @@ const SEV_RIFT = {
      upgrade; no talent shapes a spell from above that spell's row; each row a mix of what its talents shape; five chains
      of at most four, a link dropping past empty cells only:
        row I    .            Spellthief    Broken Words  .
-       row II   Lingering    RET. CRESC.   .             .
-       row III  Chain Sever  Long Arc      RIFT LINE     .
+       row II   RET. CRESC.  .             .             Lingering
+       row III  Long Arc     .             RIFT LINE     Chain Sever
        row IV   Wardrender   Keen Sev.     Wide Rift     Lasting Rift
-       row V    Splitting    Laid Bare     .             Deep Cut
+       row V    Splitting    Laid Bare     Deep Cut      .
        row VI   .            UNMAKING      SHATTERED G.  .
-     chains: Spellthief > Returning Crescent > Long Arc | Broken Words > Rift Line > Wide Rift > Shattered Ground |
-     Keen Severance > Laid Bare > Unmaking | Wardrender > Splitting Edge | Lasting Rift > Deep Cut */
+     chains: Returning Crescent > Long Arc > Wardrender > Splitting Edge | Rift Line > Wide Rift > Deep Cut > Shattered Ground |
+     Keen Severance > Laid Bare > Unmaking (28 Nov 2026, spell chains, tools/check_spell_chains.js: each spell's talents run
+     below it in its chain; was Spellthief > Returning Crescent > Long Arc | Broken Words > Rift Line > Wide Rift >
+     Shattered Ground | Keen Severance > Laid Bare > Unmaking | Wardrender > Splitting Edge | Lasting Rift > Deep Cut) */
   const at = name => T.list.findIndex(q => q.name === name || q.spell === name);
   const cells = new Array(16), put = (name, r, c) => { const i = at(name); if (i < 0) { if (typeof console !== 'undefined') console.warn('severer tree: no cell for', name); return; } cells[i] = [r, c]; };
   put('Spellthief', 0, 1); put('Broken Words', 0, 2);
-  put('Lingering Severance', 1, 0); put('cc_shards', 1, 1);
-  put('Chain Sever', 2, 0); put('Long Arc', 2, 1); put('cc_nullfield', 2, 2);
+  put('Lingering Severance', 1, 3); put('cc_shards', 1, 0);
+  put('Chain Sever', 2, 3); put('Long Arc', 2, 0); put('cc_nullfield', 2, 2);
   put('Wardrender', 3, 0); put('Keen Severance', 3, 1); put('Wide Rift', 3, 2); put('Lasting Rift', 3, 3);
-  put('Splitting Edge', 4, 0); put('Laid Bare', 4, 1); put('Deep Cut', 4, 3);
+  put('Splitting Edge', 4, 0); put('Laid Bare', 4, 1); put('Deep Cut', 4, 2);
   put('Unmaking', 5, 1); put('Shattered Ground', 5, 2);
   if (cells.some(c => !c)) return;
   // (the spell talents are moved here on purpose: their rows set first, so the layout keeps them where they are put)
   for (const t of T.list) if (t.spell) { const c = cells[T.list.indexOf(t)]; t.r = c[0]; t.c = c[1]; }
   const ch = (...names) => names.map(at);
   T._ezLaid = false;
-  if (typeof ezLayout === 'function') ezLayout('conclave', SLOT, cells, [ch('Spellthief', 'cc_shards', 'Long Arc'), ch('Broken Words', 'cc_nullfield', 'Wide Rift', 'Shattered Ground'), ch('Keen Severance', 'Laid Bare', 'Unmaking'), ch('Wardrender', 'Splitting Edge'), ch('Lasting Rift', 'Deep Cut')]);
+  if (typeof ezLayout === 'function') ezLayout('conclave', SLOT, cells, [ch('cc_shards', 'Long Arc', 'Wardrender', 'Splitting Edge'), ch('cc_nullfield', 'Wide Rift', 'Deep Cut', 'Shattered Ground'), ch('Keen Severance', 'Laid Bare', 'Unmaking')]);
   T.name = 'Severance';
   if (FORCES.conclave.talEmblem) FORCES.conclave.talEmblem[SLOT] = at('Unmaking');
   if (FORCES.conclave.talFlavor) FORCES.conclave.talFlavor[SLOT] = ['Every bond is a thread. Every thread can be cut.', 'Your priest cannot hear you from over there.'];
@@ -65278,19 +65280,19 @@ function sevLate() {
    other forces' tree layouts"; tools/open_layout.js grove; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'grove';
-  ezLayout(F, 'glaive', [[3,0],[0,2],[4,3],[2,1],[1,3],[1,2],[3,2],[3,1],[5,1],[5,2],[2,2],[4,0],[0,0],[2,3],[0,1],[0,3],[1,0]], [[12,16],[14,3,7,8],[1,5,10],[6,9],[15,4,13]]);   /* (29 Nov 2026, the Thornguard's new identity, forces_..._easy_zthornguard.js: the Long Spear in columns 1-2, Pinned Prey in 3-4; rows 4 3 3 3 2 2; chains: Skewer > Braced Rhythm | Deep Thrust > Shieldsplitter > Long Reach > Wall of Spears | Pinned Prey > Through the Pinned > Spearwood Rising | Last Thrust > Thorn and Spear | Next Prey > Thornhedge > Tossed Off the Point) */
+  ezLayout(F, 'glaive', [[3,0],[0,2],[4,3],[2,1],[1,3],[1,2],[3,2],[3,1],[5,1],[5,2],[2,2],[4,0],[0,0],[2,3],[0,1],[0,3],[1,0]], [[5,10,6,9],[12,16],[14,3,7,8],[15,4,13]]);   /* (29 Nov 2026, the Thornguard's new identity, forces_..._easy_zthornguard.js: the Long Spear in columns 1-2, Pinned Prey in 3-4; rows 4 3 3 3 2 2; chains: Through the Pinned > Spearwood Rising > Last Thrust > Thorn and Spear | Skewer > Braced Rhythm | Deep Thrust > Shieldsplitter > Long Reach > Wall of Spears | Next Prey > Thornhedge > Barbed Spear); (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   if (0) ezLayout(F, 'glaive', [[0,0],[2,3],[3,3],[0,1],[1,3],[3,0],[4,2],[3,1],[5,2],[5,1],[2,2],[5,0],[2,1],[3,2],[0,2],[4,3],[1,0]], [[10,13,6,8],[12,7,9],[0,16]]);   /* rows 3 2 3 4 2 3; chains: Spearwood Rising > Tossed Off the Point > Last Thrust > Wall of Spears | Skewer > Phalanx > Impaler | Long Haft > Braced Rhythm */
   ezLayout(F, 'arrow', [[0,1],[3,0],[3,3],[1,2],[2,0],[1,0],[3,1],[1,1],[5,1],[5,3],[4,3],[0,0],[4,1],[5,2],[0,3],[0,2],[2,2]], [[7,6,12,8],[11,5,4],[15,3,16,13],[2,10,9]]);   /* (29 Nov 2026, the Gladebow's two fantasies, forces_..._easy_zgladebow.js: the Long Shot in column 2, the Hunt in column 3; rows 4 3 2 3 2 3; chains: Long Draw > Through the Gap > First Arrow > Deadeye Draw | Spent Shaft > Thornseed Arrow > Spirit Hawk | On the Scent > Thornpoint Arrows > Ricochet > The Hunt Goes On | Fletcher's Focus > Nailing Shaft > Thornrain) */
   if (0) ezLayout(F, 'arrow', [[0,0],[0,1],[3,3],[2,2],[2,1],[1,1],[1,3],[2,3],[5,1],[5,3],[4,2],[4,1],[3,0],[5,2],[0,2],[2,0],[4,0]], [[6,7,2,9],[1,5,4],[10,13]]);   /* rows 3 2 4 2 3 3; chains: Through the Gap > Long Draw > Fletcher's Focus > Thornrain | Heartwood Volley > Thornseed Arrow > Spirit Hawk | Nailing Shaft > Hail of Shafts */
-  ezLayout(F, 'frost', [[0,0],[0,2],[4,3],[1,0],[1,2],[5,1],[4,1],[3,3],[3,0],[2,3],[2,2],[4,0],[5,3],[5,2],[4,2],[2,1],[0,1]], [[9,7,2,12],[1,4,10],[6,5],[0,3]]);   /* rows 3 2 3 2 4 3; chains: Spreading Roots > Second Snare > Root Run > Overgrowth | Thorned Vines > Mothcloud > Lashing Roots | Wither > Briar Spirit | Deep Roots > Thorn Hold */
+  ezLayout(F, 'frost', [[0,0],[0,2],[4,1],[1,0],[1,2],[5,1],[4,3],[3,3],[3,0],[2,3],[2,2],[4,0],[5,3],[5,2],[4,2],[2,1],[0,1]], [[0,3],[1,4,10],[9,7],[6,12],[2,5]]);   /* rows 3 2 3 2 4 3; chains: Deep Roots > Thorn Hold | Thorned Vines > Mothcloud > Lashing Roots | Spreading Roots > Second Snare | Wither > Overgrowth | Root Run > Strangling Briars; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'arcane', [[3,1],[0,2],[1,3],[3,2],[5,1],[1,1],[2,2],[4,1],[2,3],[5,2],[5,3],[3,3],[4,0],[0,1],[1,0],[3,0]], [[2,8,11,10],[1,6,3],[7,4],[13,5]]);   /* rows 2 3 2 4 2 3; chains: Opening Charge > Lord of the Glade > Second Charge > White Stag Spirit | Trample > Bounding Leap > Fresh Legs | White Hart's Hunt > Endless Hunt | Spell-Spurred > Through and On */
   ezLayout(F, 'storm', [[3,1],[0,2],[4,3],[4,1],[1,3],[2,3],[3,2],[2,1],[5,1],[2,2],[1,0],[4,2],[5,2],[5,3],[0,1],[0,0],[4,0]], [[7,0,3,8],[9,6,11],[15,10],[4,5]]);   /* rows 3 2 3 2 4 3; chains: Moonsap Bolts > Owl's Reach > Bramble Claws > Skyfall | Shapestorm > Wild Sweep > Wild Hunger | Shift Surge > Second Skin | Primal Swipe > Stoop */
   ezLayout(F, 'earth', [[0,2],[2,1],[3,2],[0,1],[0,0],[2,2],[5,1],[5,0],[4,1],[1,0],[3,0],[5,2],[3,3],[1,3],[4,3]], [[4,9,10,7],[8,6],[5,2],[13,12,14]]);   /* rows 3 2 2 3 2 3; chains: Shadow Partner > Twin Whirl > Gale of Blades > Bladestorm | Encore > Dance of Blades | Threading Dance > Single Partner | Dancer's Breath > Parting Cut > Spell and Steel */
-  ezLayout(F, 'cannon', [[0,0],[0,2],[0,1],[2,2],[2,0],[3,1],[1,2],[2,1],[5,0],[5,2],[5,1],[4,3],[3,0],[4,2],[1,3],[2,3],[3,3]], [[0,4,12,8],[1,6,3],[7,5]]);   /* rows 3 2 4 3 2 3; chains: Potent Spores > Skipping Pod > Drifting Spores > Spore Cloud | Ripe Pods > Puffcap Sowing > Seed Split | Snapjaw Bloom > Overripe */
+  ezLayout(F, 'cannon', [[0,0],[0,2],[0,1],[2,0],[2,2],[3,1],[1,2],[2,1],[5,0],[5,2],[5,1],[4,3],[3,0],[4,2],[1,3],[2,3],[3,3]], [[1,6,4],[7,5],[12,8]]);   /* rows 3 2 4 3 2 3; chains: Ripe Pods > Puffcap Sowing > Skipping Pod | Snapjaw Bloom > Overripe | Drifting Spores > Spore Cloud; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'venom', [[0,2],[0,1],[1,0],[1,2],[4,0],[3,0],[2,2],[2,3],[0,3],[4,1],[2,1],[4,3],[4,2],[3,1],[5,2],[5,0],[5,1]], [[10,13,9,16],[0,3,6],[8,7]]);   /* rows 3 2 3 2 4 3; chains: The Bog Takes Its Due > Fen Toad > Witch's Spite > The Drowned Queen | Clinging Mud > Bog Body > Second Gob | Marsh Fever > Bog Rhythm */
-  ezLayout(F, 'champ:rootmother', [[0,1],[0,2],[3,1],[5,1],[1,1],[2,2],[1,3],[3,2],[3,0],[4,2],[3,3],[5,3],[2,0],[5,2],[0,0],[2,3],[4,0]], [[5,7,9,13],[12,8,16],[6,15],[0,4]]);   /* rows 3 2 3 4 2 3; chains: Bramble Grasp > Sap Song > Strangling Hold > Thousand Roots | The Old Wood Walks > Heartwood Sapling > Sapling Song | Thorned Roots > Deep Sap | Patient Earth > Rootway */
-  ezLayout(F, 'champ:thornbow', [[0,1],[0,0],[2,1],[4,2],[1,1],[2,2],[1,3],[4,3],[5,1],[3,2],[2,0],[2,3],[4,0],[5,3],[3,1],[0,2],[5,2]], [[5,9,3,16],[1,10,12],[0,4],[6,11]]);   /* rows 3 2 4 2 3 3; chains: Barbed Shafts > Snarled Ground > Root Platform > Moonlit Aim | High Boughs > Running Shafts > Hunter’s Moon | Steady Draw > Farshot | Thorn Rain > Warden’s Mark */
-  ezLayout(F, 'champ:hivemother', [[3,2],[2,3],[0,1],[2,1],[1,0],[2,0],[1,1],[4,2],[5,3],[5,2],[2,2],[5,1],[4,3],[3,0],[0,2],[0,3]], [[2,6,3,11],[4,5,13],[12,8],[15,1]]);   /* rows 3 2 4 2 2 3; chains: Passing Spores > Sticky Pollen > Compost > Seedmother | Moth Swarm > Thick Garden > Rotfeast | Full Bloom > Overripe | Honey Store > Drifting Pods */
+  ezLayout(F, 'champ:rootmother', [[0,1],[0,2],[3,1],[5,0],[1,2],[2,2],[1,1],[3,2],[3,0],[4,2],[3,3],[5,2],[2,0],[5,1],[0,0],[2,1],[4,0]], [[6,15],[12,8,16,3],[4,5,7,9],[2,13]]);   /* rows 3 2 3 4 2 3; chains: Thorned Roots > Deep Sap | The Old Wood Walks > Heartwood Sapling > Sapling Song > Twin Elders | Rootway > Bramble Grasp > Sap Song > Strangling Hold | Deep Grip > Thousand Roots; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:thornbow', [[0,1],[0,0],[2,1],[4,2],[1,2],[2,2],[1,3],[4,3],[5,1],[3,2],[2,0],[2,3],[4,0],[5,2],[3,1],[0,2],[5,0]], [[1,10,12,16],[6,11],[4,5,9,3]]);   /* rows 3 2 4 2 3 3; chains: High Boughs > Running Shafts > Hunter’s Moon > Moonlit Aim | Thorn Rain > Warden’s Mark | Farshot > Barbed Shafts > Snarled Ground > Root Platform; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:hivemother', [[3,2],[2,3],[0,1],[2,1],[1,0],[2,0],[1,1],[4,0],[5,3],[5,2],[2,2],[5,1],[4,3],[3,0],[0,2],[0,3]], [[2,6,3,11],[4,5,13,7],[12,8],[15,1]]);   /* rows 3 2 4 2 2 3; chains: Passing Spores > Sticky Pollen > Compost > Seedmother | Moth Swarm > Thick Garden > Rotfeast > Pollen Drift | Full Bloom > Overripe | Honey Store > Drifting Pods; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
 }
 
 /* ================= SIMPLE PASSIVES: IRONHOLD (26 Nov 2026) =================
@@ -65369,20 +65371,20 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 {
   const F = 'ironhold';
   ezLayout(F, 'glaive', [[2,0],[0,3],[3,3],[1,0],[0,1],[2,3],[5,2],[1,1],[5,3],[4,2],[3,2],[4,0],[5,1],[3,1],[2,2],[3,0],[0,2]], [[14,10,9,6],[1,5,2],[4,7]]);   /* rows 3 2 3 4 2 3; chains: Hooked Beard > Brace and Shove > Breaker's Blow > Anvil Strike | Bearded Axe > Spinning Shield > Hot Hands | Bowling Shove > Shield Rush */
-  ezLayout(F, 'arrow', [[0,1],[0,2],[4,1],[5,1],[1,2],[0,3],[3,3],[4,0],[5,2],[2,0],[3,2],[1,1],[2,2],[3,0],[2,1],[4,2],[0,0]], [[11,14,2,3],[12,10,15,8],[9,13,7]]);   /* (28 Nov 2026, the Thunderguns' two fantasies, forces_..._easy_zzthundergun.js: the Marksman in column 2, the Gatling Crew in column 3, Breaching Slug in column 1; rows 4 2 3 3 3 2; chains: Long Iron > True Aim > Through-Ball > Called Shot | Belt-Fed > Quick Swab > Ricochet > Gatling Crank | Breaching Slug > Plate-Splitter > Splintering Slug) */
+  ezLayout(F, 'arrow', [[0,1],[0,2],[4,1],[5,1],[1,2],[0,3],[3,3],[4,0],[5,2],[2,0],[3,2],[1,1],[2,2],[3,0],[2,1],[4,3],[0,0]], [[9,13,7],[11,14,2,3],[4,12,10,8]]);   /* (28 Nov 2026, the Thunderguns' two fantasies, forces_..._easy_zzthundergun.js: the Marksman in column 2, the Gatling Crew in column 3, Breaching Slug in column 1; rows 4 2 3 3 3 2; chains: Breaching Slug > Plate-Splitter > Splintering Slug | Long Iron > True Aim > Through-Ball > Called Shot | Rattlegun > Belt-Fed > Quick Swab > Gatling Crank (Ricochet beside it on row V, the link dropping past row V)); (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   if (0)  ezLayout(F, 'arrow', [[0,0],[0,1],[2,3],[5,0],[1,3],[1,2],[3,1],[5,1],[5,2],[2,1],[2,0],[4,3],[4,2],[0,2],[3,0],[2,2],[3,2]], [[0,10,14,3],[1,9,6],[4,2]]);   /* rows 3 2 4 3 2 3; chains: Concussion Rounds > Quick Swab > Powder Purse > Called Shot | Range-Finder > Breaching Slug > Both Barrels | Rattlegun > Through-Ball */
-  ezLayout(F, 'frost', [[2,0],[0,2],[3,0],[0,1],[1,1],[3,2],[5,0],[5,2],[2,2],[5,1],[1,3],[4,0],[4,1],[2,3],[4,3],[2,1],[4,2],[0,0]], [[8,5,16,7],[3,4,15],[10,13]]);   /* rows 3 2 4 2 4 3; chains: Harpoon Winch > Double Wrap > Trapper's Rhythm > Trap Hound | Tangle > Tripwire > Two Bolas | Wide Nets > Wing Cords */
-  ezLayout(F, 'arcane', [[2,3],[0,2],[4,3],[0,0],[5,2],[3,1],[1,3],[4,2],[5,0],[2,0],[2,1],[2,2],[5,1],[0,1],[3,0],[1,2]], [[3,9,14,8],[7,4],[1,15,11],[10,5]]);   /* rows 3 2 4 2 2 3; chains: Flying Sparks > Two Brands > Anvil's Due > Forgelord | Unmaking Blow > Anvil Storm | Deep Brand > Anvil of Ages > Ringing Strokes | Glowing Anvil > Hot Iron */
+  ezLayout(F, 'frost', [[2,0],[0,2],[3,0],[0,1],[1,1],[3,2],[5,0],[5,2],[2,3],[5,1],[1,3],[4,0],[4,3],[2,2],[4,1],[2,1],[4,2],[0,0]], [[3,4,15],[5,16,7],[8,12]]);   /* rows 3 2 4 2 4 3; chains: Tangle > Tripwire > Two Bolas | Double Wrap > Trapper's Rhythm > Spring the Trap | Harpoon Winch > Weighted Throws; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'arcane', [[2,3],[0,2],[4,3],[0,3],[5,2],[3,1],[1,0],[4,2],[5,0],[2,0],[2,1],[2,2],[5,1],[0,1],[3,0],[1,2]], [[1,15,11],[7,4],[10,5],[6,9,14,8]]);   /* rows 3 2 4 2 2 3; chains: Deep Brand > Anvil of Ages > Ringing Strokes | Unmaking Blow > Hammer Rhythm | Glowing Anvil > Hot Iron | Tempering > Two Brands > Anvil's Due > Forgelord; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'storm', [[1,2],[0,1],[5,1],[2,3],[0,2],[1,3],[2,1],[4,1],[5,3],[5,2],[3,3],[4,0],[3,0],[1,0],[3,2]], [[5,3,10,8],[6,7,2],[4,0]]);   /* rows 2 3 2 3 2 3; chains: Grapnel Shot > Cluster Shell > Second Burst > Hook the Sky | Quick Traverse > Starshell > Proximity Fuse | Sky Shatter > Torn Wings */
-  ezLayout(F, 'earth', [[0,0],[4,1],[4,2],[4,0],[5,1],[1,0],[4,3],[5,2],[5,3],[2,3],[1,1],[2,2],[3,3],[3,0],[2,1],[0,1],[0,2]], [[9,12,6,8],[15,10,14],[16,11],[0,5]]);   /* rows 3 2 3 2 4 3; chains: Steam Uppercut > Pressure Release > Building Pressure > Molten Rivets | Steam Jacket > Tremor Step > Pressure Gauge | Steam Jets > Safety Valve | Packed Crowd > Pile Driver */
-  ezLayout(F, 'cannon', [[0,2],[0,1],[0,0],[2,0],[1,2],[1,3],[5,1],[4,1],[3,2],[4,3],[4,2],[2,3],[5,2],[5,0],[2,1],[3,1]], [[14,15,7,6],[5,11,9],[0,4],[3,13]]);   /* rows 3 2 3 2 3 3; chains: Ringing Ears > Powder Monkey > Big Bertha > Barrage | Double Crew > Quake Shell > The Long Drop | Glowing Casings > Skipping Shell | Pitch-Soaked Wadding > Napalm */
-  ezLayout(F, 'venom', [[1,1],[0,0],[0,1],[4,0],[0,2],[2,0],[2,2],[4,3],[3,3],[1,3],[3,2],[4,1],[5,2],[5,1],[5,3],[2,1]], [[9,8,7,14],[11,13],[4,6,10]]);   /* rows 3 2 3 2 3 3; chains: Tamped Charges > Sympathetic Blast > Rubble > Breach and Clear | Demolition > Sapper's Mate | Black Powder Pack > Powder Trail > Sapper at Work */
+  ezLayout(F, 'earth', [[0,0],[4,1],[4,2],[4,0],[5,1],[1,2],[4,3],[5,2],[5,3],[2,3],[1,1],[2,2],[3,3],[3,0],[2,1],[0,1],[0,2]], [[9,12,6,8],[15,10,14],[5,11]]);   /* rows 3 2 3 2 4 3; chains: Steam Uppercut > Pressure Release > Building Pressure > Molten Rivets | Steam Jacket > Tremor Step > First to the Anvil | Pile Driver > Safety Valve; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'cannon', [[0,2],[0,1],[0,0],[2,0],[1,2],[1,3],[5,1],[4,1],[3,2],[4,3],[4,2],[2,3],[5,2],[5,0],[2,2],[3,1]], [[0,4,14],[3,13],[5,11,9],[15,7,6]]);   /* rows 3 2 3 2 3 3; chains: Glowing Casings > Skipping Shell > Ringing Ears | Pitch-Soaked Wadding > Napalm | Long Tube > Quake Shell > The Long Drop | Switchback > Big Bertha > Barrage; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'venom', [[1,1],[0,0],[0,1],[4,0],[0,2],[2,0],[2,2],[4,2],[3,2],[1,3],[3,0],[4,3],[5,2],[5,1],[5,3],[2,1]], [[4,6,8,7],[11,14],[15,13]]);   /* rows 3 2 3 2 3 3; chains: Black Powder Pack > Powder Trail > Sympathetic Blast > Rubble | Demolition > Breach and Clear | Long Lob > Breaching Charge; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'champ:ih_thane', [[4,0],[0,2],[0,0],[3,2],[1,3],[2,3],[2,2],[3,3],[5,1],[2,1],[1,0],[5,3],[4,1],[5,2],[0,1]], [[4,5,7,11],[9,12,8],[6,3],[2,10]]);   /* rows 3 2 3 2 2 3; chains: Horn of the Hold > Braced Heels > Shield-Brother > Unbroken Line | Shield-Toll > Rising Peaks > Deep Roots | Dented Plate > Thane's Line | Wall of the Clan > War Cry */
-  ezLayout(F, 'champ:ih_artificer', [[0,0],[0,2],[2,2],[0,1],[1,0],[2,1],[3,0],[3,1],[4,3],[4,1],[4,0],[5,2],[3,3],[5,1],[1,3],[3,2]], [[5,7,9,13],[14,12,8],[0,4]]);   /* rows 3 2 2 4 3 2; chains: Stronger Field > Torn Loose > Magnetised > Restless Stone | Ricochet Rivets > Wrecking Ball > Counterweight | Tally Wheel > Lodestone */
-  ezLayout(F, 'champ:ih_brewer', [[0,0],[0,1],[1,0],[4,3],[1,3],[3,3],[2,1],[2,2],[5,1],[5,2],[3,1],[3,0],[4,1],[0,2]], [[6,10,12,8],[4,5,3],[7,9],[0,2]]);   /* rows 3 2 2 3 2 2; chains: Sticky Stout > Last Call > Last Orders > Brimming Keg | Firewater Breath > Double Measure > Open Tap | Scorching Gust > Spilled Pints | Leaky Keg > Heavy Barrel */
+  ezLayout(F, 'champ:ih_artificer', [[0,0],[0,2],[2,2],[0,1],[1,1],[2,1],[3,0],[3,1],[4,3],[4,2],[4,0],[5,2],[3,2],[5,1],[1,3],[3,3]], [[4,5,7,13],[12,9,11]]);   /* rows 3 2 2 4 3 2; chains: Lodestone > Stronger Field > Torn Loose > Restless Stone | Wrecking Ball > Magnetised > Chain Drive; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:ih_brewer', [[0,0],[0,1],[1,0],[4,3],[1,3],[3,3],[2,2],[2,3],[5,1],[5,2],[3,1],[3,2],[4,1],[0,2]], [[0,2],[10,12,8],[4,7,5,3],[11,9]]);   /* rows 3 2 2 3 2 2; chains: Leaky Keg > Heavy Barrel | Last Call > Last Orders > Brimming Keg | Firewater Breath > Scorching Gust > Double Measure > Open Tap | On the Slate > Spilled Pints; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'champ:ih_marksman', [[0,2],[1,0],[3,2],[3,1],[1,2],[2,1],[1,3],[4,1],[5,2],[5,1],[2,3],[3,0],[4,3],[0,1]], [[5,3,7,9],[6,10,12],[0,4]]);   /* rows 2 3 2 3 2 2; chains: Bright Flare > Wide Flare > Spotter's Tally > Signal Fire | Ridge-Watch > Punch-Through > Headsman's Round | Patient Aim > Spotter's Flare */
-  ezLayout(F, 'champ:ih_king', [[0,2],[1,3],[3,2],[3,1],[1,2],[2,1],[1,0],[4,1],[5,2],[5,1],[2,0],[3,3],[4,0],[0,1]], [[5,3,7,9],[6,10,12],[0,4]]);   /* rows 2 3 2 3 2 2; chains: Broad Head > Hall-Breaker > Kingsblood > The King's Due | Sworn Shield > Crown of Iron > The Mountain's Due | Long Muster > Oathhammer */
-  ezLayout(F, 'champ:ih_hrolf', [[0,2],[1,0],[3,2],[3,1],[1,2],[2,1],[1,3],[4,1],[5,2],[5,1],[2,3],[3,0],[4,3],[0,1]], [[5,3,7,9],[6,10,12],[0,4]]);   /* rows 2 3 2 3 2 2; chains: Heavy Charge > Grounding Shell > Spent Casings > Wing-Breaker | Low Angle > Grudge-Fed > The Old Grudge | Ranging Fire > Grudge Shell */
+  ezLayout(F, 'champ:ih_king', [[0,2],[1,3],[3,2],[3,1],[1,1],[2,1],[1,0],[4,3],[5,2],[5,1],[2,0],[3,3],[4,2],[0,1]], [[6,10],[4,5,3,9],[12,8]]);   /* rows 2 3 2 3 2 2; chains: Sworn Shield > Crown of Iron | Oathhammer > Broad Head > Hall-Breaker > The King's Due | The Mountain's Due > Blood of Kings; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:ih_hrolf', [[0,2],[1,0],[3,2],[3,1],[1,1],[2,1],[1,3],[4,0],[5,2],[5,1],[2,3],[3,0],[4,2],[0,1]], [[6,10],[4,5,3,9],[12,8]]);   /* rows 2 3 2 3 2 2; chains: Low Angle > Grudge-Fed | Grudge Shell > Heavy Charge > Grounding Shell > Wing-Breaker | The Old Grudge > The Long Grudge; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
 }
 
 /* ================= SIMPLE PASSIVES: THE SILVER ORDER (26 Nov 2026) =================
@@ -65463,17 +65465,17 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
    other forces' tree layouts"; tools/open_layout.js silver; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'silver';
-  ezLayout(F, 'glaive', [[2,2],[3,2],[3,0],[1,3],[5,2],[0,2],[1,0],[4,3],[5,1],[5,0],[4,2],[2,3],[0,0],[4,1],[2,1],[0,1]], [[0,1,10,4],[3,11,7],[12,6]]);   /* rows 3 2 3 2 3 3; chains: Shield-Ward > Braced Shield > Unyielding > Oath Unbroken | Shield of Faith > Unbroken Oath > Oath of Challenge | Pommel Blow > Rampart of Dawn */
+  ezLayout(F, 'glaive', [[2,2],[3,2],[3,0],[1,3],[5,2],[0,2],[1,1],[4,3],[5,1],[5,0],[4,2],[2,3],[0,0],[4,1],[2,1],[0,1]], [[0,1,10,4],[3,11,7],[6,14]]);   /* rows 3 2 3 2 3 3; chains: Shield-Ward > Braced Shield > Unyielding > Oath Unbroken | Shield of Faith > Unbroken Oath > Oath of Challenge | Rampart of Dawn > Shield Wheel; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'arrow', [[0,2],[3,1],[5,1],[1,3],[1,2],[3,3],[2,2],[0,0],[5,2],[2,0],[2,3],[0,1],[4,1],[5,3],[2,1],[4,2],[4,0]], [[3,10,5,13],[0,4,6],[9,16]]);   /* rows 3 2 4 2 3 3; chains: Double Crank > Through and Through > Heavy Quarrel > Storm of Silver | Opening Shot > Flare Bolt > Splinter Bolt | Bear Witness > Hot Crank */
-  ezLayout(F, 'frost', [[0,1],[3,2],[0,2],[2,3],[2,0],[1,1],[3,1],[0,0],[4,3],[5,2],[4,0],[5,1],[5,0],[4,2],[1,3],[2,2]], [[15,1,13,9],[0,5],[10,12],[7,4]]);   /* rows 3 2 3 2 3 3; chains: Taut Chain > Glinting Links > Double Lash > Radiant Hands | Tightening Links > Chain of Penance | Vigil Chains > Chain Whirl | Final Lash > Light Rhythm */
-  ezLayout(F, 'arcane', [[0,2],[3,0],[2,2],[1,1],[1,2],[3,3],[1,0],[2,1],[5,0],[5,1],[4,0],[4,3],[1,3],[3,1],[0,1],[0,3],[5,2]], [[6,1,10,8],[0,4,2],[15,12]]);   /* rows 3 4 2 3 2 3; chains: Trampling Hooves > Shattered Lance > Vow-Lit Lance > Thrice-Wheeled | Full Gallop > Tourney Passes > Ride Through | Hot Blood > Unhorse */
-  ezLayout(F, 'storm', [[1,2],[0,0],[4,0],[3,1],[1,3],[5,0],[2,1],[4,3],[5,1],[5,2],[2,3],[3,0],[2,2],[0,2],[0,1],[4,2]], [[1,11,2,5],[4,10,7],[6,3]]);   /* rows 3 2 3 2 3 3; chains: Dawn Rhythm > Noonfire > Last Light > Lance upon Lance | Prism > Sunburst > Dawnfall | Noon Sweep > Long Ray */
+  ezLayout(F, 'frost', [[0,1],[3,2],[0,2],[2,3],[2,0],[1,1],[3,1],[0,0],[4,3],[5,2],[4,0],[5,0],[5,1],[4,2],[1,3],[2,2]], [[0,5,6,12],[7,4],[15,1,13,9],[10,11]]);   /* rows 3 2 3 2 3 3; chains: Tightening Links > Chain of Penance > Snap Back > Chain Whirl | Final Lash > Light Rhythm | Taut Chain > Glinting Links > Quickened Chains > Radiant Hands | Vigil Chains > Quick Binding; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'arcane', [[0,2],[3,0],[2,2],[1,1],[1,2],[3,3],[1,0],[2,1],[5,0],[5,1],[4,1],[4,3],[1,3],[3,2],[0,1],[0,3],[5,2]], [[0,4,2],[6,1,8],[15,12],[7,10]]);   /* rows 3 4 2 3 2 3; chains: Full Gallop > Tourney Passes > Ride Through | Trampling Hooves > Shattered Lance > Thrice-Wheeled | Hot Blood > Unhorse | Charge of the Vow > Vow-Lit Lance; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'storm', [[1,2],[0,0],[4,0],[3,1],[1,3],[5,1],[2,1],[4,3],[5,3],[5,2],[2,3],[3,0],[2,2],[0,2],[0,1],[4,2]], [[1,11,2],[4,10,7,8],[6,3,5]]);   /* rows 3 2 3 2 3 3; chains: Dawn Rhythm > Noonfire > Last Light | Prism > Sunburst > Dawnfall > Lance of Heaven | Noon Sweep > Long Ray > Lance upon Lance; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'earth', [[3,1],[0,3],[1,2],[1,0],[0,1],[1,3],[4,0],[5,1],[5,2],[2,0],[3,2],[4,3],[3,0],[2,2],[3,3],[0,2],[1,1]], [[4,16,0,7],[9,12,6],[1,5]]);   /* rows 3 4 2 4 2 2; chains: Opening Cross > Templar's Rhythm > Press of Battle > Steel Tempest | Sword of Heaven > Heaven's Edge > Press Forward | Twin Rhythm > Whirling Flurry */
   ezLayout(F, 'cannon', [[0,3],[2,2],[5,2],[3,1],[2,1],[0,2],[4,2],[5,1],[5,3],[1,3],[3,3],[0,1],[2,0],[4,0],[1,0],[4,1]], [[4,3,15,7],[6,2],[0,9,10],[14,12]]);   /* rows 3 2 3 2 3 3; chains: Procession of Incense > Skipping Coal > Quick Thurible > Ember Spirit | Kindle the Censers > Coal Shower | Fanned Embers > Hot Coals > Direct Hit | Pall of Smoke > Ash in the Eyes */
-  ezLayout(F, 'venom', [[0,3],[0,2],[2,0],[1,0],[0,1],[1,3],[4,3],[2,2],[3,2],[2,1],[4,0],[4,1],[3,1],[5,0],[5,2],[5,1]], [[9,12,11,15],[10,13],[0,5],[7,8,14]]);   /* rows 3 2 3 2 3 3; chains: Leaping Lash > Long Chain > Zealot's Tithe > Grand Inquest | Heretic's Stake > Penitent's Flurry | Broken Litany > Writ of Seizure | Seal Slam > Shield of Doctrine > Censer of Witness */
-  ezLayout(F, 'champ:so_lion', [[0,2],[1,3],[0,1],[4,1],[1,0],[2,1],[2,2],[3,1],[5,0],[5,2],[3,2],[4,3],[5,1],[0,0],[3,0]], [[5,7,3,12],[1,11],[13,4],[6,10,9]]);   /* rows 3 2 2 3 2 3; chains: Shields Raised > Rally to the Shield > Shield Wall > The Ford Itself | Lowered Shield > The Crossing | Swift Reprisal > Bulwark Slam | Burnished Shields > Unbroken > Debt of Oaths */
-  ezLayout(F, 'champ:so_dawn', [[4,3],[0,1],[0,0],[5,1],[1,2],[2,1],[4,0],[3,1],[3,2],[4,1],[2,3],[5,2],[2,0],[5,3],[0,2],[1,3],[4,2]], [[5,7,9,3],[8,16,11],[2,12],[15,10]]);   /* rows 3 2 3 2 4 3; chains: Lingering Star > Be Still > Blinding Glare > Cloister Wall | Noonday > Noon Bell > Dawnsinger | Dawn Chorus > High Noon | First Light > Radiant Hymn */
-  ezLayout(F, 'champ:so_judge', [[0,3],[0,1],[1,0],[1,3],[5,0],[4,3],[2,3],[5,2],[2,1],[2,2],[5,1],[4,0],[3,1],[2,0],[3,2],[0,2]], [[11,4],[8,12,10],[0,3,6],[9,14]]);   /* rows 3 2 4 2 2 3; chains: The Gavel > Iron Chains | Trampling Host > Riders of the Ford > Grey Justicar | Swift Justice > Debt Collection > Witnesses Called | Clerk’s Quill > Court Fines */
+  ezLayout(F, 'venom', [[0,3],[0,2],[2,0],[1,0],[0,1],[1,3],[4,3],[2,2],[3,2],[2,3],[4,0],[4,1],[3,1],[5,0],[5,2],[5,1]], [[0,5,9],[7,8,14],[10,13],[12,11,15]]);   /* rows 3 2 3 2 3 3; chains: Broken Litany > Writ of Seizure > Damning Writ | Seal Slam > Shield of Doctrine > Zeal Against the Arcane | Heretic's Stake > Penitent's Flurry | Long Chain > Zealot's Tithe > Grand Inquest; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:so_lion', [[0,2],[1,3],[0,1],[4,1],[1,1],[2,0],[2,2],[3,1],[5,3],[5,2],[3,2],[4,3],[5,1],[0,0],[3,0]], [[1,11,8],[6,10,9],[4,7,3,12]]);   /* rows 3 2 2 3 2 3; chains: Lowered Shield > The Crossing > The Far Bank | Burnished Shields > Unbroken > Debt of Oaths | Bulwark Slam > Rally to the Shield > Shield Wall > The Ford Itself; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:so_dawn', [[4,3],[0,1],[0,0],[5,3],[1,1],[2,1],[4,0],[3,1],[3,2],[4,1],[2,3],[5,2],[2,2],[5,1],[0,2],[1,3],[4,2]], [[15,10],[4,5,7,9],[12,8,16,11],[0,3]]);   /* rows 3 2 3 2 4 3; chains: First Light > Radiant Hymn | Prism of Dawn > Lingering Star > Be Still > Blinding Glare | High Noon > Noonday > Noon Bell > Dawnsinger | Early Dawn > Cloister Wall; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:so_judge', [[0,3],[0,1],[1,0],[1,1],[5,0],[4,3],[2,3],[5,1],[2,1],[2,2],[5,2],[4,0],[3,1],[2,0],[3,2],[0,2]], [[9,14,10],[11,4],[3,8,12,7]]);   /* rows 3 2 4 2 2 3; chains: Clerk’s Quill > Court Fines > Grey Justicar | The Gavel > Iron Chains | Debt Collection > Trampling Host > Riders of the Ford > Wide Reckoning; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
 }
 
 /* ================= SIMPLE PASSIVES: THE STORMBORN (26 Nov 2026) =================
@@ -65576,16 +65578,16 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 {
   const F = 'stormborn';
   ezLayout(F, 'glaive', [[0,1],[0,2],[3,2],[5,1],[0,3],[1,2],[5,2],[4,1],[5,3],[4,3],[4,0],[2,0],[2,1],[3,0],[1,1],[2,3]], [[4,15,9,8],[11,13,10],[1,5],[14,12]]);   /* rows 3 2 3 2 3 3; chains: Spear Flurry > Howl of the Pack > Moonfang Pounce > Spirit Pack | Braced Spear > Run Them Through > Stormpin | Hunting Bond > Scent of Rain | Blood on the Fur > Worry the Prey */
-  ezLayout(F, 'arrow', [[1,0],[0,1],[3,1],[3,2],[2,1],[5,3],[3,0],[4,3],[5,2],[5,1],[1,2],[1,3],[2,0],[0,2],[4,1]], [[4,2,14,9],[11,7,5],[13,10]]);   /* rows 2 3 2 3 2 3; chains: Headwind > Tailwind > Carried On > Wind Spirit | Hurricane Volley > Skyward Gust > Gale Volley | Breath of the Gust > Run It Down */
-  ezLayout(F, 'frost', [[3,1],[0,0],[3,3],[2,2],[5,0],[0,2],[1,0],[2,3],[5,2],[3,0],[4,1],[3,2],[5,1],[0,1],[1,3],[2,1],[4,3]], [[15,0,10,12],[1,6],[3,11,8]]);   /* rows 3 2 3 4 2 3; chains: Skipping Stone > Heavy Hail > Ice Crust > Hail Shatter | Hard Frost > Black Ice | Hail Spirit > Gathering Storm > Endless Storm */
+  ezLayout(F, 'arrow', [[1,0],[0,1],[3,1],[3,2],[2,0],[5,3],[3,0],[4,2],[5,2],[5,1],[1,2],[1,3],[2,2],[0,2],[4,1]], [[2,14,9],[13,10],[4,6],[7,8],[11,5]]);   /* rows 2 3 2 3 2 3; chains: Tailwind > Carried On > Scatter Shot | Breath of the Gust > Run It Down | Headwind > Wind-Borne Volley | Skyward Gust > Skyrend | Hurricane Volley > Gale Volley; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'frost', [[3,1],[0,0],[3,3],[2,2],[5,0],[0,2],[1,2],[2,3],[5,2],[3,0],[4,1],[3,2],[5,1],[0,1],[1,3],[2,1],[4,3]], [[15,0,10,12],[6,3,11,8]]);   /* rows 3 2 3 4 2 3; chains: Skipping Stone > Heavy Hail > Ice Crust > Hail Shatter | Black Ice > Hail Spirit > Gathering Storm > Endless Storm; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'arcane', [[3,2],[0,3],[1,1],[0,2],[0,1],[1,3],[5,0],[5,2],[4,0],[2,3],[4,3],[5,1],[4,2],[2,0],[2,2],[3,1]], [[14,0,12,7],[1,5,9],[8,6],[4,2]]);   /* rows 3 2 3 2 3 3; chains: Passing Spirit > Restless Dead > Spirit Draw > Spirit Host | Deep Hex > Ancestors' Toll > Restless Ancestor | Spirit Walk > Ancestors' Blessing | Judgment > Lingering Spirits */
   ezLayout(F, 'storm', [[0,1],[3,1],[0,2],[1,0],[2,3],[1,3],[3,2],[5,1],[5,3],[2,2],[5,2],[2,0],[4,2],[0,0],[4,0],[4,3],[4,1]], [[9,6,12,10],[5,4],[13,3,11]]);   /* rows 3 2 3 2 4 3; chains: Lightning Rod > Double Strike > Spark Familiar > Stormseed | Arc Bridge > Backlash | Grounded Bolt > Charged Rhythm > Split Sky */
-  ezLayout(F, 'earth', [[2,2],[0,0],[5,2],[0,1],[1,3],[1,1],[5,1],[4,0],[4,1],[2,3],[2,0],[5,3],[0,2],[3,2],[4,2],[3,3]], [[0,13,14,2],[8,6],[4,9,15],[3,5]]);   /* rows 3 2 3 2 3 3; chains: Ground Gives Way > Stone Remembers > Earth Rhythm > Mountain's Echo | Sinkhole > Great Stomp | Stonewake > Hard Rhythm > Flying Rocks | Heavy Stomp > Loose Earth */
+  ezLayout(F, 'earth', [[2,2],[0,0],[5,2],[0,1],[1,0],[1,1],[5,1],[4,0],[4,1],[2,3],[2,0],[5,3],[0,2],[3,2],[4,2],[3,3]], [[0,13,14,2],[3,5],[8,6],[9,15],[4,10]]);   /* rows 3 2 3 2 3 3; chains: Ground Gives Way > Stone Remembers > Earth Rhythm > Mountain's Echo | Heavy Stomp > Loose Earth | Sinkhole > Great Stomp | Hard Rhythm > Flying Rocks | Stonewake > Maul Swing; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'cannon', [[3,2],[0,0],[5,1],[3,3],[0,2],[3,0],[1,2],[2,0],[5,3],[4,2],[4,0],[2,1],[5,2],[0,1],[3,1],[1,3],[2,3]], [[15,16,3,8],[7,5,10],[4,6]]);   /* rows 3 2 3 4 2 3; chains: Fan Rhythm > Rain Rhythm > Lifted Dance > Thunder Dance | Skyleap > Storm's End > Twin Bolt | Forked Strike > Rain Dance */
-  ezLayout(F, 'venom', [[2,1],[0,3],[0,2],[0,1],[1,3],[1,0],[3,3],[3,2],[3,1],[3,0],[4,2],[2,2],[4,0],[5,1],[5,2]], [[11,7,10,14],[5,9,12],[1,4],[0,8]]);   /* rows 3 2 2 4 2 2; chains: Hard Landing > Long Cast > Skyhunter's Tithe > Master of the Sky | Charged Harpoons > Skyfall Harpoon > Hunter's Haste | Long Cord > Ground Stake | Downwind Haul > Double Harpoon */
-  ezLayout(F, 'champ:sb_caller', [[0,0],[2,1],[3,0],[3,3],[1,2],[2,2],[1,3],[4,2],[5,1],[2,3],[5,3],[4,1],[5,2],[0,2],[0,1]], [[6,9,3,10],[13,4,5],[11,8],[14,1]]);   /* rows 3 2 3 2 2 3; chains: Drenching Storm > Stormsight > Drum Circle > Storm Caller | Gusting Staff > Thunder Drum > Long Roll | Tomorrow's Storm > Two Tomorrows | Crown's Due > Crown of Thunder */
-  ezLayout(F, 'champ:sb_wind', [[2,3],[4,2],[0,0],[5,1],[1,2],[2,0],[3,0],[4,3],[3,1],[4,0],[1,3],[5,2],[2,1],[0,2],[0,1],[4,1]], [[12,8,15,3],[5,6,9],[13,4],[10,0]]);   /* rows 3 2 3 2 4 2; chains: Turn the Road > Long Road Back > Rising Air > Road's End | Wide Gale > Biting Gale > Hard Landing | Whirling Steps > Stoneward Gale | Wind at Her Back > Rain in the Wind */
-  ezLayout(F, 'champ:sb_beast', [[3,2],[0,2],[1,0],[2,0],[1,2],[2,1],[3,1],[2,3],[5,0],[5,1],[4,1],[5,2],[4,3],[4,0],[0,3],[0,1]], [[5,6,10,9],[14,7,12],[2,3],[1,4]]);   /* rows 3 2 3 2 3 3; chains: Heel Biters > Pack Hunger > Spirit Run > Blood Trail | Hunter's Breath > Thunder on the Prey > Thunderbird’s Talons | Long Hunt > Wolf Den | Keen Nose > Wolfsong */
+  ezLayout(F, 'venom', [[2,1],[0,3],[0,2],[0,1],[1,3],[1,0],[3,3],[3,2],[3,1],[3,0],[4,2],[2,3],[4,0],[5,1],[5,2]], [[0,8],[1,4,11],[5,9,12],[7,10,14]]);   /* rows 3 2 2 4 2 2; chains: Downwind Haul > Double Harpoon | Long Cord > Ground Stake > Hard Landing | Charged Harpoons > Skyfall Harpoon > Killing Harpoon | First Harpoon > Lone Wolf > Master of the Sky; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:sb_caller', [[0,0],[2,1],[3,0],[3,3],[1,2],[2,2],[1,3],[4,2],[5,1],[2,3],[5,3],[4,1],[5,2],[0,2],[0,1]], [[4,5,7,12],[6,9,3,10],[11,8],[14,1]]);   /* rows 3 2 3 2 2 3; chains: Thunder Drum > Long Roll > Booming Drum > Rolling Drums | Drenching Storm > Stormsight > Drum Circle > Storm Caller | Tomorrow's Storm > Two Tomorrows | Crown's Due > Crown of Thunder; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:sb_wind', [[2,2],[4,2],[0,0],[5,1],[1,0],[2,0],[3,0],[4,3],[3,1],[4,0],[1,2],[5,2],[2,1],[0,2],[0,1],[4,1]], [[10,0],[12,8,15,3],[4,5,6,9]]);   /* rows 3 2 3 2 4 2; chains: Wind at Her Back > Rain in the Wind | Turn the Road > Long Road Back > Rising Air > Road's End | Stoneward Gale > Wide Gale > Biting Gale > Hard Landing; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:sb_beast', [[3,2],[0,2],[1,0],[2,2],[1,1],[2,1],[3,1],[2,3],[5,3],[5,2],[4,1],[5,1],[4,3],[4,0],[0,3],[0,1]], [[14,7,12,8],[4,5,6,10],[0,9]]);   /* rows 3 2 3 2 3 3; chains: Hunter's Breath > Thunder on the Prey > Thunderbird’s Talons > Stormcarrier | Wolfsong > Heel Biters > Pack Hunger > Spirit Run | Old Calls > Blood Trail; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
 }
 
 /* ================= SIMPLE PASSIVES: THE WARDBOUND (26 Nov 2026) =================
@@ -65673,17 +65675,17 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
    other forces' tree layouts"; tools/open_layout.js wardbound; forces_..._easy.js ezLayout) ---------- */
 {
   const F = 'wardbound';
-  ezLayout(F, 'glaive', [[0,1],[2,1],[0,3],[0,2],[3,0],[1,0],[1,2],[4,3],[2,3],[3,2],[4,1],[2,0],[4,2],[5,1],[5,2],[5,0]], [[5,11,4,15],[1,10,13],[3,6]]);   /* rows 3 2 3 2 3 3; chains: Oath Kept > Oath of Iron > Unyielding Pace > Second Edge | Deep Carving > Final Oath > Vowed Blade | Oathsworn Cut > Rune Cleave */
+  ezLayout(F, 'glaive', [[0,1],[2,1],[0,3],[0,2],[3,0],[1,0],[1,3],[4,0],[2,2],[3,2],[4,1],[2,0],[4,2],[5,1],[5,3],[5,2]], [[1,10,13],[5,11,4],[6,14],[12,15]]);   /* rows 3 2 3 2 3 3; chains: Deep Carving > Final Oath > Vowed Blade | Oath Kept > Oath of Iron > Fresh Steel | Rune Cleave > Whirling Oath | Greatsword Reach > Second Edge; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'arrow', [[3,0],[2,2],[0,0],[0,2],[3,2],[0,1],[2,1],[1,0],[1,3],[3,1],[4,1],[4,3],[5,2],[5,1],[5,0]], [[6,9,10,13],[8,11],[1,4,12]]);   /* rows 3 2 2 3 2 3; chains: Returning Oath > Quick Hand > Glaive Orbit > Endless Ricochet | Homeward Cut > Warding Glaive | Masked Sight > Mask's Tally > Unending Glaive */
   ezLayout(F, 'frost', [[0,0],[3,0],[0,2],[0,1],[4,2],[1,2],[1,3],[2,1],[2,0],[2,3],[3,1],[4,3],[4,1],[2,2],[5,1],[5,2],[5,0]], [[7,10,12,14],[8,1,16],[6,9]]);   /* rows 3 2 4 2 3 3; chains: Winter Ward > Biting Cold > Winter's Tithe > Winter Howls | Rimecut > Wide Sweep > Full Circle | Frostbite > Cleaving Haft */
-  ezLayout(F, 'arcane', [[0,3],[1,0],[0,1],[0,2],[3,2],[3,1],[1,2],[4,2],[2,0],[2,3],[4,0],[4,3],[2,1],[5,0],[5,1],[5,2]], [[1,8,10,13],[12,5,14],[3,6]]);   /* rows 3 2 3 2 3 3; chains: Lingering Ink > Reading Glass > Scribe the Road > Endless Script | Flick Through > Spent Ink > Cascade | Deep Script > Detonate */
-  ezLayout(F, 'storm', [[0,1],[4,0],[1,0],[0,2],[1,1],[0,3],[2,0],[2,1],[2,3],[2,2],[3,0],[4,1],[4,2],[3,2],[5,3],[5,1],[5,2]], [[9,13,12,16],[8,14],[0,4,7],[2,6]]);   /* rows 3 2 4 2 3 3; chains: Skyfall > Rider's Rhythm > Long Pennant > Second Fall | Unbroken Chain > Chain Oath | Couched Lance > Rune Pennant > Double Thrust | Swift Remount > Rider's Tithe */
-  ezLayout(F, 'earth', [[2,0],[0,1],[0,3],[3,0],[4,1],[2,3],[1,1],[4,0],[0,2],[2,1],[4,3],[1,2],[3,2],[5,3],[5,2],[5,1]], [[2,5,10,13],[1,6,9],[8,11]]);   /* rows 3 2 3 2 3 3; chains: Deep Quake > Stone's Toll > Stone Stance > Unmoving | Iron Rhythm > Quake Line > Shield Edge | Shield Bash > Crushing Rim */
+  ezLayout(F, 'arcane', [[0,3],[1,0],[0,1],[0,2],[3,2],[3,1],[1,2],[4,2],[2,0],[2,3],[4,0],[4,3],[2,1],[5,2],[5,1],[5,0]], [[1,8,10,15],[3,6,4],[12,5,14],[7,13]]);   /* rows 3 2 3 2 3 3; chains: Lingering Ink > Reading Glass > Scribe the Road > Runesight | Deep Script > Detonate > Ghost Scribe | Flick Through > Spent Ink > Cascade | Two Flicks > Endless Script; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'storm', [[0,1],[4,0],[1,0],[0,2],[1,1],[0,3],[2,0],[2,1],[2,3],[2,2],[3,2],[4,1],[4,3],[3,1],[5,3],[5,1],[5,2]], [[0,4,7],[2,6],[9,10,16],[12,14]]);   /* rows 3 2 4 2 3 3; chains: Couched Lance > Rune Pennant > Double Thrust | Swift Remount > Rider's Tithe | Runefall > Lancer's Finish > Second Fall | Long Pennant > Chain Oath; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'earth', [[2,0],[0,1],[0,3],[3,0],[4,0],[2,3],[1,1],[4,1],[0,2],[2,2],[4,3],[1,2],[3,2],[5,3],[5,2],[5,1]], [[1,6,7],[2,5,10,13],[8,11]]);   /* rows 3 2 3 2 3 3; chains: Iron Rhythm > Quake Line > Shield Song | Deep Quake > Stone's Toll > Stone Stance > Unmoving | Shield Bash > Crushing Rim; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
   ezLayout(F, 'cannon', [[0,1],[3,1],[0,2],[2,1],[4,0],[3,0],[1,3],[2,2],[0,0],[2,3],[3,2],[1,0],[3,3],[4,2],[5,2],[5,1],[5,3]], [[7,10,13,14],[8,11],[6,9,12]]);   /* rows 3 2 3 4 2 3; chains: Chain Bolt > Heavy Bolt Ready > Third Crewman > Unbroken Chain | Skewering Bolt > Shrapnel | Rune Shot > Quick Crank > Spent Bolt */
   ezLayout(F, 'venom', [[1,0],[3,1],[0,2],[1,3],[1,2],[0,1],[3,2],[3,0],[4,2],[3,3],[2,1],[2,0],[4,3],[5,2],[5,1],[5,3]], [[3,9,12,15],[2,4],[10,1,14]]);   /* rows 2 3 2 4 2 3; chains: Long Blade > Rite of Holding > Smoke Spirit > Hallowed Road | Deep Mending > Sworn Vow | Mercy Cut > Urgent Hands > Steadfast Chaplain */
-  ezLayout(F, 'champ:wb_varic', [[2,3],[0,1],[0,2],[3,1],[1,1],[2,0],[1,2],[4,0],[5,2],[5,3],[3,0],[5,1],[4,2],[3,3],[0,0]], [[2,6,12,8],[5,10,7],[1,4],[3,11]]);   /* rows 3 2 2 3 2 3; chains: Wide Ring > Heavy Hand > The Last Gate > The Gate Holds | Long Vigil > Steady Pace > Shared Watch | Warden's Reach > Hold Fast | Shield Brothers > Last Warden */
-  ezLayout(F, 'champ:wb_aedric', [[3,2],[0,0],[0,1],[2,2],[1,0],[2,1],[1,3],[3,1],[5,0],[5,1],[4,1],[5,2],[4,3],[3,0],[0,2]], [[5,7,10,9],[3,0,11],[6,12],[1,4]]);   /* rows 3 2 2 3 2 3; chains: Sun-Struck Trail > Rallying Cry > Hot Blood > Open Road | Into the Fray > Eager Sun > Sun-Sworn | Searing Wheel > Blaze of Glory | Sunlit Reach > Sun Charge */
-  ezLayout(F, 'champ:wb_isaura', [[0,2],[1,3],[1,2],[2,2],[1,0],[2,1],[4,0],[3,1],[5,2],[5,1],[3,3],[5,3],[4,2],[4,1],[0,1]], [[5,7,13,9],[1,10,11],[12,8]]);   /* rows 2 3 2 2 3 3; chains: Tighter Bonds > Shared Vow > Vow's Reckoning > Sworn Road | Silent Vow > Quiet Step > Veiled Oath | Oath Turned > Turned Twice */
+  ezLayout(F, 'champ:wb_varic', [[2,3],[0,1],[0,2],[3,1],[1,1],[2,1],[1,2],[4,1],[5,2],[5,1],[3,0],[5,0],[4,2],[3,3],[0,0]], [[2,6,12,8],[4,5,3,7],[10,11]]);   /* rows 3 2 2 3 2 3; chains: Wide Ring > Heavy Hand > The Last Gate > The Gate Holds | Hold Fast > Long Vigil > Shield Brothers > Shared Watch | Steady Pace > Last Warden; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:wb_aedric', [[3,2],[0,0],[0,1],[2,2],[1,1],[2,1],[1,3],[3,3],[5,3],[5,1],[4,1],[5,2],[4,3],[3,0],[0,2]], [[3,0,11],[4,5,10,9],[12,8]]);   /* rows 3 2 2 3 2 3; chains: Into the Fray > Eager Sun > Sun-Sworn | Sun Charge > Sun-Struck Trail > Hot Blood > Open Road | Blaze of Glory > Undying Blaze; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
+  ezLayout(F, 'champ:wb_isaura', [[0,2],[1,3],[1,2],[2,2],[1,1],[2,1],[4,0],[3,1],[5,2],[5,1],[3,3],[5,3],[4,2],[4,3],[0,1]], [[1,10],[12,8],[4,5,7,9],[13,11]]);   /* rows 2 3 2 2 3 3; chains: Silent Vow > Quiet Step | Oath Turned > Turned Twice | Binding Sweep > Tighter Bonds > Shared Vow > Sworn Road | Vow's Reckoning > Veiled Oath; (28 Nov 2026, spell chains, tools/check_spell_chains.js: a spell's improvers run below it in its chain) */
 }
 
 /* Fifteen capstones that were "Every 2nd attack: hits the target again" (the attack pass's spirits and second fighters), each
@@ -67608,12 +67610,14 @@ const WBA_KIT = { slot: 'frost', mana: { max: 110, regen: 1, hit: .6 }, abilitie
     GT('Second Shadow', 'quick', 2, 1, 2, '', {}, { req: [1, 1] }),
     GT('Lone Wolf', 'moon', 2, 2, 2, n => `While no other unit stands within ${WBA.lone.r} cells of the ${one}, her attacks and spells hit ${pc(WBA.lone.per * n)}% harder.`, {}, { cap: 'wbaLone' }),
     /* row IV */
-    GT('Swift Quietus', 'hourglass', 3, 1, 2, '', {}),
+    GT('Swift Quietus', 'hourglass', 3, 0, 2, '', {}),
     GS('wb_oathhunt', 3, 3),
     GT('Long Stride', 'spyglass', 3, 2, 2, '', {}, { req: [2, 2] }),
     /* row V */
-    GT('Twin Shadows', 'swords', 4, 0, 2, '', {}),
-    GT('Merciless Hunt', 'skull', 4, 1, 2, '', {}),
+    /* (28 Nov 2026, spell chains, tools/check_spell_chains.js: Twin Shadows, a Sable Step talent, runs below it in its chain, over
+       Swift Quietus's old cell; Merciless Hunt and Swift Quietus take column 0) */
+    GT('Twin Shadows', 'swords', 4, 1, 2, '', {}, { req: [2, 1] }),
+    GT('Merciless Hunt', 'skull', 4, 0, 2, '', {}),
     GT("Hunter's Count", 'stars', 4, 3, 2, '', {}, { req: [3, 3] }),
     /* row VI: the capstones, one a fantasy */
     GT('No Oath Unanswered', 'skullbolt', 5, 1, 1, `When the ${one} slays a foe, her next leap comes as soon as she is back at her post.`, {}, { cap: 'wbaAgain' }),
@@ -83698,7 +83702,8 @@ const THEMES = {
      Glade is (its top and foot in view, a touch more than its height: fitOut; centred on the picture; never past its sides:
      viewW); no keep, a ward line at the foot. Its fog drifts round the edges, never over the field (painted.fog.clear). */
   snowpass: (() => { const R = typeof SNOWPASS_PAINT_RECT !== 'undefined' ? SNOWPASS_PAINT_RECT : [-18.3, -5.6, 47.6, 22.7], M = typeof SNOWPASS_FOG_MOTION !== 'undefined' && SNOWPASS_FOG_MOTION || { drift: [0, 0], noise: .1 }; return {
-    id: 'snowpass', sunDir: nrm3([-.52, .72, .47]), sunCol: [1.4, 1.34, 1.24], sky: [.3, .36, .5], gnd: [.3, .32, .36], fogHex: '#2a3448',
+    id: 'snowpass', snow: true,   // (snow: footprints and snow thrown up by heavy blows, snowfx.js)
+    sunDir: nrm3([-.52, .72, .47]), sunCol: [1.4, 1.34, 1.24], sky: [.3, .36, .5], gnd: [.3, .32, .36], fogHex: '#2a3448',
     pitch: 57, fitTop: R[1] + .1, fitBot: R[1] + R[3] - .1, fitOut: 1.08, noKeep: true, h: () => 0, fly: [.85, 1, .45],
     camX: R[0] + R[2] / 2, viewW: R[2],
     bendR: 1e5, shafts: 'none', ward: [.55, .82, 1], wardBare: true, inShade: 1, walkUpright: true, walkTilt: 0, walkRise: 0,
@@ -85469,7 +85474,7 @@ const SCENE3D_MAPS = {
     mood: { top: '#d4dae2', topK: .06, bounce: '#eef0f4', bounceK: .06, key: '#f6f4f0', keyK: .03 },
     tone: { sat: .92, contrast: 1.02, ev: 0, warm: -2 },   // (warm -2: the snow read cream (227,217,198) against Ember's cool white (207,220,233))
     theme: typeof SNOWPASS_PAINT_RECT !== 'undefined' ? { fitTop: SNOWPASS_PAINT_RECT[1] + .1, fitBot: SNOWPASS_PAINT_RECT[1] + SNOWPASS_PAINT_RECT[3] - .1, fitOut: 1.08, camX: COLS / 2,
-      viewW: 2 * Math.min(COLS / 2 - SNOWPASS_PAINT_RECT[0], SNOWPASS_PAINT_RECT[0] + SNOWPASS_PAINT_RECT[2] - COLS / 2), mistCol: [.82, .88, .96] } : { mistCol: [.82, .88, .96] },
+      viewW: 2 * Math.min(COLS / 2 - SNOWPASS_PAINT_RECT[0], SNOWPASS_PAINT_RECT[0] + SNOWPASS_PAINT_RECT[2] - COLS / 2), mistCol: [.82, .88, .96], snow: true } : { mistCol: [.82, .88, .96], snow: true },   // (snow: prints and thrown snow, snowfx.js)
     edge: [34, 16.5, 3.8],   // (the exported area: game x -30 to 41, z -13 to 21)
   },
   /* (Glowcap Hollow, the second scene, was taken out on 28 Nov 2026, owner: "can you remove the mushroom themed battle map from the
@@ -151694,6 +151699,202 @@ const CMFX = (() => {
   hook();
   return { staff, hook, dial, rewind, echo, tickRing, ghost, K };
 })();
+
+/* ================= SNOW UNDERFOOT: footprints and snow thrown up by heavy blows (owner, 28 Nov 2026) =================
+   "if we're using 3d can you also make minions leave snow prints"; "smashes on the snow from steamhammer etc should throw
+   snow in the air as well". Only on a map whose theme says snow: true (maps.js THEMES.snowpass, painted, and the 3D scene
+   that takes its place, scene3d.js SCENE3D_MAPS.snowpass.theme); every other map is untouched.
+     prints   every foe walking on the field presses a print into the snow, left and right in turn, a stride apart; a big
+              foe a bigger, deeper one; flyers, burrowed and lifted foes none. A print is a soft blue-grey dent: its wall on
+              the sun's side in shadow, the far wall catching the light, the floor a touch shaded; it fills back in and fades
+              over SN.life seconds. Kept in a fixed ring of SN.cap instances (8 floats each), written once when pressed and
+              drawn in one instanced draw by its own small program in the spells' pass (gl.js vfxGL ext), so nothing is
+              allocated a frame and the CPU only writes a print when a foot comes down.
+     bursts   groundImpactFx(x, z, power): a heavy blow on the snow throws up powder (a low skirt rolling out, a plume rising
+              and drifting down), clumps that arc out under gravity and lie where they land, and a few cold glints. power 1
+              is an ordinary Steam Hammer smash. Hooked in generically, not spell by spell: a crack or a large scorch laid on
+              the ground (game.js decal: the hammers' smash, fxQuake and so boulders, slams and quakes, fxExplode, meteors)
+              and a heavy dust kick (fxDust: landings, burrowers surfacing, a unit set down). Blows landing together at one
+              spot merge into one burst. GPU particles (vfx.js vfxBurst); on Graphics Low a few plain puffs instead.
+   Graphics Low: prints last SN.lifeLow seconds in a smaller ring; bursts are a handful of puffs. Off: SN.on = false. */
+const SN = { on: true, cap: 1024, capLow: 256, life: 12, lifeLow: 6, F: 8, d: null, head: 0, n: 0, lo: 0, hi: 0, wrap: 0, t: 0, used: 0 };
+SN.d = new Float32Array(SN.cap * SN.F);
+const snowOn = () => SN.on && typeof TH !== 'undefined' && TH && !!TH.snow && typeof G !== 'undefined' && G && G.state === 'play';
+const snowLow = () => typeof GFX !== 'undefined' && GFX === 'low';
+
+/* ---- the prints ---- */
+// one print: (x, z) its centre, yaw the way the foot points (atan2(dx, dz), as the foes' own), w and l its half-width and
+// half-length, dep how deep (1 an ordinary foe), side 1 the right foot, -1 the left (its shape mirrored)
+function snowPrint(x, z, yaw, w, l, dep, side) {
+  const cap = snowLow() ? SN.capLow : SN.cap, i = SN.head % cap, o = i * SN.F, d = SN.d;
+  d[o] = x; d[o + 1] = z; d[o + 2] = yaw; d[o + 3] = G.time;
+  d[o + 4] = w; d[o + 5] = l; d[o + 6] = dep; d[o + 7] = side;
+  if (SN.lo === SN.hi) { SN.lo = i; SN.hi = i + 1; } else if (i === SN.hi) SN.hi++; else SN.wrap = 1;
+  SN.head = (i + 1) % cap; SN.n = Math.min(cap, SN.n + 1); SN.used = cap;
+}
+function snowClear() { SN.d.fill(0); SN.head = 0; SN.n = 0; SN.lo = SN.hi = 0; SN.wrap = 1; }
+// a foe's feet this frame: a print each time it has gone a stride since the last (its state is the view's, vstate: never G's)
+function snowSteps(c, s) {
+  if (c.dead || c.fly || c.burT > 0 || (c.liftT > G.time) || c.ragdoll) { s.snx = null; return; }
+  if (typeof tunK === 'function' && tunK(c) > .02) { s.snx = null; return; }   // (still on the way in, off the field)
+  const x = c.x + (c.ox || 0), z = c.y + (c.oy || 0);
+  if (s.snx == null) { s.snx = x; s.snz = z; s.sns = 1; return; }
+  const dx = x - s.snx, dz = z - s.snz, dd = Math.hypot(dx, dz);
+  const r = c.def.r * (typeof cscale === 'function' ? cscale(c.type) : 1) * (c.elite && typeof ELITE_SC !== 'undefined' ? ELITE_SC : 1), k = r / .34;
+  const stride = .3 * Math.max(.7, Math.min(2.4, k));
+  if (dd > stride * 4) { s.snx = x; s.snz = z; return; }   // (a blink or a knock: no trail across the gap)
+  if (dd < stride) return;
+  const ux = dx / dd, uz = dz / dd, sd = s.sns = -s.sns, off = .085 * Math.min(2.6, k);
+  // (the right of the way it walks is (uz, -ux): the right foot a little to the right of its line, the left to the left)
+  const heavy = (c.def.boss ? .35 : 0) + (c.elite ? .1 : 0), dep = Math.max(.6, Math.min(1.6, .75 + (k - 1) * .45 + heavy));
+  snowPrint(x + uz * off * sd, z - ux * off * sd, Math.atan2(ux, uz), .075 * Math.min(2.8, k), .13 * Math.min(2.8, k), dep, sd);
+  s.snx = x; s.snz = z;
+}
+function snowTick() {
+  if (typeof G === 'undefined' || !G) return;
+  if (G.time < SN.t - .5) snowClear();   // (a new game: its clock starts again)
+  SN.t = G.time;
+  if (!snowOn()) return;
+  if (typeof VS !== 'undefined') for (const c of G.creeps) { const s = VS.get(c.id); if (s && s.c === c) snowSteps(c, s); }
+  if (SN.n && typeof RD !== 'undefined' && RD && RD.vfx) { const X = RD.vfx; if (!X.ext.includes(SN_EXT)) X.ext.push(SN_EXT); SN_EXT.n = SN.n; }
+}
+
+// the print's program: a quad per instance laid on the ground, the dent drawn in its fragment shader
+const SN_VS = `#version 300 es
+layout(location=0) in vec2 aC; layout(location=1) in vec4 iA; layout(location=2) in vec4 iB;
+uniform mat4 uVP; uniform float uTime, uLife, uHead, uCap, uFull; uniform vec3 uSunW;
+out vec2 vP, vSun; out float vK, vDep, vSeed;
+${BEND_GLSL}
+void main(){
+  float age = uTime - iA.w;
+  if (iB.x <= 0. || age < 0. || age > uLife) { gl_Position = vec4(2., 2., 2., 1.); return; }
+  float c = cos(iA.z), s = sin(iA.z);
+  vec2 f = vec2(s, c), r = vec2(c, -s);   // (forward, the way the foot points; right of it)
+  vec2 q = aC * vec2(1.3, 1.2);           // (a margin round the sole for its soft edge and its lit rim)
+  vec2 w = iA.xy + r * q.x * iB.x + f * q.y * iB.y;
+  gl_Position = uVP * vec4(bendW(vec3(w.x, .018, w.y)), 1.);
+  vP = vec2(q.x * iB.w, q.y);
+  // the sun on the ground, in the print's own frame (as a fraction of its size, so the dent's walls are a fixed share of it)
+  vec2 sg = vec2(dot(uSunW.xz, r) * iB.w, dot(uSunW.xz, f)); float sl = length(sg);
+  vSun = (sl > 1e-3 ? sg / sl : vec2(0., 1.)) * vec2(.2, .14);
+  // (it fills back in: deep for its first third, then shallower and fainter to nothing)
+  vK = smoothstep(0., .12, age) * (1. - smoothstep(uLife * .3, uLife, age));
+  // (a full ring: the oldest tenth of its slots, the next to be pressed over, fade out first, so none vanishes at once)
+  if (uFull > .5) vK *= smoothstep(0., .1, mod(float(gl_InstanceID) - uHead + uCap, uCap) / uCap);
+  vDep = iB.z; vSeed = fract(iA.w * 7.31 + iA.x * .37);
+}`;
+const SN_FS = `#version 300 es
+precision highp float;
+in vec2 vP, vSun; in float vK, vDep, vSeed; uniform vec3 uShadow, uLit; uniform vec2 uBloom; out vec4 o;
+${NOISE_GLSL}
+// the sole: x across (its inside at +x), y along (the heel at -1, the toes at +1); 1 inside the dent, 0 outside, soft between
+float sole(vec2 p){
+  float b = length((p - vec2(.06, .36)) / vec2(.8, .6));      // the ball and toes
+  float h = length((p - vec2(-.02, -.56)) / vec2(.62, .42));  // the heel
+  float a = length((p - vec2(-.1, -.1)) / vec2(.45, .5));     // the outer edge of the arch between them
+  float d = min(min(b, h), a) + (vnoise(p * 3.1 + vSeed * 40.) - .5) * .22;   // (crumbled, never a clean stamp)
+  return 1. - smoothstep(.66, 1., d);
+}
+void main(){
+  if (uBloom.x > 0.) discard;
+  float D = sole(vP);
+  // the dent's walls: the one nearer the sun faces away from it (shadow), the far one faces it (light)
+  float g = sole(vP + vSun) - sole(vP - vSun);
+  float sh = clamp(-g, 0., 1.), li = clamp(g, 0., 1.) * (1. - D * .5);
+  float k = vK * vDep, a = clamp((D * .16 + sh * .5) * k, 0., .8);
+  if (a < .004 && li * k < .004) discard;
+  vec3 c = mix(uShadow * 1.12, uShadow, sh);
+  o = vec4(c * a + uLit * li * .1 * k, a);
+}`;
+// the frame's prints: the slots pressed since the last frame go up, then the ring is drawn (the faded ones collapse)
+function snowDraw(E, bloom) {
+  if (bloom || !SN.n || typeof RD === 'undefined' || !RD || !RD.vfx || !(typeof TH !== 'undefined' && TH && TH.snow)) { E.n = 0; return; }
+  const X = RD.vfx, gl = X.gl, R = X.R;
+  if (!E.P) {
+    E.P = X.prog(SN_VS, SN_FS); E.vao = gl.createVertexArray(); E.cb = gl.createBuffer(); E.ib = gl.createBuffer();
+    gl.bindVertexArray(E.vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, E.cb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, E.ib); gl.bufferData(gl.ARRAY_BUFFER, SN.d, gl.DYNAMIC_DRAW);
+    for (let k = 0; k < 2; k++) { gl.enableVertexAttribArray(1 + k); gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, SN.F * 4, k * 16); gl.vertexAttribDivisor(1 + k, 1); }
+    gl.bindVertexArray(null); SN.lo = SN.hi = 0; SN.wrap = 0;
+  }
+  gl.bindVertexArray(E.vao); gl.bindBuffer(gl.ARRAY_BUFFER, E.ib);
+  if (SN.wrap) gl.bufferSubData(gl.ARRAY_BUFFER, 0, SN.d);
+  else if (SN.hi > SN.lo) gl.bufferSubData(gl.ARRAY_BUFFER, SN.lo * SN.F * 4, SN.d, SN.lo * SN.F, (SN.hi - SN.lo) * SN.F);
+  SN.lo = SN.hi = 0; SN.wrap = 0;
+  const u = E.P.u, sky = R.sky || [.3, .36, .48], m = Math.max(.05, sky[0], sky[1], sky[2]), sun = R.sunDir || [-.5, .8, .3];
+  gl.useProgram(E.P.p);
+  gl.uniformMatrix4fv(u.uVP, false, R.vp); gl.uniform3fv(u.uBend, R.bend); gl.uniform1f(u.uTime, G.time);
+  gl.uniform1f(u.uLife, snowLow() ? SN.lifeLow : SN.life); gl.uniform1f(u.uHead, SN.head); gl.uniform1f(u.uCap, SN.used || SN.cap); gl.uniform1f(u.uFull, SN.n >= (SN.used || SN.cap) ? 1 : 0); gl.uniform3fv(u.uSunW, sun); gl.uniform2f(u.uBloom, 0, 0);
+  // (the shade in the dent: a cold blue-grey, leaning to the map's own sky)
+  gl.uniform3f(u.uShadow, .4 + .1 * sky[0] / m, .44 + .1 * sky[1] / m, .52 + .1 * sky[2] / m);
+  const sc = R.sunCol || [1, 1, 1], sm = Math.max(.05, sc[0], sc[1], sc[2]); gl.uniform3f(u.uLit, sc[0] / sm, sc[1] / sm, sc[2] / sm);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, Math.min(SN.used || SN.cap, SN.cap));
+  gl.bindVertexArray(null);
+  E.n = 0;   // (drawn: it adds no light, so it must not wake the glow pass, gl.js vfxGL bloom)
+}
+const SN_EXT = { n: 0, P: null, vao: null, cb: null, ib: null, draw(bloom) { snowDraw(this, bloom); } };
+
+/* ---- snow thrown up ---- */
+const SN_HIT = { x: new Float32Array(8), z: new Float32Array(8), t: new Float32Array(8).fill(-99), p: new Float32Array(8), i: 0 };
+let SN_COL = null;
+function snowCols() {
+  return SN_COL || (SN_COL = { puff: vfxC('#f4f8ff', 1.4), puff1: vfxC('#d0dcee', 1.2), plume: vfxC('#f8fbff', 1.45), plume1: vfxC('#d8e2f2', 1.2), clump: vfxC('#eef3fb', 1.35), glint: vfxC('#dff0ff', 1.3) });
+}
+// x, z where it lands (cells); power how hard (1: a Steam Hammer smash, up to 3)
+function groundImpactFx(x, z, power) {
+  if (!snowOn() || !(power > .08) || typeof VLIVE !== 'undefined' && !VLIVE) return 0;
+  power = Math.min(3, power);
+  // (two blows at one spot within a moment, a slam's crack and its dust: one burst, as hard as the harder, a little more)
+  const H = SN_HIT, t = G.time;
+  for (let k = 0; k < 8; k++) if (t - H.t[k] < .15 && Math.abs(H.x[k] - x) < .6 && Math.abs(H.z[k] - z) < .6) {
+    const extra = power - H.p[k] * .7; if (extra < .15) return 0;
+    H.p[k] = Math.max(H.p[k], power); power = extra; break;
+  }
+  H.x[H.i] = x; H.z[H.i] = z; H.t[H.i] = t; H.p[H.i] = power; H.i = (H.i + 1) & 7;
+  const q = Math.sqrt(power), C = snowCols();
+  const gpu = typeof vfxFid === 'function' && vfxFid().gpu > 0 && typeof VFX_OK !== 'undefined' && VFX_OK > 0;
+  if (!gpu) {   // Graphics Low: a few plain puffs (the atlas particles), no clumps
+    for (let k = 0, n = Math.round(3 + 3 * power); k < n; k++) { const a = k / n * TAU + R_(-.4, .4), v = R_(.5, 1.1) * q;
+      part({ k: 'xpuff', x: x + Math.cos(a) * .1, z: z + Math.sin(a) * .1, h: .12, vx: Math.cos(a) * v, vz: Math.sin(a) * v, vh: R_(.3, .9) * q, drag: 2.6, life: R_(.7, 1.1), max: 1.1, size: R_(.12, .18) * q, col: '#e6eefa', al: .7 }); }
+    return 1;
+  }
+  let n = 0;
+  // a low skirt of powder rolling out over the snow (lifted a little off it, so the soft particles are not faded into it)
+  n += vfxBurst({ x, y: .2, z, shape: 'ring', r: .15 * q, flat: 1, sp: [.9 * q, 2 * q], up: [.1, .5], life: [1.2, 2], size: [.16 * q, .24 * q], grow: 2.4,
+    c0: C.puff, c1: C.puff1, a0: .9, a1: .25, drag: 2.4, grav: .25, layer: VT.SMOKE, add: 0, spin: 1.2, fadeIn: .04 }, 12 * power);
+  // a plume of fine snow thrown up, hanging a moment and sifting back down
+  n += vfxBurst({ x, y: .25, z, shape: 'hemi', r: .15 * q, sp: [.3, 1.2 * q], up: [2.2 * q, 4 * q], life: [1.4, 2.2], size: [.14 * q, .22 * q], grow: 2.4,
+    c0: C.plume, c1: C.plume1, a0: .85, a1: .2, drag: 2.4, grav: 1.6, layer: VT.PUFF, add: 0, spin: .8, fadeIn: .05 }, 8 * power);
+  // clumps arcing out under gravity, lying where they land, then gone
+  n += vfxBurst({ x, y: .1, z, shape: 'hemi', r: .1, sp: [1 * q, 2.6 * q], up: [2.2 * q, 4.2 * q], life: [1.1, 1.8], size: [.06 * q, .11 * q], grow: .85,
+    c0: C.clump, c1: C.clump, a0: 1, a1: .9, drag: .3, grav: 11, layer: VT.DIRT, add: 0, spin: 9, fadeIn: .02 }, 10 * power);
+  // a few cold glints in the thrown snow
+  n += vfxBurst({ x, y: .3, z, shape: 'hemi', r: .2 * q, sp: [.3, 1.4 * q], up: [1.4 * q, 3 * q], life: [.6, 1.1], size: [.03, .05], grow: .5,
+    c0: C.glint, a0: .9, a1: 0, drag: 1.5, grav: 3, layer: VT.STAR, add: 1, spin: 4 }, 4 * power);
+  return n;
+}
+
+/* ---- the hooks (wrappers only: the wrapped files are untouched) ---- */
+if (typeof decal === 'function') {
+  const _snDecal = decal;
+  // a crack in the ground is a heavy blow (r .42 a Steam Hammer smash: power 1); a large scorch an explosion on it (a fire
+  // strike's small one, under .45, is not)
+  decal = function (k, x, z, r, col, life) {
+    if (k === 'crack') groundImpactFx(x, z, r / .42); else if (k === 'scorch' && r >= .45) groundImpactFx(x, z, r / .6);
+    return _snDecal.apply(this, arguments);
+  };
+}
+if (typeof fxDust === 'function') {
+  const _snDust = fxDust;
+  fxDust = function (x, z, n) { if (n >= 6) groundImpactFx(x, z, Math.min(1.4, n / 12)); return _snDust.apply(this, arguments); };
+}
+if (typeof drawCreeps === 'function') {
+  const _snCreeps = drawCreeps;
+  drawCreeps = function (dt) { const r = _snCreeps.apply(this, arguments); try { snowTick(); } catch (e) { SN.on = false; console.warn('snow prints off:', e && e.message || e); } return r; };
+}
 
 /* ================= When the game asks for its lazy asset groups (src/lazyassets.js) =================
    Loaded last, so it wraps what it needs; in a build with every asset in the page (SPLIT=0, test.html, ?assets=all, the
