@@ -1,4 +1,4 @@
-const BUILD_TAG = '00a246d2@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = 'd3c9937b@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -54999,7 +54999,7 @@ function ffClear() {
 /* ---- which faction holds a wave: the one whose home the battle is fought in ---- */
 // the faction of a region's location (region.js: RG_REGIONS, a battle's G.region.node); the region's own data first
 function ffHome(force, node) {
-  const D = typeof RG_REGIONS !== 'undefined' && RG_REGIONS[force]; if (!D) return null;
+  const D = typeof rgRegionOfNode === 'function' ? rgRegionOfNode(force, node) : typeof RG_REGIONS !== 'undefined' && RG_REGIONS[force]; if (!D) return null;   // (an old run on the borrowed Greatroot copy: its places are the Grove's)
   const n = (D.nodes || []).find(x => x.id === node);
   const id = (n && n.faction) || FORF.homes[D.id + ':' + node] || D.faction || FORF.homes[D.id];
   return (id && FOREST_FACTIONS[id]) || null;
@@ -103520,204 +103520,94 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
-   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
-   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
-   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
-   waves the server counted. Nothing here can write a score directly.
-   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
-   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
-   ever and your best stays on this device. */
-const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
-const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
-SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
-const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
-const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
+/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
+   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
+   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
+   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
+   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
+   board says so, and your best stays on this device as before. */
+const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
 const BOARD_NICK_MAX = 20;
-const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
-   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
-   one, else Campaign: the main mode for the whole life of the online board. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
-let SESS = lsJ('rk.auth'), refreshing = null;
-async function sbSignIn() {
-  if (!SB.on) return;
-  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
-  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
-  lsJ('rk.pkce', { v, at: Date.now() });
-  const back = location.origin + location.pathname;
-  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
-}
-function sbKeep(s) {
-  if (!s || !s.access_token || !s.refresh_token) return null;
-  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
-  lsJ('rk.auth', SESS); return SESS;
-}
-async function sbAuthPost(grant, body) {
-  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
-  return j;
-}
-// back from Discord: swap the one-time code for a session, and tidy the address bar
-async function sbCallback() {
-  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
-  if (!code && !err) return;
-  history.replaceState(null, '', location.pathname + location.hash);
-  if (err) { BOARD.signinErr = err; return; }
-  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
-  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
-  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
-  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
-}
-// a fresh access token, renewed a minute before it runs out (one renewal at a time)
-async function sbToken() {
-  if (!SESS) return null;
-  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
-  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
-    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
-    .finally(() => { refreshing = null; });
-  const s = await refreshing; return s ? s.access_token : null;
-}
-async function sbSignOut() {
-  const t = SESS && SESS.access_token;
-  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
-  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
-  boardPaint();
-}
-// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
-async function sbCall(path, body, asUser) {
-  const tok = asUser ? await sbToken() : null;
-  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
-  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
-  try {
-    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
-    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
-    if (tok) h.Authorization = 'Bearer ' + tok;
-    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
-    return r.status === 204 ? null : await r.json();
-  } finally { clearTimeout(tm); }
-}
-const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
-
-/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
-    await sbCallback();
-    if (SESS) await boardLoadMe();
-    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
-    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
-    if (RUN && RUN.q && RUN.q.length) runFlush();
-    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
+    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
+    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
+    const [db, user] = await Promise.all([use('db'), use('user')]);
+    BOARD.db = db; BOARD.user = user;
+    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
+    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
+    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
+    try {
+      db.collection('scores').limit(500).onSnapshot(snap => {
+        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
+        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
+        boardPaint();
+      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
+    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
   })();
 }
-async function boardLoadMe() {
-  try {
-    const tok = await sbToken(); if (!tok) return;
-    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
-    if (!SESS.uid) return;
-    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
-    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
-  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
-  boardPaint();
+const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
+const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
+const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
+// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
+const boardKey = e => (e.r | 0) * 100000 + +e.w;
+function boardRank(diff) {
+  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
+    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
 }
-// the standings on one difficulty, from the server's public view (kept a minute)
-async function boardFetch(diff, force) {
-  if (!SB.on) return;
-  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
-  BOARD.rowsAt[diff] = Date.now();
-  try {
-    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
-    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
-    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
-    BOARD.rows[diff] = rows;
-    BOARD.err = '';
-  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
-  boardPaint();
+/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
+   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
+   mode the whole time this board has stood. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
+// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
+function boardWrite(patch) {
+  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
+  return BOARD.wq = BOARD.wq.then(async () => {
+    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
+    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
+      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
+      boardPaint(); return true; }
+    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
+  });
 }
-
-/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
-let RUN = null, flushing = false, flushWait = 0;
-function runSave() { lsJ('rk.run', RUN); }
-async function boardRunStart() {
-  RUN = null; lsJ('rk.run', null);
-  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
-  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
-  try {
-    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
-    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
-    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
-    if (RUN !== mine) return;
-    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
-      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
-    else mine.dead = (r && r.why) || 'start';
-  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
-}
-function boardWaveCleared(ws) {
-  if (!RUN || RUN.dead || !ws || !ws.length) return;
-  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
-  runFlush();
-}
-// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
-// starting right after the last wave the server counted. A lost connection waits and tries again.
-async function runFlush() {
-  if (flushing || !RUN || !RUN.id || RUN.dead) return;
-  flushing = true; const run = RUN;
-  try {
-    while (run === RUN && run.q.length && !run.dead) {
-      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
-      if (last < first) { run.q = []; break; }
-      const upto = Math.min(last, first + 9);
-      let r;
-      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
-      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
-      flushWait = 0;
-      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
-      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
-      runSave();
-    }
-  } finally { flushing = false; }
-}
-// a run has ended: send what's left, close it, and say where it stands
+// a run has ended: post it if it beats my best on that difficulty
 async function boardPost(w, won) {
-  if (!SB.on) return { why: 'off' };
-  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
-  if (!SESS) return { why: 'signin' };
-  const run = RUN;
-  if (!run) return { why: 'unranked' };
-  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
-  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
-  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
-  if (run.dead) return { why: 'dead', reason: run.dead };
-  if (run.q.length) return { why: 'pending' };
-  boardFetch(run.diff, true);
-  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
+  await boardInit();
+  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
+  if (BOARD.canPost === false) return { why: 'readonly' };
+  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
+  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
+  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
+  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
+  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
+  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
+  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
 }
+// the line under a finished run
 function boardEndLine(res) {
-  switch (res.why) {
-    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
-    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
-    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
-    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
-    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
-    case 'off': return '';
-    default: return 'This run wasn’t counted on the scoreboard.';
-  }
+  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
+  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
+  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
+  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
+  return 'The scoreboard can’t be reached right now.';
 }
-function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+// the leader on a difficulty, for the title screen
+function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
+async function boardNames(ids) {
+  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
+  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
+  return out;
+}
 
-/* --- the board itself, an overlay like the others --- */
+/* the board itself, an overlay like the others */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -103726,207 +103616,75 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint(); boardFetch(BOARD.tab, true);
+  boardPaint();
 }
-const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
-const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
-function boardPaint() {
-  titleBoardLine();
+const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
+let lbPaintN = 0;
+async function boardPaint() {
   const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+  titleBoardLine();
   if (!list || !meBox) return;
-  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
+  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
+  const ids = rows ? rows.map(x => x.r.id) : [];
+  const ps = await boardNames(ids.concat(my ? [my] : []));
+  if (n !== lbPaintN) return;   // a newer paint is on its way
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
-  else if (rows === undefined) note('Loading the board…');
-  else if (rows === null) note('The scoreboard can’t be reached right now.');
-  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
-  else rows.slice(0, 25).forEach(x => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
-    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
-    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
+  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
+  else rows.forEach((x, i) => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
+    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
+    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
+    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
+  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
+  // who you are on the board
   meBox.textContent = '';
-  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
-  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
-  if (!SESS) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
-    meBox.appendChild(b);
-    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
-    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
+  const p = document.createElement('p'), local = bestWave();
+  if (!my) {
+    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
+    meBox.appendChild(p);
+    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
     return;
   }
-  const me = BOARD.me || { name: '' };
-  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
-  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
-  else {
-    const mine = rows && rows.find(x => x.user_id === my);
-    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
-    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
-    const f = document.createElement('form'); f.className = 'lb-nick';
-    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
-    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-    f.append(inp, bt); meBox.appendChild(f);
-    f.onsubmit = async ev => {
-      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
-      try { const r = await sbRpc('set_display_name', { new_name: v });
-        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
-        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
-      catch (e) { toast('Couldn’t save your name just now.'); }
-      bt.disabled = false; boardPaint();
-    };
-  }
-  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
-  meBox.appendChild(so);
+  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
+  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
+  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
+  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
+  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
+  const q = document.createElement('p'); q.className = 'lb-sm';
+  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
+  meBox.appendChild(q);
+  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
+  // the name shown on the board (yours to choose; blank uses your claude.ai name)
+  const f = document.createElement('form'); f.className = 'lb-nick';
+  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
+  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+  f.append(inp, bt); meBox.appendChild(f);
+  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return;
-  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
-  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
-  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
-  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
-  if (rows === undefined && BOARD.tried) boardFetch('normal');
+  const el = document.getElementById('tScores'); if (!el) return false;
+  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
+  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
+  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
+    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
+  return true;
 }
 
-/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
-   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
-   no and the game carries on. --- */
-const TRK = { notes: [], sending: false, leaks: {}, off: false };
-function trkArmy() {
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
-  return by;
-}
-function trkNote(kind, wave, data) {
-  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
-  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
-}
-async function trkSend() {
-  if (TRK.sending) return; TRK.sending = true;
-  try {
-    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
-      const n = TRK.notes[0];
-      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
-      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
-      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
-      TRK.notes.shift();
-    }
-  } finally { TRK.sending = false; }
-}
-{
-  const s0 = boardRunStart;
-  boardRunStart = async function () {
-    TRK.leaks = {}; const r = await s0.apply(this, arguments);
-    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
-    return r;
-  };
-  const c0 = boardWaveCleared;
-  boardWaveCleared = function (ws) {
-    const r = c0.apply(this, arguments);
-    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
-    return r;
-  };
-  const p0 = boardPost;
-  boardPost = async function (w, won) {
-    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
-    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
-    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
-    return p0.apply(this, arguments);
-  };
-}
-if (typeof leak === 'function') {
-  const l0 = leak;
-  leak = function (c) {
-    const lives0 = G.lives, r = l0.apply(this, arguments);
-    try {
-      const lost = (lives0 | 0) - (G.lives | 0);
-      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
-    } catch (e) { /* never in the way of the game */ }
-    return r;
-  };
-}
-
-/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
-   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
-function signGate() {
-  if (!SB.on || SESS || document.getElementById('signGate')) return;
-  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
-  const d = document.createElement('div'); d.id = 'signGate';
-  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
-  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
-    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
-    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
-    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
-    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
-  document.body.appendChild(d);
-  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
-  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
-}
-{
-  const i0 = boardInit;
-  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
-}
-
-/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
-   its strongest units), and the board shows the build of each player's best run. --- */
-const BLD = { last: '' };
-function bldNow() {
-  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
-  let hero = '';
-  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
-  const by = {};
-  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
-  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
-  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
-}
-function bldSend() {
-  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
-  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
-  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
-}
-{
-  const s1 = boardRunStart;
-  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
-  const c1 = boardWaveCleared;
-  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
-  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
-  boardFetch = async function (diff, force) {
-    const r = await f0.apply(this, arguments);
-    try {
-      const rows = BOARD.rows[diff];
-      if (rows && rows.length && !('build' in rows[0])) {
-        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
-        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
-        boardPaint();
-      }
-    } catch (e) { /* no build column yet */ }
-    return r;
-  };
-  const p1 = boardPaint;
-  boardPaint = function () {
-    const r = p1.apply(this, arguments);
-    try {
-      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
-      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
-        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
-        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
-        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
-        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
-      });
-    } catch (e) {}
-    return r;
-  };
-}
+// (the web version's board counts runs on its server as they go; here a run posts when it ends)
+function boardRunStart() {}
+function boardWaveCleared() {}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
@@ -134159,7 +133917,8 @@ function huntPanelBind(B, k, redraw) {
 }
 
 /* ================= REGION MAP (prototype, the title's Homeland button): a force's homeland, Act I =================
-   Design: docs/design/region_map_2026-11-11.md. One region is built: the Grove's homeland, the Greatroot Marches.
+   Design: docs/design/region_map_2026-11-11.md. Every force has its own region: the Grove's, the Greatroot Marches, here;
+   the other five's in region_homelands.js (28 Nov 2026, basic: the Greatroot's foes, fields and shape, placeholder art).
    THE LOOP. A map of 12 places joined by roads. Each trouble shows its foe family (campaign.js CAMP_FAMILIES), its waves (a
      slice of the 50-wave curve), its boss, the warlord's pips on it, its reward and what a broken line costs, before you commit.
      A battle is that slice, 5-7 waves, on the place's own field, run as a Hunt is (hunts.js): the warband (level, talents,
@@ -134404,7 +134163,7 @@ const rgField = n => { const m = n && n.map; return typeof MAPS !== 'undefined' 
 // w: the waves of its battle; map: its field; x, y on a 1000 x 620 board
 const RG_REGIONS = {
   grove: {
-    id: 'marches', name: 'The Greatroot Marches', lord: 'grakk',
+    id: 'marches', name: 'The Greatroot Marches', lord: 'grakk', act: 'Act I', settled: 'The Marches are settled', back: 'Back to the Marches', save: 'Marches', mapArt: 'grove',
     say: 'The Grove’s homeland. Packs and raiders press in from every side while the ogre warlord Grakk gathers his host in Gloamfen.',
     nodes: [
       { id: 'thornwick', name: 'Thornwick', kind: 'town', start: 1, tier: 1, x: 105, y: 520, say: 'The Grove’s last walled village before the deep wood. Where the host musters.' },
@@ -134447,11 +134206,24 @@ function rgShuffle(seed, key, a) { const o = a.slice(); for (let i = o.length - 
 // every force may march a homeland for testing (owner, 23 Nov 2026: "allow any set to start homeland not just elves for testing,
 // we can change it once we add more homeland maps"): a force with no region of its own borrows the Grove's map
 const RG_FKEY = 'runehold.region.force';
-// a force without a homeland of its own fights on the Grove's; Ironhold's first battle (Mossford, waves 1-6) is on the
-// Snowy Pass, painted in Ember Engine (owner, 28 Nov 2026: "make it the first map on the dwarf homeland map"); rgField
-// falls back to Mistfall Ledge if that painting is not loaded
+// every force has a homeland of its own (28 Nov 2026: region_homelands.js); a force without one (a new force) fights on the
+// Grove's. Before that every force marched a copy of the Grove's, Ironhold's with its first battle (Mossford, waves 1-6) on the
+// Snowy Pass: a run saved on that copy (R.reg 'marches', set by rgGet for an old save) finishes on it (rgDef), so it still loads
+// as it was; a new run marches the force's own homeland
 const RG_FIRST_FIELD = { ironhold: { node: 'mossford', map: 'snowpass' } };
 const rgBorrowed = f => { const o = RG_FIRST_FIELD[f], G = RG_REGIONS.grove; return o ? Object.assign({}, G, { nodes: G.nodes.map(n => n.id === o.node ? Object.assign({}, n, { map: o.map }) : n) }) : G; };
+const RG_BORROWED = {};
+// the region a run marches: its force's, or for a run saved on the borrowed Greatroot copy, that copy
+function rgDefOf(force, reg) { const D = RG_REGIONS[force]; if (!D || !reg || reg === D.id || reg !== RG_REGIONS.grove.id) return D; return RG_BORROWED[force] || (RG_BORROWED[force] = rgBorrowed(force)); }
+// the region that holds a place of this force's (the force's own, else the borrowed Greatroot copy an old run marches)
+function rgRegionOfNode(force, node) { const D = RG_REGIONS[force]; if (!D || D.nodes.some(n => n.id === node)) return D || null; const B = rgDefOf(force, RG_REGIONS.grove.id); return B && B.nodes.some(n => n.id === node) ? B : D; }
+// the warlord's edges of a region: its places' spec (forges, hive, den: region_homelands.js), else the Greatroot's (RG_WAR_SPEC)
+const RG_SPEC_KIND = { forges: 'cinder', hive: 'thornhive', den: 'rootdeep' };
+function rgWS(R) {
+  const D = rgDef(R); if (D._ws) return D._ws;
+  const own = D.nodes.filter(n => n.spec && RG_WAR_SPEC[RG_SPEC_KIND[n.spec]]);
+  return (D._ws = own.length ? Object.fromEntries(own.map(n => [n.id, RG_WAR_SPEC[RG_SPEC_KIND[n.spec]]])) : RG_WAR_SPEC);
+}
 function rgEnsure() { if (typeof FORCES === 'undefined' || typeof HEROES === 'undefined') return; for (const f in FORCES) if (!RG_REGIONS[f] && HEROES.some(h => h.force === f && (typeof heroPickable !== 'function' || heroPickable(h)))) RG_REGIONS[f] = rgBorrowed(f); }
 const rgForces = () => { rgEnsure(); return Object.keys(RG_REGIONS).filter(f => typeof FORCES !== 'undefined' && FORCES[f]); };
 function rgLastForce() { let f = null; try { f = localStorage.getItem(RG_FKEY); } catch (e) {} rgEnsure(); return f && RG_REGIONS[f] ? f : 'grove'; }
@@ -134459,11 +134231,19 @@ function rgSetForce(f) { try { localStorage.setItem(RG_FKEY, f); } catch (e) {} 
 const rgForceTabs = cur => `<div class="rg-forces" role="tablist">${rgForces().map(f => `<button type="button" class="rg-force${f === cur ? ' on' : ''}" data-f="${f}" style="--fh:${FORCES[f].hue || '#c8a050'}">${rgEsc(FORCES[f].name)}${rgGet(f) ? '<small>run under way</small>' : ''}</button>`).join('')}</div>`;
 function rgForceWire() { for (const b of ovp.querySelectorAll('.rg-force')) b.onclick = () => { sfx('click'); rgSetForce(b.dataset.f); rgSel = null; rgOpen(b.dataset.f); }; }
 function rgAll() { let s = null; try { s = JSON.parse(localStorage.getItem(RG_KEY) || 'null'); } catch (e) {} return s && s.runs && typeof s.runs === 'object' ? s : { v: 1, runs: {} }; }
-function rgGet(force) { rgEnsure(); const s = rgAll(), R = force && s.runs[force]; if (R && R.wounded && Object.keys(R.wounded).length) R.wounded = {}; if (R && R.st && RG_REGIONS[force]) { rgFill(R); rgWarFill(R); } return R && R.st && RG_REGIONS[force] ? R : null; }   // (wounds are gone: a save from before has its cleared)
+function rgGet(force) { rgEnsure(); const s = rgAll(), R = force && s.runs[force]; rgRegOf(R); if (R && R.wounded && Object.keys(R.wounded).length) R.wounded = {}; if (R && R.st && RG_REGIONS[force]) { rgFill(R); rgWarFill(R); } return R && R.st && RG_REGIONS[force] ? R : null; }   // (wounds are gone: a save from before has its cleared)
+// which region a saved run marches (R.reg): a run from before the forces had homelands of their own stood on the Greatroot's
+// places (its host at one of them), so it keeps marching that copy; every other run its force's own
+function rgRegOf(R) {
+  if (!R || !R.st || R.reg || !RG_REGIONS[R.force]) return R;
+  const D = RG_REGIONS[R.force], G = RG_REGIONS.grove;
+  R.reg = D !== G && !D.nodes.some(n => n.id === R.at) && G.nodes.some(n => n.id === R.at) ? G.id : D.id;
+  return R;
+}
 // a run saved before a place or road was added to its map (the Thornhive, 25 Nov 2026) gets them now, drawn from its own seed
 // as rgNew would: without this the map, its cards and the march read a place with no state and throw
 function rgFill(R) {
-  const D = RG_REGIONS[R.force], tier = id => (D.nodes.find(n => n.id === id) || { tier: 1 }).tier;
+  const D = rgDef(R), tier = id => (D.nodes.find(n => n.id === id) || { tier: 1 }).tier;
   if (!Array.isArray(R.roads)) R.roads = [];
   for (const n of D.nodes) {
     if (R.st[n.id]) continue;
@@ -134481,7 +134261,7 @@ function rgFill(R) {
 }
 function rgPut(R) { const s = rgAll(); R.at2 = Date.now(); s.runs[R.force] = R; try { localStorage.setItem(RG_KEY, JSON.stringify(s)); return true; } catch (e) { return false; } }
 function rgDrop(force) { const s = rgAll(); delete s.runs[force]; try { localStorage.setItem(RG_KEY, JSON.stringify(s)); } catch (e) {} }
-const rgDef = R => RG_REGIONS[R.force];
+const rgDef = R => rgDefOf(R.force, R.reg);
 const rgNode = (R, id) => rgDef(R).nodes.find(n => n.id === id);
 const rgRoadIx = (R, a, b) => R.roads.findIndex(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
 const rgNb = (R, id) => R.roads.filter(r => r.a === id || r.b === id).map(r => r.a === id ? r.b : r.a);
@@ -134492,7 +134272,7 @@ function rgLog(R, t) { R.log.unshift(t); R.log = R.log.slice(0, 14); }
 // a new run: the seed draws each trouble's family, the roads' danger and waylayers, the two helpers and the two events
 function rgNew(force, hero, hard) {
   const D = RG_REGIONS[force], seed = (Math.random() * 2 ** 31) | 0;
-  const R = { v: 1, force, hero, seed, hard: !!hard, at: D.nodes.find(n => n.start).id, lives: RG_LIVES, chest: 0, wounded: {}, band: null, rnBank: 0,
+  const R = { v: 1, force, reg: D.id, hero, seed, hard: !!hard, at: D.nodes.find(n => n.start).id, lives: RG_LIVES, chest: 0, wounded: {}, band: null, rnBank: 0,
     st: {}, roads: [], helpers: [], log: [], pending: null, battle: null, battles: 0, moves: 0, over: '', done: false, t0: Date.now() };
   const left = {};
   for (const n of D.nodes) {
@@ -134581,7 +134361,7 @@ function rgSupplied(R) { const L = rgLair(R), seen = new Set([L]), q = [L]; whil
 function rgWarRate(R, sup) {
   sup = sup || rgSupplied(R); const L = rgLair(R); let rate = RG_WAR.muster.base;
   for (const id of sup) if (id !== L) rate += RG_WAR.muster.place;
-  for (const sid in RG_WAR_SPEC) if (RG_WAR_SPEC[sid].muster && sup.has(sid) && !rgMine(R, sid)) rate += RG_WAR_SPEC[sid].muster;
+  { const WS = rgWS(R); for (const sid in WS) if (WS[sid].muster && sup.has(sid) && !rgMine(R, sid)) rate += WS[sid].muster; }
   return rate;
 }
 const rgWarTotal = R => rgArmies(R).reduce((s, a) => s + a.pips, 0) + Object.values(R.war.gar).reduce((s, n) => s + (n | 0), 0) + (R.war.reserve | 0);
@@ -134613,7 +134393,7 @@ function rgWarFill(R) {
 // what a place's battle carries from the war: its garrison, the armies there, their edge from a place the warlord holds
 function rgPipsAt(R, id) {
   const W = R.war || { gar: {} }, gar = rgMine(R, id) ? 0 : W.gar[id] | 0, here = R.war ? rgArmiesAt(R, id) : [], edge = [];
-  for (const a of here) for (const sid in RG_WAR_SPEC) { const X = RG_WAR_SPEC[sid]; if (X.fams && X.fams.includes(a.fam) && R.st[sid] && !rgMine(R, sid)) { edge.push([a, sid]); break; } }
+  for (const a of here) for (const sid in rgWS(R)) { const X = rgWS(R)[sid]; if (X.fams && X.fams.includes(a.fam) && R.st[sid] && !rgMine(R, sid)) { edge.push([a, sid]); break; } }
   const raw = gar + here.reduce((s, a) => s + a.pips, 0) + edge.length;
   return { gar, armies: here, edge, raw, g: Math.min(RG_WAR.gcap, raw) };
 }
@@ -134702,12 +134482,12 @@ function rgWarChoose(R, a) {
     for (const n of D.nodes) {
       if (!rgMine(R, n.id)) continue;
       if (n.kind === 'town') add('siege', n.id, 2 + .5 * (dH[n.id] | 0) - .6 * dA[n.id] + (aggr ? 1.5 : 0) - (def ? 1 : 0) - (R.at === n.id ? 1.5 : 0) + (a.pips >= 3 ? .5 : -1));
-      else if (n.id !== R.at) add('retake', n.id, 1.2 + .4 * (n.tier | 0) + (RG_WAR_SPEC[n.id] ? 1.5 : 0) + .3 * (dH[n.id] | 0) - .6 * dA[n.id] + (aggr ? 1 : 0) - (def ? .5 : 0));
+      else if (n.id !== R.at) add('retake', n.id, 1.2 + .4 * (n.tier | 0) + (rgWS(R)[n.id] ? 1.5 : 0) + .3 * (dH[n.id] | 0) - .6 * dA[n.id] + (aggr ? 1 : 0) - (def ? .5 : 0));
     }
   }
   for (const n of D.nodes) {   // guard: a key place the warlord holds that your host is within 2 roads of
     if (rgMine(R, n.id) || dH[n.id] == null || dH[n.id] > 2) continue;
-    const v = (n.kind === 'lair' ? 3 : 0) + (RG_WAR_SPEC[n.id] ? 2 : 0) + (rgPrizeAt(R, n.id) ? 1.5 : 0) + (n.tier >= 3 ? .5 : 0); if (!v) continue;
+    const v = (n.kind === 'lair' ? 3 : 0) + (rgWS(R)[n.id] ? 2 : 0) + (rgPrizeAt(R, n.id) ? 1.5 : 0) + (n.tier >= 3 ? .5 : 0); if (!v) continue;
     add('guard', n.id, 1 + .8 * v + (def ? 3 : 0) - .5 * dA[n.id] - (n.id === a.at ? rest : 0));
   }
   out.sort((x, y) => y.s - x.s || (x.k + x.to < y.k + y.to ? -1 : 1));
@@ -134817,7 +134597,7 @@ function rgWarTurn(R, out) {
   }
   for (const a of rgArmies(R)) if (a.plan && a.plan.k !== 'siege' && a.next == null) a.plan.left--;
   // the stance: aggressive while he hunts you, defensive when you near his lair or hold a place that feeds his armies
-  const dL = rgDist(R, L)[R.at], keys = Object.keys(RG_WAR_SPEC).some(id => rgMine(R, id)), deep = D.nodes.filter(n => n.tier >= 3 && rgMine(R, n.id)).length;
+  const dL = rgDist(R, L)[R.at], keys = Object.keys(rgWS(R)).some(id => rgMine(R, id)), deep = D.nodes.filter(n => n.tier >= 3 && rgMine(R, n.id)).length;
   const st0 = W.stance; W.stance = W.hunt > 0 ? 'aggressive' : (dL <= 2 || keys || deep >= 3) ? 'defensive' : 'watchful';
   if (W.stance !== st0) say(`The warlord turns ${RG_STANCE[W.stance].toLowerCase()}`);
   rgWarThink(R);
@@ -134913,10 +134693,10 @@ function rgWarAttrition(R, S, out) {
 function rgWarIncome(R) {
   const D = rgDef(R), I = RG_WAR2.income, k = 1 + I.perW * Math.max(1, R.maze && R.maze.w | 0 || 1), parts = [];
   const towns = D.nodes.filter(n => n.kind === 'town' && !n.start && rgMine(R, n.id)), start = D.nodes.filter(n => n.kind === 'town' && n.start && rgMine(R, n.id));
-  const spec = D.nodes.filter(n => RG_WAR_SPEC[n.id] && rgMine(R, n.id)), places = D.nodes.filter(n => n.kind !== 'town' && !RG_WAR_SPEC[n.id] && rgMine(R, n.id));
+  const spec = D.nodes.filter(n => rgWS(R)[n.id] && rgMine(R, n.id)), places = D.nodes.filter(n => n.kind !== 'town' && !rgWS(R)[n.id] && rgMine(R, n.id));
   if (start.length) parts.push([start.map(n => n.name).join(', '), Math.round(I.start * k)]);
   if (towns.length) parts.push([`${towns.length} freed ${towns.length === 1 ? 'town' : 'towns'}`, Math.round(I.town * k * towns.length)]);
-  if (spec.length) parts.push([spec.map(n => RG_WAR_SPEC[n.id].tag.toLowerCase()).join(', ') + ' taken', Math.round(I.spec * k * spec.length)]);
+  if (spec.length) parts.push([spec.map(n => rgWS(R)[n.id].tag.toLowerCase()).join(', ') + ' taken', Math.round(I.spec * k * spec.length)]);
   if (places.length) parts.push([`${places.length} settled ${places.length === 1 ? 'place' : 'places'}`, Math.round(I.place * k * places.length)]);
   return { parts, total: parts.reduce((s, p) => s + p[1], 0) };
 }
@@ -134978,11 +134758,11 @@ function rgWarLine(R, id) {
   const W = R.war, n = rgNode(R, id), mine = rgMine(R, id), P = rgPipsAt(R, id), d = rgDist(R, id), parts = [];
   if (!mine) parts.push(P.gar ? `Garrison ${P.gar}` : 'No garrison');
   for (const a of P.armies) parts.push(`${a.name} is here (${rgPipW(a.pips)})`);
-  for (const [a, sid] of P.edge) parts.push(`+1: ${RG_WAR_SPEC[sid].tag.toLowerCase()} at ${rgNode(R, sid).name} arm ${a.name}`);
+  for (const [a, sid] of P.edge) parts.push(`+1: ${rgWS(R)[sid].tag.toLowerCase()} at ${rgNode(R, sid).name} arm ${a.name}`);
   const s = W.siege[id]; if (s) parts.push(s.left > 0 ? `Besieged: falls in ${s.left} ${s.left === 1 ? 'turn' : 'turns'}` : 'Walls breached');
   if (W.cut[id]) parts.push('Cut off from the lair: its garrison weakens each turn');
   for (const a of rgArmies(R)) { if (a.at === id || d[a.at] == null || d[a.at] > 2) continue; const toMe = a.plan && a.plan.to === id || a.next === id; parts.push(`${a.name} is ${rgRoadsW(d[a.at])}${toMe ? ', marching here' : ''}`); }
-  if (RG_WAR_SPEC[id] && !mine) parts.push(`${RG_WAR_SPEC[id].tag}: ${RG_WAR_SPEC[id].say}`);
+  if (rgWS(R)[id] && !mine) parts.push(`${rgWS(R)[id].tag}: ${rgWS(R)[id].say}`);
   return parts.join(' · ');
 }
 // its causes, in a line: the war's pips (garrison, armies, an edge), a first place, the boss (the foes' health and the waves are
@@ -135209,7 +134989,7 @@ function rgEnd(won, retreat) {
       R.st[S.node].s = 'held'; R.st[S.node].g = 0; R.st[S.node].why = [];
       out.push(node.kind === 'town' ? `${node.name} freed: rest there, and its stores supply the host (+${Math.round(RG_WAR2.income.town * (1 + RG_WAR2.income.perW * Math.max(1, R.maze && R.maze.w | 0 || 1)))} gold a turn for your battles)` : node.kind === 'lair' ? `${node.name} falls: the Marches are settled` : `${node.name} settled`);
       const h = R.helpers.find(x => x.node === S.node); if (h) out.push(`Helper gone: ${CAMP_FAMILIES[h.fam].name} leave the lair`);
-      if (RG_WAR_SPEC[S.node]) out.push(`${RG_WAR_SPEC[S.node].tag} taken: the warlord loses its edge`);
+      if (rgWS(R)[S.node]) out.push(`${rgWS(R)[S.node].tag} taken: the warlord loses its edge`);
       rgWarAfter(R, S, true, false, out);
       if (node.kind === 'lair') R.done = true;
     }
@@ -135239,14 +135019,14 @@ function rgEnd(won, retreat) {
   // what a restart would fight now (the war has moved on) against the checkpoint's waves (as they were when the line fell)
   const nx = retry ? (retry.kind === 'waylay' ? rgSpec(R, null, 'waylay', retry.road) : rgSpec(R, retry.node, retry.kind)) : null;
   const grew = nx && (nx.w0 !== S.w0 || Math.abs((nx.hpK || 1) - (S.hpK || 1)) > 1e-9);
-  const title = won ? (S.kind === 'waylay' ? 'Through the ambush' : R.done ? 'The Marches are settled' : `${node.name}: held`) : retreat ? 'The retreat is sounded' : S.kind === 'waylay' ? 'Thrown back' : 'The line breaks';
+  const title = won ? (S.kind === 'waylay' ? 'Through the ambush' : R.done ? rgDef(R).settled || 'The Marches are settled' : `${node.name}: held`) : retreat ? 'The retreat is sounded' : S.kind === 'waylay' ? 'Thrown back' : 'The line breaks';
   setTimeout(() => {
     showOverlay(`<h2 class="ttl ${won ? 'win' : 'lose'}">${rgEsc(title)}</h2><p class="sub">${rgEsc(S.name)} · ${rgWvN(S)} waves</p>
       <ul class="rg-out">${out.map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul>
       ${R.over ? `<p class="rg-over">${rgEsc(R.over)} The run is over.</p>` : ''}
       ${retry && ck ? `<button class="btn rg-go" id="rgRetryCk">Retry from wave ${rgWv(S, ck.wave)}<small>Your maze and gold as they stood at wave ${rgWv(S, ck.wave)}.</small></button>` : ''}
       ${retry ? `<button class="btn ${ck ? 'ghost rg-sec' : 'rg-go'}" id="rgRetry">${ck ? 'Restart the battle' : `Retry ${rgEsc(retry.name)}`}<small>From wave 1 with full starting gold: build a new maze.${grew ? ' The war has changed it since.' : ''}</small></button>` : ''}
-      <button class="btn${retry ? ' ghost rg-sec' : ' rg-go'}" id="rgBack">${R.over ? 'The run’s end' : R.done ? 'The muster calls' : 'Back to the Marches'}</button>`, 'rgend');
+      <button class="btn${retry ? ' ghost rg-sec' : ' rg-go'}" id="rgBack">${R.over ? 'The run’s end' : R.done ? 'The muster calls' : rgDef(R).back || 'Back to the Marches'}</button>`, 'rgend');
     $('#rgBack').onclick = () => { sfx('click'); rgOpen(); };
     if (retry) $('#rgRetry').onclick = () => { sfx('click'); hideOverlay(); RG_CKPT = null; rgRetry(R, retry); };
     if (retry && ck) $('#rgRetryCk').onclick = () => { sfx('click'); hideOverlay(); rgRetryCk(R, retry); };
@@ -135395,7 +135175,7 @@ function rgMapSVG(R) {
     const W = R.war || { gar: {}, siege: {}, cut: {} }, gn = st.s !== 'held' ? W.gar[n.id] | 0 : 0, sg = W.siege[n.id], cutf = !!W.cut[n.id];
     const pips = gn ? `<g class="rg-grow rg-gar" aria-hidden="true">${Array.from({ length: gn }, (_, k) => `<path d="M${(k - (gn - 1) / 2) * 15},-47l6,6l-6,6l-6,-6z"/>`).join('')}</g>` : '';
     const siege = sg ? `<g class="rg-sg" transform="translate(-19 -19)"><circle r="11"/><text y="4.5">${sg.left}</text></g>` : '';
-    const g = RG_GLYPH[n.id] ? `<path class="rg-gl" transform="translate(-13.5 -13.5) scale(.75)" d="${RG_GLYPH[n.id]}"/>` : `<circle class="rg-gl" r="6"/>`;
+    const gk = RG_GLYPH[n.id] ? n.id : n.glyph, g = RG_GLYPH[gk] ? `<path class="rg-gl" transform="translate(-13.5 -13.5) scale(.75)" d="${RG_GLYPH[gk]}"/>` : `<circle class="rg-gl" r="6"/>`;
     return `<g class="${cls}" data-id="${n.id}" data-tip-at="above" transform="translate(${n.x} ${n.y})" role="button" tabindex="${rgSel === n.id ? 0 : -1}" aria-pressed="${rgSel === n.id}" aria-label="${rgEsc(n.name)}, ${stw}${wv ? ', ' + wv : ''}${gn ? `, garrison ${gn}` : ''}${sg ? `, besieged: falls in ${sg.left}` : ''}${cutf ? ', cut off' : ''}${here ? ', your host is here' : ''}">
       <circle class="rg-hit" r="34"/><circle class="rg-halo" r="29"/>${here ? '<circle class="rg-here-ring" r="31"/>' : ''}<circle class="rg-sh" r="23"/><circle class="rg-in" r="19"/>${g}
       <g class="rg-badge" transform="translate(17 -17)"><circle r="8"/>${badge}</g>${pips}${siege}${rgPrizeAt(R, n.id) ? '<g class="rg-prz" transform="translate(19 16)"><title>A prize here</title><circle r="9"/><path d="M0,-6L5,0L0,6L-5,0Z"/></g>' : ''}${help ? '<text class="rg-help" x="-30" y="-14">☗</text>' : ''}
@@ -135600,7 +135380,7 @@ function rgPendingHTML(R) {
   }
   const E = RG_EVENTS[P.ev];
   return `<section class="cm-loc rg-card rg-evcard"><h3><span>On the road to ${rgEsc(rgNode(R, P.to).name)}</span>${E.name}</h3>
-    <p class="cm-say">${P.ev === 'refugees' ? 'Families from the burned farms, with what they could carry. They ask for bread and safe roads.' : 'A moss-grown shrine of the old wood, a bowl of rainwater before it.'}</p>
+    <p class="cm-say">${rgEsc(P.ev === 'refugees' ? rgDef(R).refugees || 'Families from the burned farms, with what they could carry. They ask for bread and safe roads.' : rgDef(R).shrine || 'A moss-grown shrine of the old wood, a bowl of rainwater before it.')}</p>
     <div class="rg-town">${rgEventOpts(R, P).map((o, k) => `<button class="btn${k ? ' ghost' : ''} rg-sec" data-ev="${k}" ${o[2] ? '' : 'disabled'}>${o[0]}<small>${rgEsc(o[1])}</small></button>`).join('')}</div></section>`;
 }
 const rgFace = h => (typeof COMMANDER_ART !== 'undefined' && COMMANDER_ART[h.id]) || (typeof HERO_ART !== 'undefined' && HERO_ART[h.id]) || heroFaceURL(h);
@@ -135649,14 +135429,15 @@ function rgBannerSet(force) {
 }
 // the painted map under the places (the owner's Greatroot terrain, tools/make_regionmapart.py): the force's own when it has one,
 // else the Grove's (every force marches the Greatroot Marches for now). Asked for once; set when it lands, if that map is still shown
-const rgMapArtOf = f => (typeof globalThis !== 'undefined' && globalThis.REGION_MAP_ART) ? globalThis.REGION_MAP_ART[f] || globalThis.REGION_MAP_ART.grove || '' : '';
-function rgMapArtSet(force) {
-  const src = rgMapArtOf(force);
+// (each region names its painting, mapArt: the Grove's 'grove', every other homeland its force's, region_homelands.js; one not yet
+// painted shows a plain tinted ground, region.css .rg-mapin[data-f]; a run on the borrowed Greatroot copy shows the Grove's)
+const rgMapArtOf = f => (typeof globalThis !== 'undefined' && globalThis.REGION_MAP_ART) ? globalThis.REGION_MAP_ART[f] || '' : '';
+function rgMapArtSet(force, key) {
+  const f = key || force, src = rgMapArtOf(f);
   ov.style.setProperty('--rgmap', src ? `url(${src})` : 'none');
   if (src || typeof needAssets !== 'function' || typeof LAZY === 'undefined' || !LAZY.state) return;
-  const f = LAZY.state['regionmapart_' + force] != null ? force : 'grove';
   if (LAZY.state['regionmapart_' + f] == null) return;
-  try { needAssets(['rgmap:' + f], { low: true }).then(() => { const got = rgMapArtOf(force); if (got && document.querySelector('.rg-head[data-f="' + force + '"]')) ov.style.setProperty('--rgmap', `url(${got})`); }, () => {}); } catch (e) { /* the plain ground stays */ }
+  try { needAssets(['rgmap:' + f], { low: true }).then(() => { const got = rgMapArtOf(f); if (got && document.querySelector('.rg-head[data-f="' + force + '"]')) ov.style.setProperty('--rgmap', `url(${got})`); }, () => {}); } catch (e) { /* the plain ground stays */ }
 }
 // the setup screen (no run under way for this force): the begin screen's own layout and classes (heroes.js openHeroPicker,
 // menus.css .hx-cinematic): the commander's portrait with the arrows to browse, the forces as crest tabs, the commander's gift,
@@ -135701,7 +135482,7 @@ function rgStartHTML(force) {
         </header></div>
       <div class="hx-dossier"><div class="hx-faction"><img alt="" src="${crest(force)}"><span>${rgEsc(FORCES[force].name)}</span></div>
       <div class="hx-icons" role="tablist" aria-label="Force">${tabs}</div>
-      <section class="hx-info">${rgKitHTML(h)}<p class="hx-quest">${RG_HOME[force] ? `This homeland’s own map is still to come. Until then the host marches ${rgEsc(D.name)}.` : rgEsc(D.say)}</p></section>
+      <section class="hx-info">${rgKitHTML(h)}<p class="hx-quest">${rgEsc(D.say)}</p></section>
       <footer class="hx-footer"><label class="rg-hard"><input type="checkbox" id="rgHard" ${rgPick.hard ? 'checked' : ''}><i aria-hidden="true"></i><span><b>Hardcore</b><small>The first broken line ends the run. Without it you have ${RG_LIVES} lives.</small></span></label>
         <button type="button" class="hx-go" id="rgBegin"><span>Muster the host at <b>${rgEsc(town)}</b></span><kbd aria-hidden="true">Enter</kbd></button></footer>
       </div></article></div></div>`;
@@ -135733,7 +135514,7 @@ function rgOpen(force) {
     return;
   }
   if (R.over || R.done) {
-    showOverlay(`<div class="cm rg"><header class="cm-hd"><h2 class="ttl ${R.done ? 'win' : 'lose'}">${R.done ? 'The Marches are settled' : 'The host is broken'}</h2><p class="sub">${R.done ? 'Gloamfen Lair has fallen and the homeland is quiet. The muster for Act II calls (not built in this prototype).' : rgEsc(R.over)}</p></header>
+    showOverlay(`<div class="cm rg"><header class="cm-hd"><h2 class="ttl ${R.done ? 'win' : 'lose'}">${R.done ? rgDef(R).settled || 'The Marches are settled' : 'The host is broken'}</h2><p class="sub">${R.done ? rgEsc(rgNode(R, rgLair(R)).name) + ' has fallen and the homeland is quiet. The muster for Act II calls (not built in this prototype).' : rgEsc(R.over)}</p></header>
       <ul class="rg-out">${R.log.map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul><p class="sub">${R.battles} battles · ${rgSettled(R)} places settled · level ${R.band && R.band.raised ? xpLevelOf(R.band.xp || 0) : 1}</p>
       <button class="btn" id="rgAgain">A new run</button><button class="btn ghost" id="rgTitle">Title screen</button></div>`, 'campaign');
     $('#rgAgain').onclick = () => { sfx('click'); rgDrop(force); rgOpen(force); };
@@ -135745,7 +135526,7 @@ function rgOpen(force) {
   const who = FORCES[force] ? FORCES[force].name : '';
   // (the owner's campaign map redesign, 26 Nov 2026): a panoramic header (the homeland's painting; its words are HTML), the map
   // on the painted terrain with the threat dial, a legend and Locate, and the side: the commander, the Forge, the place's card
-  showOverlay(`<div class="cm rg" data-f="${force}"><header class="rg-head" data-f="${force}"><p class="rg-eye">${rgEsc(who)}’s homeland<span>Act I</span></p><h2 class="ttl">${rgEsc(D.name)}</h2><p class="rg-lead">Choose your next destination. Pick a place, then act; double-click (double-tap) a place to go straight there.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
+  showOverlay(`<div class="cm rg" data-f="${force}"><header class="rg-head" data-f="${force}"><p class="rg-eye">${rgEsc(who)}’s homeland<span>${rgEsc(D.act || 'Act I')}</span></p><h2 class="ttl">${rgEsc(D.name)}</h2><p class="rg-lead">Choose your next destination. Pick a place, then act; double-click (double-tap) a place to go straight there.</p><button type="button" class="tx" id="rgX" aria-label="Back">${X_SVG}</button></header>
     ${R.notice ? `<p class="rg-notice" role="status"><i aria-hidden="true">!</i><span>${rgEsc(R.notice)}</span></p>` : ''}
     <div class="cm-body"><section class="rg-mapc" aria-label="The map"><div class="rg-mtb"><span><i aria-hidden="true"></i>The ${rgEsc(D.name.split(' ').pop())}</span><button type="button" id="rgLocate">Locate your host<span aria-hidden="true">⌖</span></button></div>
       <div class="rg-mapf"><div class="cm-map rg-mapv"><div class="rg-mapin" data-f="${force}">${rgMapSVG(R)}</div></div>${rgThreatHTML(R)}</div>
@@ -135756,7 +135537,7 @@ function rgOpen(force) {
     <details class="rg-log"><summary>The march so far${R.log[0] ? `: <span>${rgEsc(R.log[0])}</span>` : ''}</summary><ul>${R.log.slice(0, 14).map(t => `<li>${rgEsc(t)}</li>`).join('')}</ul></details></aside></div>
     <footer class="cm-ft">${rgForceTabs(force)}<button type="button" class="btn ghost rg-sec" id="rgDropB">Abandon this run</button><button type="button" class="btn ghost rg-sec" id="rgTitleB">Title screen<small>the run is saved</small></button></footer></div>`, 'campaign rg-ov');
   ov.style.setProperty('--t2bg', typeof TITLE_BG !== 'undefined' ? `url(${TITLE_BG})` : 'none');
-  rgBannerSet(force); rgMapArtSet(force);
+  rgBannerSet(force); rgMapArtSet(force, D.mapArt || force);
   // a place: a click picks it; a second click on it within RG_DBL ms (a double-click, or a double-tap on touch: the map is drawn
   // anew after the first, so the two clicks land on different elements and the time between them decides) takes its primary
   // action, or says why it cannot be taken. Keys: Enter/Space pick, the arrows move to the nearest place that way
@@ -135976,7 +135757,7 @@ function rgEvenWave(g, S) {
     return r;
   };
   const _sn = campSaveName;
-  campSaveName = function (s) { try { if (s && s.region && s.region.name) return `Marches: ${s.region.name}`; } catch (e) {} return _sn.apply(this, arguments); };
+  campSaveName = function (s) { try { if (s && s.region && s.region.name) { const f = s.force || (typeof forceOfHero === 'function' ? forceOfHero(s.hero) : null), D = f && RG_REGIONS[f]; return `${D && D.save || 'Marches'}: ${s.region.name}`; } } catch (e) {} return _sn.apply(this, arguments); };
   const _ts = titleScreen;
   titleScreen = function () { const r = _ts.apply(this, arguments); rgTitleInject(); return r; };
 }
@@ -136030,6 +135811,166 @@ function rgHudTick() {
   if (el.style.bottom !== b + 'px') el.style.bottom = b + 'px';
 }
 if (typeof setInterval === 'function' && typeof document !== 'undefined') setInterval(rgHudTick, 500);
+
+/* ================= THE OTHER FORCES' HOMELANDS (region.js RG_REGIONS; owner, 28 Nov 2026: "make new homeland maps for each
+   order, just make it basic for now we can add art and new oponnets etc later") =================
+   Each force has its own homeland now: its own name, act title, places, layout and roads. The Grove's (the Greatroot Marches)
+   lives in region.js and is untouched; this file adds the Silver Order's, the Conclave's, Ironhold's, the Stormborn's and the
+   Wardbound's, built on the Greatroot's shape: a start town, two first places, a town and two troubles in tier 2, three troubles
+   and a town in tier 3, two in tier 4, the warlord's lair. All of it is data: change a name, a place, a road, a field, a faction
+   or a foe here and the map follows.
+
+   A PLACE'S ROLE. Every place names its role in the Greatroot (RG_ROLE below, the Grove place it stands in for): the role gives
+   it its kind, tier, waves, battle field, its forest faction, its warlord's edge (spec: forges, hive, den) and its map glyph.
+   Anything a place sets itself (map, faction, glyph, w, spec ...) wins over its role's.
+
+   FOR NOW (placeholders, to be replaced):
+   - Foes: the Greatroot's (the warlord Grakk, the same families and boss rules, the forest factions on the same roles). Set a
+     region's `lord`, `faction`, `pools` or a place's `faction` to give it its own.
+   - Battle fields: the Greatroot's (Ironhold's first battle, Frostgap Pass, is the Snowy Pass). A place's `map` is its field.
+   - Art. The region map: a plain tinted ground (region.css .rg-mapin[data-f]) until assets/regionmap/<force>.webp exists
+     (tools/make_regionmapart.py -> src/regionmapart_<force>.js; build.sh picks every one up). A place's banner: its field's
+     still until assets/placeart/<place id>.webp exists (tools/make_placeart.py -> src/placeart_<id>.js). A place's glyph: its
+     role's Grove glyph (region.js RG_GLYPH; add one under the place's id to give it its own). The setup screen's banner is the
+     owner's homeland painting already (assets/homeland/<force>.webp). */
+const RG_ROLE = {
+  start: { kind: 'town', start: 1, tier: 1, glyph: 'thornwick' },
+  first: { kind: 'trouble', tier: 1, w: [1, 6], map: 'oakmere', glyph: 'mossford' },
+  second: { kind: 'trouble', tier: 1, w: [2, 7], map: 'fernbrook', faction: 'glowcap', glyph: 'fernwatch' },
+  town2: { kind: 'town', tier: 2, w: [8, 13], map: 'mistfall', glyph: 'brightwater' },
+  barrow: { kind: 'trouble', tier: 2, w: [9, 15], map: 'mistfall', faction: 'hollowthorn', glyph: 'barrows' },
+  water: { kind: 'trouble', tier: 2, w: [11, 17], map: 'oakmere', glyph: 'weir' },
+  cross: { kind: 'trouble', tier: 3, w: [17, 23], map: 'mistfall', faction: 'hollowthorn', glyph: 'greywood' },
+  heath: { kind: 'trouble', tier: 3, w: [19, 25], map: 'glowhollow', faction: 'glowcap', glyph: 'stagrun' },
+  hive: { kind: 'trouble', tier: 3, w: [24, 30], map: 'thornhive', faction: 'thornmantis', spec: 'hive', glyph: 'thornhive' },
+  town3: { kind: 'town', tier: 3, w: [21, 27], map: 'mistfall', glyph: 'briarfast' },
+  den: { kind: 'trouble', tier: 4, w: [29, 35], map: 'mistfall', faction: 'hollowthorn', spec: 'den', glyph: 'rootdeep' },
+  forges: { kind: 'trouble', tier: 4, w: [32, 38], map: 'glowhollow', faction: 'glowcap', spec: 'forges', glyph: 'cinder' },
+  lair: { kind: 'lair', tier: 5, w: [44, 50], map: 'mistfall', glyph: 'gloam' },
+};
+// a region from its places (each [role, id, name, x, y, say, own fields]) and roads ([id, id]) on the 1000 x 620 board
+function rgHomeland(force, D, places, roads) {
+  const G = RG_REGIONS.grove;
+  const nodes = places.map(([role, id, name, x, y, say, own]) => { const r = RG_ROLE[role]; return Object.assign({ id, name }, r, { role, x, y, say }, own || {}); });
+  return Object.assign({ lord: G.lord, faction: 'reedcourt', mapArt: force, pools: JSON.parse(JSON.stringify(G.pools)) }, D, { nodes, roads });
+}
+// (the forest factions' registrations add their homes by region id; these regions name theirs on each place instead)
+RG_REGIONS.silver = rgHomeland('silver', {
+  id: 'dawnmere', name: 'The Dawnmere Vale', act: 'Act I · The Silent Bells', settled: 'The Vale is at peace', back: 'Back to the Vale', save: 'Vale',
+  say: 'The Silver Order’s river kingdoms. The chapter bells have gone quiet along the Dawnmere while the ogre warlord Grakk gathers his host in the Blackreed fens.',
+  shrine: 'A roadside reliquary of the Order, its candle still burning.',
+}, [
+  ['start', 'candlemere', 'Candlemere', 100, 250, 'A river town under the Order’s chapter house. Where the host musters.'],
+  ['first', 'wenford', 'Wenford Bridge', 265, 140, 'Raiders hold the old stone bridge, and every barge on the river with it.'],
+  ['second', 'larkspur', 'Larkspur Mill', 175, 410, 'The mill wheel has stopped. Something has moved into the mill race.'],
+  ['town2', 'vespermouth', 'Vespermouth', 330, 315, 'A market town where two rivers meet. It fell in the first week. Free it and its stores feed the host.'],
+  ['barrow', 'chantry', 'The Drowned Chantry', 470, 180, 'A chantry the floods took a century ago. Its crypts have opened.'],
+  ['water', 'osier', 'Osier Locks', 290, 525, 'The locks hold the river’s level. Whoever holds them holds the lowland farms.'],
+  ['cross', 'pilgrim', 'Pilgrim’s Crossing', 520, 335, 'Every road of the vale meets at the pilgrims’ cross. Every column on the march passes here.'],
+  ['heath', 'sallow', 'Sallow Leas', 470, 505, 'Water meadows where the Order’s horses grazed. Now it is a camp.'],
+  ['hive', 'hivewold', 'The Hivewold Orchards', 700, 150, 'The abbey’s orchards, overgrown with a hive of amber and bark. It hums.'],
+  ['town3', 'morrowgate', 'Morrowgate', 650, 430, 'A knights’ castle, taken from within. Free it and the road to the fens opens.'],
+  ['den', 'undercroft', 'Ashcombe Undercroft', 805, 255, 'The vaults under a burned priory. The warlord’s allies den here.'],
+  ['forges', 'clarion', 'Clarion Bellworks', 790, 525, 'The foundry that cast the Order’s bells now casts blades for the warlord.'],
+  ['lair', 'blackreed', 'Blackreed Lair', 915, 390, 'The warlord’s lair in the reed fens. Strip his helpers before you storm it.'],
+], [['candlemere', 'wenford'], ['candlemere', 'larkspur'], ['wenford', 'larkspur'], ['wenford', 'chantry'], ['wenford', 'vespermouth'], ['larkspur', 'vespermouth'],
+  ['larkspur', 'osier'], ['vespermouth', 'osier'], ['vespermouth', 'pilgrim'], ['chantry', 'pilgrim'], ['chantry', 'hivewold'], ['osier', 'sallow'], ['pilgrim', 'sallow'],
+  ['pilgrim', 'morrowgate'], ['sallow', 'morrowgate'], ['hivewold', 'undercroft'], ['morrowgate', 'undercroft'], ['morrowgate', 'clarion'], ['sallow', 'clarion'],
+  ['undercroft', 'blackreed'], ['clarion', 'blackreed'], ['morrowgate', 'blackreed']]);
+
+RG_REGIONS.conclave = rgHomeland('conclave', {
+  id: 'shardspire', name: 'The Shardspire Reach', act: 'Act I · The Broken Lenses', settled: 'The Reach is at peace', back: 'Back to the Reach', save: 'Reach',
+  say: 'The Conclave’s reach of crystal spires and old observatories. Raiders loot the college towns while the ogre warlord Grakk gathers his host under the Hollowmoon.',
+  shrine: 'A wayside lens of the old college, still catching the light.',
+}, [
+  ['start', 'quillhaven', 'Quillhaven', 500, 535, 'A scholars’ town of ink and lamplight. Where the host musters.'],
+  ['first', 'glassford', 'Glassford', 335, 480, 'Raiders hold the ford where the glass carts cross.'],
+  ['second', 'orrery', 'Orrery Hill', 665, 480, 'The great orrery has stopped turning. Something holds the hill.'],
+  ['town2', 'parchmere', 'Parchmere', 500, 375, 'A town of paper mills and copy-houses. It fell in the first week. Free it and its stores feed the host.'],
+  ['barrow', 'athenaeum', 'The Silent Athenaeum', 255, 335, 'A sealed library, broken open from below.'],
+  ['water', 'prismfalls', 'Prism Falls', 760, 340, 'The falls that turn the college’s wheels. Whoever holds them holds the reach’s power.'],
+  ['cross', 'shardfield', 'Shardfield Crossing', 390, 225, 'Roads meet among fallen crystal. Every column on the march passes here.'],
+  ['heath', 'starfall', 'Starfall Moor', 615, 230, 'Open moor where a star came down. Now it is a camp.'],
+  ['hive', 'geode', 'The Humming Geode', 130, 265, 'A split geode the size of a hill, a hive in its hollow. It hums.'],
+  ['town3', 'spirewatch', 'Spirewatch', 865, 205, 'A watch-spire town, taken from within. Free it and the road to the Hollowmoon opens.'],
+  ['den', 'underlibrary', 'The Underlibrary', 285, 85, 'Stacks below the stacks. The warlord’s allies den here.'],
+  ['forges', 'kilnglass', 'Kilnglass Works', 715, 95, 'The glass kilns burn day and night, for the warlord now.'],
+  ['lair', 'hollowmoon', 'Hollowmoon Lair', 500, 105, 'The warlord’s lair in a hollowed moonstone. Strip his helpers before you storm it.'],
+], [['quillhaven', 'glassford'], ['quillhaven', 'orrery'], ['glassford', 'parchmere'], ['orrery', 'parchmere'], ['glassford', 'athenaeum'], ['orrery', 'prismfalls'],
+  ['parchmere', 'shardfield'], ['parchmere', 'starfall'], ['athenaeum', 'shardfield'], ['athenaeum', 'geode'], ['prismfalls', 'starfall'], ['prismfalls', 'spirewatch'],
+  ['shardfield', 'starfall'], ['geode', 'underlibrary'], ['shardfield', 'underlibrary'], ['starfall', 'kilnglass'], ['spirewatch', 'kilnglass'],
+  ['underlibrary', 'hollowmoon'], ['kilnglass', 'hollowmoon'], ['shardfield', 'hollowmoon']]);
+
+// Ironhold's first battle (Frostgap Pass, waves 1-6) is on the Snowy Pass (owner, 28 Nov 2026: "make it the first map on the
+// dwarf homeland map"); rgField falls back to Mistfall Ledge if that painting is not loaded
+RG_REGIONS.ironhold = rgHomeland('ironhold', {
+  id: 'emberdeep', name: 'The Emberdeep Holds', act: 'Act I · The Cold Forges', settled: 'The Holds are at peace', back: 'Back to the Holds', save: 'Holds',
+  say: 'Ironhold’s snowbound holds under the mountains. Raiders choke the passes while the ogre warlord Grakk gathers his host in Hrimfang.',
+  shrine: 'A cairn of the old delvers, a lamp left burning in it.', refugees: 'Miners from the fallen shafts, with what they could carry. They ask for bread and safe roads.',
+}, [
+  ['start', 'hearthdelve', 'Hearthdelve', 890, 525, 'The last open hold-gate below the snows. Where the host musters.'],
+  ['first', 'frostgap', 'Frostgap Pass', 745, 500, 'Raiders hold the pass, and the road down to the valley with it.', { map: 'snowpass' }],
+  ['second', 'bellows', 'Bellows Tarn', 880, 360, 'The tarn that cools the hold’s forges has gone quiet. Something holds it.'],
+  ['town2', 'gearholm', 'Gearholm', 690, 345, 'A town of cranes and winches on the cliff. It fell in the first week. Free it and its stores feed the host.'],
+  ['barrow', 'cairnfield', 'The Cairnfield', 585, 465, 'The old kings’ cairns, broken open from below.'],
+  ['water', 'rimewater', 'Rimewater Sluice', 770, 210, 'The sluice drives the hold’s great hammers. Whoever holds it holds the forges below.'],
+  ['cross', 'fourshaft', 'Four-Shaft Junction', 540, 295, 'Four mine roads meet under the mountain. Every column on the march passes here.'],
+  ['heath', 'ashenscree', 'Ashen Scree', 610, 145, 'A slope of grey scree where the goats were herded. Now it is a camp.'],
+  ['hive', 'glowworm', 'The Glowworm Galleries', 385, 480, 'Worked-out galleries, full of a hive’s amber glow. It hums.'],
+  ['town3', 'stonebrand', 'Stonebrand Hold', 330, 315, 'A hold of the old clans, taken from within. Free it and the road to Hrimfang opens.'],
+  ['den', 'deepvault', 'The Deepvault', 210, 430, 'A vault below the deepest shafts. The warlord’s allies den here.'],
+  ['forges', 'slagmouth', 'Slagmouth Furnaces', 420, 135, 'The great furnaces, lit again for the warlord.'],
+  ['lair', 'hrimfang', 'Hrimfang Lair', 120, 300, 'The warlord’s lair in a frozen cavern. Strip his helpers before you storm it.'],
+], [['hearthdelve', 'frostgap'], ['hearthdelve', 'bellows'], ['frostgap', 'bellows'], ['frostgap', 'gearholm'], ['bellows', 'gearholm'], ['frostgap', 'cairnfield'],
+  ['bellows', 'rimewater'], ['gearholm', 'cairnfield'], ['gearholm', 'rimewater'], ['gearholm', 'fourshaft'], ['cairnfield', 'fourshaft'], ['cairnfield', 'glowworm'],
+  ['rimewater', 'ashenscree'], ['fourshaft', 'ashenscree'], ['fourshaft', 'stonebrand'], ['glowworm', 'stonebrand'], ['glowworm', 'deepvault'], ['stonebrand', 'deepvault'],
+  ['ashenscree', 'slagmouth'], ['stonebrand', 'slagmouth'], ['deepvault', 'hrimfang'], ['slagmouth', 'hrimfang'], ['stonebrand', 'hrimfang']]);
+
+RG_REGIONS.stormborn = rgHomeland('stormborn', {
+  id: 'thunderstep', name: 'The Thunderstep Steppes', act: 'Act I · The Stilled Winds', settled: 'The Steppes are at peace', back: 'Back to the Steppes', save: 'Steppes',
+  say: 'The Stormborn’s high moors and storm-crowned crags. Raiders burn the clan halls while the ogre warlord Grakk gathers his host at Murkcrag.',
+  shrine: 'A standing stone scored by old lightning, a bowl of rainwater at its foot.', refugees: 'Herders from the burned shielings, with what they could carry. They ask for bread and safe roads.',
+}, [
+  ['start', 'cairnhame', 'Cairnhame', 890, 105, 'The clans’ walled hall on the high moor. Where the host musters.'],
+  ['first', 'galeford', 'Gale Ford', 725, 135, 'Raiders hold the ford, and the drove road home with it.'],
+  ['second', 'heatherwatch', 'Heatherwatch', 870, 265, 'The beacon on the watch-hill is dark. Something holds it.'],
+  ['town2', 'skirlbrae', 'Skirlbrae', 690, 290, 'A brae town of pipers and drovers. It fell in the first week. Free it and its stores feed the host.'],
+  ['barrow', 'orrstone', 'The Orrstone Ring', 545, 135, 'An old stone ring over the barrow-mounds, broken open from below.'],
+  ['water', 'varrowmere', 'Varrowmere Shore', 800, 430, 'The loch shore where the boats are kept. Whoever holds it holds the glens.'],
+  ['cross', 'thunderstep', 'Thunderstep Crossing', 520, 320, 'The drove roads meet under the thunder-crag. Every column on the march passes here.'],
+  ['heath', 'windflayed', 'Windflayed Moor', 640, 490, 'Bare moor where the wild ponies ran. Now it is a camp.'],
+  ['hive', 'stormwasp', 'The Stormwasp Crags', 340, 165, 'Crags hung with a hive of bark and amber. It hums under the thunder.'],
+  ['town3', 'brackenhold', 'Brackenhold', 395, 420, 'A clan fort in the bracken, taken from within. Free it and the road to Murkcrag opens.'],
+  ['den', 'howlingglen', 'The Howling Glen', 215, 275, 'A glen the wind never leaves. The warlord’s allies den here.'],
+  ['forges', 'strikeforge', 'Strikeforge Tor', 430, 545, 'The tor where the clans forged with lightning, worked for the warlord now.'],
+  ['lair', 'murkcrag', 'Murkcrag Lair', 130, 470, 'The warlord’s lair under a dark crag. Strip his helpers before you storm it.'],
+], [['cairnhame', 'galeford'], ['cairnhame', 'heatherwatch'], ['galeford', 'heatherwatch'], ['galeford', 'orrstone'], ['galeford', 'skirlbrae'], ['heatherwatch', 'skirlbrae'],
+  ['heatherwatch', 'varrowmere'], ['skirlbrae', 'orrstone'], ['skirlbrae', 'thunderstep'], ['skirlbrae', 'varrowmere'], ['orrstone', 'thunderstep'], ['orrstone', 'stormwasp'],
+  ['varrowmere', 'windflayed'], ['thunderstep', 'windflayed'], ['thunderstep', 'stormwasp'], ['thunderstep', 'brackenhold'], ['windflayed', 'brackenhold'], ['windflayed', 'strikeforge'],
+  ['stormwasp', 'howlingglen'], ['brackenhold', 'howlingglen'], ['brackenhold', 'strikeforge'], ['howlingglen', 'murkcrag'], ['strikeforge', 'murkcrag'], ['brackenhold', 'murkcrag']]);
+
+RG_REGIONS.wardbound = rgHomeland('wardbound', {
+  id: 'runefrost', name: 'The Runefrost Wilds', act: 'Act I · The Failing Wards', settled: 'The Wilds are at peace', back: 'Back to the Wilds', save: 'Wilds',
+  say: 'The Wardbound’s wild frontier of rune-stones and frozen roads. The wards are failing one by one while the ogre warlord Grakk gathers his host in Frostmaw.',
+  shrine: 'A ward-stone by the road, its runes still faintly lit.', refugees: 'Families from the burned steadings, with what they could carry. They ask for bread and safe roads.',
+}, [
+  ['start', 'wardstead', 'Wardstead', 95, 320, 'The wardens’ walled steading at the edge of the wilds. Where the host musters.'],
+  ['first', 'glyphford', 'Glyphstone Ford', 235, 205, 'Raiders hold the ford of the carved stones, and the road home with it.'],
+  ['second', 'lichenwatch', 'Lichen Watch', 235, 445, 'The ward on the watch-tower has gone dark. Something holds it.'],
+  ['town2', 'rimehallow', 'Rimehallow', 375, 325, 'A frost-bound trading town. It fell in the first week. Free it and its stores feed the host.'],
+  ['barrow', 'sigilbarrows', 'The Sigil Barrows', 400, 115, 'Mounds sealed under old sigils, broken open from below.'],
+  ['water', 'frostrune', 'Frostrune Falls', 405, 525, 'Frozen falls carved with the oldest ward. Whoever holds them holds the southern roads.'],
+  ['cross', 'waymark', 'The Waymark Cross', 535, 245, 'Four roads meet at the great waymark stone. Every column on the march passes here.'],
+  ['heath', 'paletundra', 'The Pale Tundra', 565, 440, 'Open tundra where the elk ran. Now it is a camp.'],
+  ['hive', 'rimewasp', 'The Rimewasp Nest', 625, 95, 'A hive of bark and amber grown over a toppled ward. It hums.'],
+  ['town3', 'keystone', 'Keystone Hold', 705, 330, 'The hold that keeps the great ward, taken from within. Free it and the road to Frostmaw opens.'],
+  ['den', 'brokenward', 'The Broken Ward', 800, 165, 'A ward-ring shattered from inside. The warlord’s allies den here.'],
+  ['forges', 'emberglyph', 'Emberglyph Kilns', 805, 500, 'The kilns where ward-stones were fired, burning for the warlord now.'],
+  ['lair', 'frostmaw', 'Frostmaw Lair', 920, 325, 'The warlord’s lair in a frozen gorge. Strip his helpers before you storm it.'],
+], [['wardstead', 'glyphford'], ['wardstead', 'lichenwatch'], ['glyphford', 'rimehallow'], ['lichenwatch', 'rimehallow'], ['glyphford', 'sigilbarrows'], ['lichenwatch', 'frostrune'],
+  ['rimehallow', 'waymark'], ['rimehallow', 'paletundra'], ['sigilbarrows', 'waymark'], ['sigilbarrows', 'rimewasp'], ['frostrune', 'paletundra'], ['waymark', 'paletundra'],
+  ['waymark', 'rimewasp'], ['waymark', 'keystone'], ['paletundra', 'keystone'], ['paletundra', 'emberglyph'], ['rimewasp', 'brokenward'], ['keystone', 'brokenward'],
+  ['keystone', 'emberglyph'], ['brokenward', 'frostmaw'], ['emberglyph', 'frostmaw'], ['keystone', 'frostmaw']]);
 
 /* ================= HOMELAND LOOT: what each place's foes can drop (region.js) =================
    Owner, 24 Nov 2026: "can you add a loot table for each map on homeland, would like to add more calculation risk/reward play
