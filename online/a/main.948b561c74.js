@@ -1,4 +1,4 @@
-const BUILD_TAG = 'd4b7bc9b@2026-11-28';   // the play log's build version (playlog.js)
+const BUILD_TAG = '453c49d8@2026-11-28';   // the play log's build version (playlog.js)
 'use strict';
 if (typeof window !== 'undefined' && window.__boot) window.__boot('Reading the game');
 /* ================= CORE: constants, data, pathing ================= */
@@ -35264,6 +35264,8 @@ SPEC_KW.push(
      by: { n: 1 }      add to one of the spell's per-tier numbers (ab.by[key], read through byT): more targets, longer holds
      reach: 0.3        cells added to its reach (spells that aim with abReach)
      vs: [cond, k]     its hits deal +k to foes in a state (SP_COND): damage only in tandem with a condition
+     crit: 0.2         its hits crit that much more often: added to the unit's crit chance when one of them rolls its crit
+                       (forces_..._crit.js, through spCrit), and a crit strikes at the unit's own multiple
      rider: { ... }    every foe its hits strike gets this too (SP_RIDE; once per foe per 2s)
      haste: [k, s]     each cast quickens the unit's strikes by k for s seconds
      ally: m           each cast gives m mana to every other unit within 1.6 cells
@@ -35302,7 +35304,7 @@ function spMods(id) {
       const n = Math.min(pk[t.id] | 0, t.max); if (!n || !t.sp) continue;
       for (const e of [].concat(t.sp(n))) {
         if (!e || e.ab !== id) continue;
-        M = M || { cd: 0, cost: 0, reach: 0, by: {}, vs: [], rider: [], haste: null, ally: 0, every: 0, ready: [], kill: { mana: 0, cd: 0 }, at: [], geom: {}, pierce: 0 };
+        M = M || { cd: 0, cost: 0, reach: 0, crit: 0, by: {}, vs: [], rider: [], haste: null, ally: 0, every: 0, ready: [], kill: { mana: 0, cd: 0 }, at: [], geom: {}, pierce: 0 };
         if (e.at) { M.at.push(e); continue; }
         spFold(M, e);
       }
@@ -35311,7 +35313,7 @@ function spMods(id) {
   return (_spC.m[id] = M);
 }
 function spFold(M, e) {
-  M.cd += e.cd || 0; M.cost += e.cost || 0; M.reach += e.reach || 0; M.ally += e.ally || 0; M.pierce += e.pierce || 0;
+  M.cd += e.cd || 0; M.cost += e.cost || 0; M.reach += e.reach || 0; M.crit += e.crit || 0; M.ally += e.ally || 0; M.pierce += e.pierce || 0;
   for (const k in e.by || {}) M.by[k] = (M.by[k] || 0) + e.by[k];
   for (const k in e.geom || {}) M.geom[k] = (M.geom[k] || 0) + e.geom[k];
   if (e.vs) M.vs.push(e.vs);
@@ -35423,6 +35425,12 @@ function spAmp(c, src) {
   const M = spLive(src, AB_NOW); if (!M || !M.vs.length) return 0;
   let a = 0; for (const [k, v] of M.vs) if (SP_COND[k] && SP_COND[k](c)) a += v;
   return a;
+}
+// the crit chance the casting spell's talents add to its hits (crit: in their entries), read where a hit rolls its crit
+function spCrit(src) {
+  if (!src || !src.def || !src.def.force || !AB_NOW) return 0;
+  const ab = ABIL[AB_NOW]; if (!ab || ab.unit !== src.def.unit) return 0;
+  const M = spLive(src, AB_NOW); return M && M.crit > 0 ? M.crit : 0;
 }
 const SP_RIDE = {
   slow: (c, v, s) => chill(c, { slow: v[0], slowT: v[1] }, null, s),
@@ -53288,8 +53296,8 @@ if (typeof FORCE_HOOKS !== 'undefined' && FORCE_HOOKS.conclave) {
    - Every force unit has a 5% chance to crit (CRIT.base), and a crit deals x2 (CRIT.m). A talent, an item's rule or a
      legendary weapon that sets its own multiple (Headshot, a crit legendary's x3) keeps it.
    - Spells crit too: each spell hit (abHit, and every ability hit through hurt with DTAG AB_TAG) rolls the unit's crit
-     chance and strikes x2, shown as a strike's crit is (the damage number's crit, a crit mark). Damage over time never
-     crits, nor an item's own hit ('relic') or a reaction ('rx').
+     chance (plus what that spell's own talents add: critSpellCh) and strikes x2, shown as a strike's crit is (the damage
+     number's crit, a crit mark). Damage over time never crits, nor an item's own hit ('relic') or a reaction ('rx').
    - Crit Chance on gear is small now, like Hit Chance: a relic with a Crit Chance line carries +1% at Item Level 1, up to
      +3% (rare, epic) or +4% (legendary) by level 50 (itempower.js ITEM_CRIT, paid for like Armour Penetration, and the
      points it no longer takes go to the relic's other lines). Every other source of crit (talents, a hero's favour, a
@@ -53323,10 +53331,13 @@ function critSpellOk(c, amt, src, dot) {
   if ((c.critT || 0) >= G.time + .85) return false;   // (already a crit this instant: a spell's own sure crit)
   return critOn();
 }
+// a spell hit's crit chance: the unit's, and what that spell's own talents add (forces_zy_spells.js spCrit: "Increases the
+// critical strike chance of Quietus by 20%", the WoW way: on top of the unit's chance, not halved, never above 100%)
+const critSpellCh = src => Math.min(1, (src.st.crit || 0) + (typeof spCrit === 'function' ? spCrit(src) : 0));
 if (typeof hurt === 'function') {
   const _critHurt = hurt;
   hurt = function (c, amt, type, src, dot) {
-    if (critSpellOk(c, amt, src, dot) && Math.random() < (src.st.crit || 0)) {
+    if (critSpellOk(c, amt, src, dot) && Math.random() < critSpellCh(src)) {
       const was = c.critT; c.critT = G.time + .9;
       const a = Array.prototype.slice.call(arguments); a[1] = amt * (src.st.critM || CRIT.m);
       const r = _critHurt.apply(this, a);
@@ -63860,6 +63871,8 @@ function ezTal(force, slot, name, kind, a, b, w) {
    too simple"): always on, one clear number a rank. what (each per rank):
      cd: seconds off its cooldown   cost: mana off its cost   pow: it hits that much harder (.1 = 10%)
      by: { key: x }  added to one of the spell's own numbers (ab.by[key]: dur, n, low, stun ...), with say(v, ab) for its words
+     crit: x   its hits crit that much more often (.2 = 20%: on top of the unit's crit chance, at its own crit multiple)
+   what.max sets the talent's ranks (a 2-rank talent made 3: a save's 2 ranks stay 2 of 3), what.name renames it in place.
    It is an ordinary spell entry (sp), so the tree rules hold: it sits below its spell's own talent and names the spell. */
 /* Not every spell talent is "X% more damage" (owner, 28 Nov 2026: "rather than flat damage increases on spells for talents can
    you make it slightly more interesting ... mix it up a bit more. seeing too many flat % increase, its ok on some talents
@@ -63879,14 +63892,20 @@ function ezSpell(force, slot, name, abId, what, say) {
   if (!ab) { if (typeof console !== 'undefined') console.warn('easy talents: no spell', abId, name); return null; }
   ezClear(t);
   t.tag = 'Spell'; t.ez = 'spell'; t.ezAb = abId;
+  if (what.max) t.max = what.max;
   if (what.name && what.name !== t.name) {   /* (a new name: the old painting stays, as the attack pass's renames keep theirs) */
     if (typeof TAL_ART_ALIAS !== 'undefined' && !TAL_ART_ALIAS[what.name]) TAL_ART_ALIAS[what.name] = TAL_ART_ALIAS[t.name] || t.name;
-    t.oldName = t.oldName || t.name; t.name = what.name;
+    const was = t.name; t.oldName = t.oldName || was; t.name = what.name;
+    if (typeof TAL_ALIAS !== 'undefined') {   // (a save's ranks follow it, from this name and any older one: talnames.js)
+      for (const k in TAL_ALIAS) if (TAL_ALIAS[k] === was) TAL_ALIAS[k] = what.name;
+      if (!TAL_ALIAS[was]) TAL_ALIAS[was] = what.name;
+    }
   }
   t.sp = n => {
     const e = { ab: abId };
     if (what.cd) e.cd = -what.cd * n / ab.cd;
     if (what.cost) e.cost = -what.cost * n / ab.mana;
+    if (what.crit) e.crit = what.crit * n;
     if (what.pow) e.vs = ['any', what.pow * n];
     if (what.vs) e.vs = [what.vs[0], what.vs[1] * n];
     if (what.by) { e.by = {}; for (const k in what.by) e.by[k] = what.by[k] * n; }
@@ -63898,6 +63917,7 @@ function ezSpell(force, slot, name, abId, what, say) {
     const M = Math.max(1, Math.min(n | 0 || 1, t.max)), out = [];
     if (what.cd) out.push(`Reduces the cooldown of ${ab.name} by ${ezR(what.cd * M)} sec.`);
     if (what.cost) out.push(`Reduces the mana cost of ${ab.name} by ${ezR(what.cost * M)}.`);
+    if (what.crit) out.push(`Increases the critical strike chance of ${ab.name} by ${ezP(what.crit * M)}%.`);
     if (what.pow) out.push(`Increases the damage of ${ab.name} by ${ezP(what.pow * M)}%.`);
     if (what.vs) out.push(`Increases the damage of ${ab.name} by ${ezP(what.vs[1] * M)}% against ${EZ_VS[what.vs[0]] || what.vs[0]}.`);
     if (what.by && say) { const txt = String(say(M, ab)), m = /^lasts ([\d.]+)s longer$/.exec(txt); out.push(m ? `Increases the duration of ${ab.name} by ${m[1]} sec.` : `${ab.name} ${txt}.`); }
@@ -63907,6 +63927,7 @@ function ezSpell(force, slot, name, abId, what, say) {
     const rec = { kind: 'spell', ab: abId }, st = f => ({ from: 1, vals: ezSteps(t.max, 1, f) });
     if (what.cd) rec.cd = st(k => what.cd * k);
     if (what.cost) rec.cost = st(k => what.cost * k);
+    if (what.crit) rec.crit = st(k => what.crit * k);
     if (what.pow) rec.pow = st(k => what.pow * k);
     if (what.vs) rec.cond = st(k => what.vs[1] * k);
     if (what.by && say) rec.by = st(byNum);
@@ -64197,7 +64218,7 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
 
   /* ---------- Spellblades. Kept: Binding Cut, Press the Opening, Ghost Edge, Rift Wake, Phase Dancer; capstones Twin
      Riftblades, Riftsteel Flurry, Rift Dance ---------- */
-  ezSpell(F, 'glaive', 'Measured Cuts', 'cc_blinkstrike', { pow: .2, verb: 'slices' });
+  /* (Measured Cuts: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'glaive', 'Opening Salute', 'rhythm', .03, 'pass of its riftblade');
   ezSpell(F, 'glaive', 'Riftsteel Rhythm', 'cc_blinkstrike', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezSpell(F, 'glaive', 'Fresh Blood', 'cc_sigilcleave', { cd: 1.5, back: 'cleaves every' });
@@ -64213,12 +64234,12 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
   ezSpell(F, 'arrow', 'Tome Familiar', 'cc_barrage', { by: { n: 1 } }, v => `looses ${v} more missile${v > 1 ? 's' : ''}`);
   ezFlav(F, 'arrow', 'Bursting Missiles', 'echo', .3, 'casts missiles');
   ezFlav(F, 'arrow', 'Last Lesson', 'momentum', .03, 'casts missiles');
-  ezSpell(F, 'arrow', 'Charged Recital', 'cc_grandorb', { pow: .2, verb: 'breaks' });
+  /* (Charged Recital: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'arrow', 'Study Rhythm', 'tap', .5, 'the Mageling');
 
   /* ---------- Frostweavers (control). Kept: Chilling Bolts, Icicle Through, Deep Freeze, Absolute Stillness, Second
      Spear; capstones Deep Winter, Icicle Volley, Coffin Burst ---------- */
-  ezSpell(F, 'frost', 'Shard Spray', 'cc_glacialglyph', { vs: ['slowed', .1] });
+  /* (Shard Spray: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'frost', 'Cracking Cold', 'overflow', .1, 'her icicles hit');
   ezTal(F, 'frost', 'Long Staff', 'reach', .25, 0, 'Her staff reaches');
   ezFlav(F, 'frost', 'Cold Library', 'tap', .5, 'the Frostweaver');
@@ -64239,7 +64260,7 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
      Turning Stars; capstones Constellation, Starfall Sky, Binary Star ---------- */
   ezFlav(F, 'storm', 'Bright Fourth', 'watch', .1, 'its starlight');
   ezFlav(F, 'storm', 'Busy Sky', 'tempo', .05, 'reads stars down');
-  ezSpell(F, 'storm', 'Omen Light', 'cc_fallingstar', { vs: ['low', .4] });
+  /* (Omen Light: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezSpell(F, 'storm', 'Orrery Moon', 'cc_orrery', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezSpell(F, 'storm', 'Zodiac', 'cc_fallingstar', { cd: 1.5, back: 'is called every' });
   ezSpell(F, 'storm', 'Falling Finish', 'cc_omen', { vs: ['crowd', .4] });
@@ -64248,7 +64269,7 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
      capstones Shatterground, Shockwave, Stone Sprite ---------- */
   ezSpell(F, 'earth', "Warden's Command", 'cc_seismic', { cd: 1, back: 'leaps every' });
   ezFlav(F, 'earth', 'Double Fist', 'tempo', .04, 'its golem pounds');
-  ezSpell(F, 'earth', 'Gathering Weight', 'cc_seismic', { vs: ['fresh', .45] });
+  /* (Gathering Weight: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezTal(F, 'earth', 'Hurled Stone', 'hp', .15);
   ezSpell(F, 'earth', 'Waking Golem', 'cc_tremorglyph', { pow: .2, verb: 'hurls' });
   ezFlav(F, 'earth', 'Golem Core', 'momentum', .04, 'its golem pounds');
@@ -64258,7 +64279,7 @@ ezCharged('wardbound', 'arcane', 'Inked Stylus', 2, 'After a spell: its next 2 a
      Stoked Fire, Flashover, Banked Heat; capstones Sunfall, Pyre Bloom ---------- */
   ezFlav(F, 'cannon', 'Ember Wisp', 'flurry', .15, 'kindles and throws');
   ezSpell(F, 'cannon', 'Twin Fireball', 'cc_kindle', { by: { n: 1 } }, v => `skips ${v} more time${v > 1 ? 's' : ''}`);
-  ezSpell(F, 'cannon', 'Bouncing Fireball', 'cc_flamewave', { vs: ['burning', .24] });
+  /* (Bouncing Fireball: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'cannon', 'Stoking Hands', 'echo', .3, 'kindles and throws');
 
   /* ---------- Arcane Severers. Kept: Keen Crescent, Hunting Crescent, Splintering, Homeward Edge, Glancing Crescent;
@@ -65084,7 +65105,7 @@ function sevLate() {
 
   /* ---------- Thornguard Spears (line holder). Kept: Hold the Line, Deep Thrust, Shieldsplitter, Skewer, Phalanx;
      capstones Wall of Spears, Impaler, Thorn Spirit ---------- */
-  ezSpell(F, 'glaive', 'Long Haft', 'lunge', { vs: ['fresh', .6] });
+  /* (Long Haft: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'glaive', 'Jab and Jab', 'rhythm', .08, 'jab of its thornspear');
   ezFlav(F, 'glaive', 'Point First', 'momentum', .06, 'jabs with its thornspear');
   ezSpell(F, 'glaive', 'Tossed Off the Point', 'brambleguard', { by: { n: 1 } }, v => `catches ${v} more foe${v > 1 ? 's' : ''}`);
@@ -65094,7 +65115,7 @@ function sevLate() {
 
   /* ---------- Gladebow Rangers (damage: no control). Kept: Quick Nock, Thornpoint Arrows, Through the Gap; capstones
      Deadeye Draw, Thornrain, Hail of Shafts ---------- */
-  ezSpell(F, 'arrow', 'Heartwood Volley', 'aimedshot', { pow: .2, verb: 'lands' });
+  /* (Heartwood Volley: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'arrow', 'Warming Bow', 'watch', .08, 'its longbow');
   ezFlav(F, 'arrow', "Hunter's Rhythm", 'rhythm', .03, 'shaft');
   ezSpell(F, 'arrow', 'Spirit Hawk', 'volley', { cd: 1.5, back: 'is nocked every' });
@@ -65115,7 +65136,7 @@ function sevLate() {
      capstones Endless Hunt, Hooves of Thunder, White Stag Spirit ---------- */
   ezTal(F, 'arcane', "Hunter's Breath", 'mhit', 2, 0, 'pass of its lance');   /* (kept: Battle Trance; without it the Stag Lancers fall a quarter) */
   ezSpell(F, 'arcane', 'Fresh Legs', 'stampede', { cd: 1.5, back: 'can be leapt every' });
-  ezSpell(F, 'arcane', 'Scent of Quarry', 'heroiccharge', { cd: 1.5, back: 'sounds every' });
+  /* (Scent of Quarry: a spell crit talent now, forces_..._easy_zzcrit.js) */
 
   /* ---------- Grove Shifters. Kept: Wild Pace, Owl's Reach, Moonsap Bolts, Through the Prey, Bramble Claws (its
      payoff on a held foe); capstones Skyfall, Owl
@@ -65126,7 +65147,7 @@ function sevLate() {
   ezFlav(F, 'storm', 'Raking Strikes', 'flurry', .15, 'in every form it attacks');
   ezSpell(F, 'storm', 'Wild Sweep', 'wildsurge', { cd: 2, back: 'gathers every' });
   ezSpell(F, 'storm', 'Wild Hunger', 'wildsurge', { pow: .2, verb: 'rages' });
-  ezSpell(F, 'storm', 'Stoop', 'wildstrike', { vs: ['flyer', .4] });
+  /* (Stoop: a spell crit talent now, forces_..._easy_zzcrit.js) */
 
   /* ---------- Blade Dancers. Kept: Leaf-Edged Blades, Twin Whirl, Gale of Blades; capstones Dance of Blades,
      Bladestorm, Petalfall ---------- */
@@ -65135,7 +65156,7 @@ function sevLate() {
   ezSpell(F, 'earth', "Dancer's Breath", 'whirlwind', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezFlav(F, 'earth', 'Shadow Partner', 'flurry', .15, 'whirls her blades');
   ezSpell(F, 'earth', 'Single Partner', 'leafdance', { by: { n: 1 } }, v => `threads ${v} more foe${v > 1 ? 's' : ''}`);
-  ezSpell(F, 'earth', 'Parting Cut', 'whirlwind', { vs: ['crowd', .3] });
+  /* (Parting Cut: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezSpell(F, 'earth', 'Spell and Steel', 'whirlwind', { cd: 1.5, back: 'spins up every' });
 
   /* ---------- Seedcasters. Kept: Ripe Pods, Choking Spores, Potent Spores, Seed Split, Drifting Spores; capstones Spore
@@ -65192,14 +65213,14 @@ function sevLate() {
   /* ---------- Ironbreakers (line holder). Kept: Off Balance, Brace and Shove, Bowling Shove, Shield Rush, Bearded Axe,
      Hold the Pass, Hooked Beard; capstones Anvil Strike, Armourbreaker, Shieldbrother ---------- */
   ezFlav(F, 'glaive', 'Forge Rhythm', 'harvest', 5, 'the Ironbreaker');
-  ezSpell(F, 'glaive', 'Plate Salvage', 'ih_shieldshove', { cd: .5, back: 'is braced every' });
+  /* (Plate Salvage: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'glaive', 'Double Chop', 'tempo', .01, 'brings its axe down');
   ezFlav(F, 'glaive', 'Felling Chop', 'momentum', .04, 'brings its axe down');
 
   /* ---------- Thunderguns (damage: no control). Kept: Concussion Rounds, Sighting In, Range-Finder, Through-Ball;
      capstones Thunder Volley (Called Shot and Gatling Crank are the force tree's) ---------- */
   ezFlav(F, 'arrow', 'Quick Ramrod', 'tempo', .04, 'reloads and fires');
-  ezSpell(F, 'arrow', 'Powder Purse', 'ih_longshot', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
+  /* (Powder Purse: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'arrow', 'Ricochet', 'watch', .1, 'its thundergun');
   ezSpell(F, 'arrow', "Spotter's Call", 'ih_rollingvolley', { by: { n: 2 } }, v => `fires ${2 * v} more bullets`);
   ezTal(F, 'arrow', 'Long Iron', 'reach', .3, 0, 'Its long iron carries');
@@ -65215,7 +65236,7 @@ function sevLate() {
 
   /* ---------- Anvilwrights (support). Kept: Deep Brand, Forge Spirit, Searing Brand, Flying Sparks, Ringing Strokes;
      capstones Anvil Storm, Forgelord, Masterwork Day ---------- */
-  ezSpell(F, 'arcane', 'Glowing Anvil', 'ih_runebrand', { vs: ['low', .5] });
+  /* (Glowing Anvil: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'arcane', 'Anvil of Ages', 'rhythm', .02, 'ring of its hammer');
   ezSpell(F, 'arcane', 'Two Brands', 'ih_runeofpower', { by: { n: 1 } }, v => `tempers ${v} more unit${v > 1 ? 's' : ''}`);
   ezFlav(F, 'arcane', 'Big Work', 'echo', .3, 'rings its hammer');
@@ -65225,7 +65246,7 @@ function sevLate() {
   /* ---------- Flak Cannoneers (damage: no control). Kept: Fast Fuses, Barbed Shrapnel, High Sights, Hot Shrapnel, Sky
      Shatter, Torn Wings; capstones Proximity Fuse, Hook the Sky, Twin Mount ---------- */
   ezSpell(F, 'storm', "Gunner's Tithe", 'ih_flakscreen', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
-  ezSpell(F, 'storm', 'Cluster Shell', 'ih_grapnel', { pow: .1, verb: 'hauls' });
+  /* (Cluster Shell: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'storm', 'Quick Traverse', 'tempo', .02, 'fires its flak gun');
   ezSpell(F, 'storm', 'Second Burst', 'ih_flakscreen', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
 
@@ -65234,17 +65255,17 @@ function sevLate() {
   ezSpell(F, 'earth', 'Head of Steam', 'ih_pressureslam', { cd: 1, back: 'builds every' });
   ezFlav(F, 'earth', 'Twice Struck', 'overflow', .1, 'its steam-hammer hits');
   ezFlav(F, 'earth', 'Building Pressure', 'tempo', .04, 'drives its piston');
-  ezSpell(F, 'earth', 'Pressure Release', 'ih_pistondrive', { pow: .2, verb: 'lifts' });
+  /* (Pressure Release: a spell crit talent now, forces_..._easy_zzcrit.js) */
 
   /* ---------- Mortar Crew. Kept: Glowing Casings, Whistling Shells, Double Crew, Quake Shell, Pitch-Soaked Wadding;
      capstones Barrage, Crew Chief's Shout, Napalm (Big Bertha and Ringing Ears are the force tree's) ---------- */
-  ezSpell(F, 'cannon', 'Bouncing Shell', 'ih_incendiary', { cd: 1.5, back: 'is rammed home every' });
+  /* (Bouncing Shell: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezTal(F, 'cannon', 'Cluster Round', 'splash', .1);
   ezFlav(F, 'cannon', 'Thick of It', 'echo', .3, 'drops rounds');
 
   /* ---------- Siege Breakers. Kept: Shaped Charges, Fuse Cutter, Planted by Hand, Black Powder Pack, Tamped Charges,
      Rubble; capstones Satchel Rain, Sapper's Mate, Breach and Clear ---------- */
-  ezSpell(F, V, 'Two Satchels', 'ih_breach', { cd: 1.5, back: 'is planted every' });
+  /* (Two Satchels: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, V, 'Sapper at Work', 'tempo', .04, 'lights and throws satchels');
   ezFlav(F, V, 'Blasting Wage', 'harvest', 6, 'the Siege Breaker');
   ezSpell(F, V, 'Sympathetic Blast', 'ih_trench', { by: { n: 1 } }, v => `lays ${v} more charge${v > 1 ? 's' : ''}`);
@@ -65282,7 +65303,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 
   /* ---------- Oathsworn Shieldbearers (line holder). Kept: Shield-Ward, Pommel Blow, Shield of Faith, Unbroken Oath,
      Braced Shield, Unyielding; capstones Oath Unbroken, Wall of Shields, Ringing Shield ---------- */
-  ezSpell(F, 'glaive', 'Backswing', 'so_bash', { vs: ['fresh', .55] });
+  /* (Backswing: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'glaive', 'Press the Wounded', 'tempo', .04, 'swings its oathblade');
   ezSpell(F, 'glaive', 'Shield Wheel', 'so_aegis', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'glaive', 'Pommel Finish', 'rhythm', .03, 'stroke of its oathblade');
@@ -65290,7 +65311,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   /* ---------- Silverbolt Crossbows (damage: no control). Kept: Opening Shot, Heavy Quarrel, Bodkin Heads, Through and
      Through; capstones Siege Quarrel, Squire at Arms, Storm of Silver ---------- */
   ezFlav(F, 'arrow', 'Double Crank', 'tempo', .04, 'cranks and looses');
-  ezSpell(F, 'arrow', 'Sighted In', 'so_sanct', { vs: ['big', .3] });
+  /* (Sighted In: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'arrow', 'Ready Crank', 'momentum', .02, 'cranks and looses');
   ezSpell(F, 'arrow', 'Splinter Bolt', 'so_hail', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezSpell(F, 'arrow', 'Hot Crank', 'so_witness', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
@@ -65312,14 +65333,14 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezSpell(F, 'arcane', 'Ride Through', 'so_ridedown', { by: { n: 1 } }, v => `rides ${v} more pass${v > 1 ? 'es' : ''}`);
   ezSpell(F, 'arcane', 'Vow-Lit Lance', 'so_vow', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezTal(F, 'arcane', 'Long Course', 'reach', .3, 0, 'Its course runs');
-  ezSpell(F, 'arcane', 'Shattered Lance', 'so_grail', { pow: .1, verb: 'breaks through' });
+  /* (Shattered Lance: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'arcane', 'Phantom Rider', 'echo', .3, 'wheels and couches its lance');
 
   /* ---------- Sunlance Clerics (damage: no control). Kept: Zenith, Scorching Rays, Lingering Beam, Long Ray, Prism,
      Sunburst; capstones Lance upon Lance, Lance of Heaven, High Noon ---------- */
   ezFlav(F, 'storm', 'Halo Wisp', 'echo', .05, 'casts rays of sun');
   ezFlav(F, 'storm', 'Dawn Rhythm', 'overflow', .08, 'her rays hit');
-  ezSpell(F, 'storm', 'Noonfire', 'so_sunlance', { pow: .1, verb: 'blazes' });
+  /* (Noonfire: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'storm', 'Vigil Prayer', 'watch', .05, 'her sunrays');
 
   /* ---------- Templars of the Ford (line holder). Kept: Twin Rhythm, Crossed Blades, Parry and Riposte, Press Forward,
@@ -65328,18 +65349,18 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezFlav(F, 'earth', 'Sword Prayer', 'harvest', 5, 'the Templar');
   ezSpell(F, 'earth', 'Crossed Finish', 'so_crush', { cd: 1.5, back: 'crosses every' });
   ezSpell(F, 'earth', "Templar's Rhythm", 'so_crush', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
-  ezSpell(F, 'earth', 'Carried Cut', 'so_hammerfall', { cd: 2, back: 'falls every' });
+  /* (Carried Cut: a spell crit talent now, forces_..._easy_zzcrit.js) */
 
   /* ---------- Censer Bearers. Kept: Fanned Embers, Hot Coals, Choking Smoke, Direct Hit, Pall of Smoke, Rekindling,
      Skipping Coal, Ash in the Eyes; capstones Coal Shower, Ember Spirit, Psalm of Embers ---------- */
-  ezSpell(F, 'cannon', 'Two Coals', 'so_sweep', { pow: .2, verb: 'scatters' });
+  /* (Two Coals: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezSpell(F, 'cannon', 'Quick Thurible', 'so_smoke', { by: { n: 1 } }, v => `lays ${v} more patch${v > 1 ? 'es' : ''}`);
   ezFlav(F, 'cannon', 'Censer Tithe', 'harvest', 6, 'the Censer Bearer');
 
   /* ---------- Magebane Inquisitors. Kept: Scorching Seal, Broken Litany, Dry Well, Zeal, Forfeit, Shield of Doctrine;
      capstones Penitent's Flurry, Censer of Witness, Grand Inquest ---------- */
   ezSpell(F, V, 'Sanctioned Lash', 'so_edict', { pow: .25, verb: 'scourges' });
-  ezSpell(F, V, 'Leaping Lash', 'so_seize', { cd: 1, back: 'is served every' });
+  /* (Leaping Lash: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezTal(F, V, 'Long Chain', 'reach', .2, 0, 'Her seal-chain reaches');
   ezFlav(F, V, 'Seal Slam', 'overflow', .1, 'her seal hits');
   ezSpell(F, V, "Zealot's Tithe", 'so_edict', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
@@ -65380,7 +65401,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezTal(F, 'glaive', 'Wolf at the Throat', 'pen', .15);
   ezSpell(F, 'glaive', 'Blood on the Fur', 'sb_pounce', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
   ezFlav(F, 'glaive', 'Spear Flurry', 'tempo', .04, 'thrusts its spear');
-  ezSpell(F, 'glaive', 'Worry the Prey', 'sb_pounce', { vs: ['low', .7] });
+  /* (Worry the Prey: a spell crit talent now, forces_..._easy_zzcrit.js) */
   atkSwap(F, 'glaive', { old: 'Run Them Through', name: 'Run Them Through', tag: 'Damage', see: 'The spear runs on into the foe behind.',
     pro: (n, s) => `Each attack also hits the foe behind for ${s(70)}%.`, fx: { hit: { do: 'pierce', k: .7, r: 1.5 } } });   /* (always on: it was every 3rd attack) */
   ezTal(F, 'glaive', 'Ash Haft', 'reach', .15, 0, 'Its spear reaches');
@@ -65390,7 +65411,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
      capstones Gale Volley, Skyrend, Wind Spirit ---------- */
   ezFlav(F, 'arrow', 'Updraft Reader', 'watch', .07, 'her arrows');
   ezSpell(F, 'arrow', 'Breath of the Gust', 'sb_galearrow', { cost: 8 });
-  ezSpell(F, 'arrow', 'Gust Fletching', 'sb_galearrow', { pow: .25, verb: 'tears through its line' });
+  /* (Gust Fletching: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'arrow', 'Tailwind', 'flurry', .08, 'looses arrows');
   ezSpell(F, 'arrow', 'Wind-Borne Volley', 'sb_crosswind', { by: { dur: 1 } }, longer('holds its gale'));
   ezFlav(F, 'arrow', 'Carried On', 'momentum', .03, 'draws her bow');
@@ -65417,7 +65438,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 
   /* ---------- Thunder Callers. Kept: Split Sky, Backlash, Grounded Bolt; capstones Thunderclap, Last Spark, Stormseed ---------- */
   ezTal(F, 'storm', 'Long Fork', 'jump', 1);
-  ezSpell(F, 'storm', 'Thunder Finish', 'sb_calllightning', { pow: .25, verb: 'cracks' });
+  /* (Thunder Finish: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'storm', 'Thunder Hunger', 'harvest', 4, 'the Thunder Caller');
   ezFlav(F, 'storm', 'Double Strike', 'tempo', .035, 'calls lightning');
   ezSpell(F, 'storm', 'Charged Rhythm', 'sb_calllightning', { cd: 1, back: 'answers every' });
@@ -65429,13 +65450,13 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezSpell(F, 'earth', 'Ground Gives Way', 'sb_stonetotem', { vs: ['slowed', .18] });
   ezSpell(F, 'earth', 'Stone Remembers', 'sb_stonetotem', { by: { dur: 1 } }, longer('stands'));
   ezFlav(F, 'earth', 'Hard Rhythm', 'rhythm', .03, 'blow of its maul');
-  ezSpell(F, 'earth', 'Maul Swing', 'sb_fissure', { cd: 2 });
+  /* (Maul Swing: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezSpell(F, 'earth', 'Earth Rhythm', 'sb_stonetotem', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
 
   /* ---------- Cloud Dancers. Kept: Brooding Sky, Long Clouds, Forked Strike; capstones Storm Front, Thunder Dance,
      Sky Lattice ---------- */
   ezSpell(F, 'cannon', 'Answering Sky', 'sb_thunderhead', { by: { dur: 2 } }, v => `lasts ${2 * v}s longer`);
-  ezSpell(F, 'cannon', "Storm's End", 'sb_stormdance', { vs: ['big', .75] });
+  /* (Storm's End: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezSpell(F, 'cannon', 'Rain Rhythm', 'sb_thunderhead', { cost: 15, text: (v, ab) => `${ab.name} costs ${15 * v} less mana.` });
   ezTal(F, 'cannon', 'Rain Returns', 'pool', .15, 0, 'Cloud Dancer');   /* (the pool that can hold Skyleap) */
   ezSpell(F, 'cannon', 'Twin Bolt', 'sb_stormdance', { cd: 2, back: 'can be danced every' });
@@ -65449,7 +65470,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezFlav(F, V, 'Sky Lore', 'harvest', 6, 'the Skyhunter');
   ezSpell(F, V, 'Double Harpoon', 'sb_tether', { by: { n: 1 } }, v => `pulls down ${v} more flyer${v > 1 ? 's' : ''}`);
   ezSpell(F, V, 'Hard Landing', 'sb_downdraft', { by: { dur: 1 } }, longer('holds its flyer'));
-  ezSpell(F, V, "Hunter's Haste", 'sb_skyfall', { pow: .4, verb: 'crashes down' });
+  /* (Hunter's Haste: a spell crit talent now, forces_..._easy_zzcrit.js) */
 }
 /* ---------- Champion trees whose rows were mostly about one spell: opened and laid out (tools/open_layout.js; the
    rest of this force's trees follow when the owner approves the Ironhold sample) ---------- */
@@ -65493,7 +65514,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
 
   /* ---------- Glaive Wardens. Kept: Rune-Etched Edge, Long Ricochet, Homeward Cut, Masked Sight; capstones Unending
      Glaive, Endless Ricochet, Three Glaives ---------- */
-  ezSpell(F, 'arrow', 'Gilded Edge', 'wb_runevolley', { pow: .15, verb: 'sings' });
+  /* (Gilded Edge: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'arrow', 'Second Glaive', 'tempo', .025, 'hurls her great glaive');
   ezFlav(F, 'arrow', 'Glaive Finish', 'flurry', .15, 'her great glaive flies');
   ezSpell(F, 'arrow', 'Quick Hand', 'wb_piercingshaft', { cd: 1.5, back: 'is flung every' });
@@ -65515,7 +65536,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
     pro: (n, s) => `Each attack also carves a second foe for ${s(50)}%.`, fx: { hit: { do: 'split', n: 1, k: .5, r: 1.8 } } });   /* (always on: it was every 3rd attack) */
   ezFlav(F, 'arcane', 'Busy Stylus', 'tempo', .08, 'carves with its stylus');
   ezTal(F, 'arcane', 'Reading Glass', 'reach', .25, 0, 'Its stylus reaches');
-  ezSpell(F, 'arcane', 'Ghost Scribe', 'wb_detonate', { pow: .6, verb: 'flares' });
+  /* (Ghost Scribe: a spell crit talent now, forces_..._easy_zzcrit.js) */
 
   /* ---------- Sable Lancers. Kept: Couched Lance, Swift Remount, Forked Pennon, Unbroken Chain; capstones Thunder
      Oath, Falling Light, Second Fall ---------- */
@@ -65525,12 +65546,12 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
   ezFlav(F, 'storm', 'Sable Hawk', 'momentum', .02, 'couches and drives its lance');
   ezTal(F, 'storm', 'Long Lance', 'reach', .15, 0, 'Its storm-lance reaches');
   ezSpell(F, 'storm', "Rider's Rhythm", 'wb_charge', { cd: 1.5, back: 'rides out every' });
-  ezSpell(F, 'storm', "Lancer's Finish", 'wb_skyfall', { cd: 3 });
+  /* (Lancer's Finish: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezSpell(F, 'storm', 'Long Pennant', 'wb_stormbanner', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
 
   /* ---------- Stoneguard (line holder). Kept: Iron Rhythm, Restless Earth, Shield Bash, Deep Quake, Stone's Toll;
      capstones Unmoving, Quaking Steps, Mountain's Weight ---------- */
-  ezSpell(F, 'earth', 'Shield Spirit', 'wb_shieldwall', { pow: .1 });
+  /* (Shield Spirit: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezFlav(F, 'earth', 'Shield Edge', 'rhythm', .03, 'shield-rim blow');
   ezFlav(F, 'earth', 'Under Fire', 'tempo', .04, 'brings its shield-rim down');
   ezSpell(F, 'earth', 'Crushing Rim', 'wb_shieldwall', { cost: 10, text: (v, ab) => `${ab.name} costs ${10 * v} less mana.` });
@@ -65540,7 +65561,7 @@ ezOpen('ironhold');   /* (first: what each talent needed before is kept for the 
      Chain, Ballista Volley, Skewer Line ---------- */
   ezTal(F, 'cannon', 'Spotter', 'reach', .25, 0, 'Its ballista carries');
   ezFlav(F, 'cannon', 'Quick Crank', 'tempo', .04, 'cranks and fires');
-  ezSpell(F, 'cannon', 'Heavy Bolt Ready', 'wb_pinbolt', { vs: ['fresh', .5] });
+  /* (Heavy Bolt Ready: a spell crit talent now, forces_..._easy_zzcrit.js) */
   ezSpell(F, 'cannon', "Loader's Finish", 'wb_chainbolt', { by: { dur: 1 } }, v => `lasts ${v}s longer`);
   ezFlav(F, 'cannon', 'Steady Crew', 'harvest', 5, 'the Graveshot Ballista');
   ezFlav(F, 'cannon', 'Third Crewman', 'watch', .1, 'its ballista');
@@ -66204,6 +66225,71 @@ if (typeof castAbility === 'function') {
   if (typeof ezFlav === 'function' && ezFlav('silver', 'storm', 'Prism', 'flurry', .1)) own('silver', 'storm', 'Prism', n => `After a critical strike: the Sunlance Cleric attacks ${10 * n}% faster for 3s.`);
 })();
 
+/* ================= SPELL CRIT TALENTS: one a damage tree (owner, 28 Nov 2026) =================
+   Owner: "should be a talent that gives quietus a 20%->40%->60% crit chance", then "would like more talents like that".
+   So each damage unit's tree has ONE talent that makes one of its spells crit more often, WoW style: "Increases the
+   critical strike chance of Aimed Shot by 20%." a rank, 20/40/60% over three ranks, on top of the unit's own crit chance
+   and at its own crit multiple (forces_zy_spells.js crit, read by forces_..._crit.js critSpellCh). The spell is the one a
+   big crit suits: a single heavy blow, a leap or charge, a nuke.
+   Each is an existing talent turned over IN PLACE (its cell, its id, its arrows; nothing added): the weak or samey ones
+   first (the "against foes above/below half health", "against bosses", "against slowed foes" and plain "+X% damage" spell
+   talents, and a few plain cooldown ones), always one that already shaped that same spell, so it still sits under it.
+   Two-rank talents become three (a save's ranks carry over: 2 of 2 is 2 of 3). A name that no longer fits is changed (the
+   painting stays, TAL_ART_ALIAS; a save's ranks follow it, TAL_ALIAS: both in ezSpell). The Nightblades' Keen Quietus is set
+   in its own file (forces_..._wb_oathknife.js, which builds that tree after this one runs).
+   Not given one: the control and support units (Briarwardens, Chronomancers, Chain Trappers, Lightbinder Sisters, Hail
+   Shamans, Spirit Walkers, Oathbound, Ashen Chaplains), the Seedcasters and Bogwitches (their damage is spores, swarms and
+   bogs over time, which never crit), and the Champion trees. The list: docs/spell_crit_talents.md.
+   Check: node tools/check_spell_crit.js */
+const EZ_CRIT = [
+  // force, slot, talent, spell, new name (or null)
+  ['grove', 'glaive', 'Long Haft', 'lunge'],
+  ['grove', 'arrow', 'Heartwood Volley', 'aimedshot'],
+  ['grove', 'arcane', 'Scent of Quarry', 'heroiccharge'],
+  ['grove', 'storm', 'Stoop', 'wildstrike'],
+  ['grove', 'earth', 'Parting Cut', 'whirlwind'],
+  ['conclave', 'glaive', 'Measured Cuts', 'cc_blinkstrike'],
+  ['conclave', 'arrow', 'Charged Recital', 'cc_grandorb'],
+  ['conclave', 'frost', 'Shard Spray', 'cc_glacialglyph'],
+  ['conclave', 'storm', 'Omen Light', 'cc_fallingstar'],
+  ['conclave', 'earth', 'Gathering Weight', 'cc_seismic'],
+  ['conclave', 'cannon', 'Bouncing Fireball', 'cc_flamewave'],
+  ['conclave', 'venom', 'Keen Severance', 'cc_sunder'],
+  ['ironhold', 'glaive', 'Plate Salvage', 'ih_shieldshove', 'Crushing Shove'],
+  ['ironhold', 'arrow', 'Powder Purse', 'ih_longshot', 'True Aim'],
+  ['ironhold', 'arcane', 'Glowing Anvil', 'ih_runebrand'],
+  ['ironhold', 'storm', 'Cluster Shell', 'ih_grapnel'],
+  ['ironhold', 'earth', 'Pressure Release', 'ih_pistondrive'],
+  ['ironhold', 'cannon', 'Bouncing Shell', 'ih_incendiary', 'Dead Centre'],
+  ['ironhold', 'venom', 'Two Satchels', 'ih_breach', 'Well-Placed Charge'],
+  ['silver', 'glaive', 'Backswing', 'so_bash'],
+  ['silver', 'arrow', 'Sighted In', 'so_sanct'],
+  ['silver', 'arcane', 'Shattered Lance', 'so_grail'],
+  ['silver', 'storm', 'Noonfire', 'so_sunlance'],
+  ['silver', 'earth', 'Carried Cut', 'so_hammerfall', "Heaven's Edge"],
+  ['silver', 'cannon', 'Two Coals', 'so_sweep', 'Live Coals'],
+  ['silver', 'venom', 'Leaping Lash', 'so_seize', 'Damning Writ'],
+  ['stormborn', 'glaive', 'Worry the Prey', 'sb_pounce'],
+  ['stormborn', 'arrow', 'Gust Fletching', 'sb_galearrow'],
+  ['stormborn', 'storm', 'Thunder Finish', 'sb_calllightning'],
+  ['stormborn', 'earth', 'Maul Swing', 'sb_fissure'],
+  ['stormborn', 'cannon', "Storm's End", 'sb_stormdance'],
+  ['stormborn', 'venom', "Hunter's Haste", 'sb_skyfall', 'Killing Harpoon'],
+  ['wardbound', 'arrow', 'Gilded Edge', 'wb_runevolley'],
+  ['wardbound', 'arcane', 'Ghost Scribe', 'wb_detonate'],
+  ['wardbound', 'storm', "Lancer's Finish", 'wb_skyfall'],
+  ['wardbound', 'earth', 'Shield Spirit', 'wb_shieldwall'],
+  ['wardbound', 'cannon', 'Heavy Bolt Ready', 'wb_pinbolt'],
+];
+const EZ_CRIT_K = .2, EZ_CRIT_MAX = 3;   // 20% a rank, three ranks
+if (typeof ezSpell === 'function') {
+  for (const [f, slot, name, ab, nm] of EZ_CRIT) {
+    const o = { crit: EZ_CRIT_K, max: EZ_CRIT_MAX }; if (nm) o.name = nm;
+    const t = ezSpell(f, slot, name, ab, o);
+    if (!t && typeof console !== 'undefined') console.warn('spell crit talents: not set', f, slot, name);
+  }
+}
+
 /* ================= THE WARDBOUND'S ASSASSIN: the Oathknives take the Gatewatch Halberdiers' place (27 Nov 2026) =================
    Owner: "a unit to the wardbound that jumps ... behind cloth targets and does bonus damage. it can be their anti caster
    unit ... sort of an assassin type unit." The Halberdiers' spear role overlapped the Sable Lancers, so they are retired.
@@ -66511,7 +66597,7 @@ const WBA_KIT = { slot: 'frost', mana: { max: 110, regen: 1, hit: .6 }, abilitie
     GT('Hush', 'feather', 0, 2, 2, '', {}),
     /* row II */
     GS('wb_sablestep', 1, 1),
-    GT('Keen Quietus', 'target', 1, 3, 2, '', {}),
+    GT('Keen Quietus', 'target', 1, 3, 3, '', {}),
     /* row III */
     GT('Finishing Cut', 'cracked', 2, 0, 2, n => `The ${one}'s attacks and spells hit foes under ${pc(WBA.finish.at)}% health ${pc(WBA.finish.per * n)}% harder.`, {}, { cap: 'wbaFinish' }),
     GT('Second Shadow', 'quick', 2, 1, 2, '', {}, { req: [1, 1] }),
@@ -66540,7 +66626,9 @@ const WBA_KIT = { slot: 'frost', mana: { max: 110, regen: 1, hit: .6 }, abilitie
   // the simple passives (forces_..._easy.js): one clear number a rank, WoW wording
   ezTal(F, 'frost', 'Whetted Knives', 'crit', .04);
   ezFlav(F, 'frost', 'Hush', 'harvest', 4);
-  ezSpell(F, 'frost', 'Keen Quietus', 'wb_quietus', { vs: ['low', .3] });
+  /* (owner, 28 Nov 2026: "should be a talent that gives quietus a 20%->40%->60% crit chance". It was +30% a rank against foes
+     below half health: Finishing Cut hits the dying already. Three ranks now; a save's two stay two of three.) */
+  ezSpell(F, 'frost', 'Keen Quietus', 'wb_quietus', { crit: .2, max: 3 });
   ezSpell(F, 'frost', 'Second Shadow', 'wb_sablestep', { cd: 1.5 });
   ezSpell(F, 'frost', 'Swift Quietus', 'wb_quietus', { cd: 1 });
   ezTal(F, 'frost', 'Long Stride', 'reach', .2);
@@ -102161,6 +102249,7 @@ function gpStats(t, alt) {
   if (st.heat && gpMech(t)) fx.push(() => txt('Heat a strike', P(st.heat), 'Each strike warms its engine; at full heat its next strike vents'));
   for (const p of st.ipr || []) fx.push(() => txt(`Every ${ordN(p.n)} hit`, `${GEAR_BASES[p.id] ? GEAR_BASES[p.id].name + ': ' : ''}${p.kind}`, IPROC[p.kind] ? IPROC[p.kind].say(p.n, p.k) : ''));
   for (const sp in st.itw || {}) { const w = st.itw[sp]; fx.push(() => txt(ipSpell(sp), GEAR_BASES[w.id] ? GEAR_BASES[w.id].text(w.k) : w.kind, 'An item that reshapes this spell')); }
+  if (kit && typeof spMods === 'function') for (const ab of kit.abilities) { const M = spMods(ab.id); if (M && M.crit > 0) fx.push(() => txt(`${ab.name} crit`, P(Math.min(1, (st.crit || 0) + M.crit)), `The chance a hit of ${ab.name} crits: its Crit Chance and its talents`)); }   // (a spell crit talent: forces_..._easy_zzcrit.js)
   if (st.auraD) fx.push(() => out.push(gpStat('Aura damage', st.auraD, b.auraD, v => '+' + P(v), 'Damage it lends the units round it')));
   if (st.auraS) fx.push(() => out.push(gpStat('Aura haste', st.auraS, b.auraS, v => '+' + P(v), 'Speed it lends the units round it')));
   if (st.auraR) fx.push(() => out.push(gpStat('Aura radius', st.auraR, b.auraR, gpF, hint('How far its aura reaches', on('aura')))));
@@ -103220,94 +103309,204 @@ if (typeof window !== 'undefined' && window.addEventListener) window.addEventLis
   dmapToggle();
 });
 
-/* ---------- Top scores: everyone's best wave, signed in with claude.ai ----------
-   Each player's best wave on each difficulty sits in one shared document, scores/<their claude.ai id>. The page's
-   rules let each player write only their own, and the keep's owner tidy any of them. Names come from the claude.ai
-   profile, or a name the player sets for the board. Standard runs count; challenges and Tower Wars don't.
-   Where the page can't reach the store (signed out, opened outside claude.ai, or a viewer who may only read), the
-   board says so, and your best stays on this device as before. */
-const BOARD = { tried: false, db: null, user: null, me: null, rows: null, fresh: false, slow: false, err: '', canPost: null, tab: 'normal', wq: Promise.resolve(), live: null, last: null };
+/* ---------- Top scores, the standalone web version: Discord sign-in through Supabase ----------
+   Used instead of board.js when the game is built for its own website (./build_web.sh). The server does the
+   counting (see web/supabase/schema.sql): a run is opened there when a game starts, each cleared wave is reported as
+   it happens, and the server checks every report against its own clock before a wave counts. The board only shows
+   waves the server counted. Nothing here can write a score directly.
+   Talks to Supabase over plain fetch (its Auth, REST and RPC endpoints), no library: the page's security policy
+   allows scripts from this site only. Works without it all: no config, offline or signed out, the game plays as
+   ever and your best stays on this device. */
+const RKC = (typeof window !== 'undefined' && window.RK_CONFIG) || {};
+const SB = { url: String(RKC.supabaseUrl || '').trim().replace(/\/+$/, ''), key: String(RKC.supabaseAnonKey || '').trim() };
+SB.on = /^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/.test(SB.url) && SB.key.length > 30;
+const GAME_VERSION = 3;   // raise it when the rules change; the server's min_version setting turns older copies away
+const BOARD = { tried: false, rows: {}, rowsAt: {}, err: '', me: null, tab: 'normal', last: null, back: null };
 const BOARD_NICK_MAX = 20;
+const lsJ = (k, v) => { if (v === undefined) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } } try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* the mode a score was set in. 'campaign': a force run (Begin, or a location on the Chronicles map); 'classic': the
+   elemental towers. A score from before the board kept modes (web/supabase/mode.sql) reads its build's force when it has
+   one, else Campaign: the main mode for the whole life of the online board. */
+const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
+const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
+const lbMode = x => x && BOARD_MODES[x.mode] ? x.mode : x && x.build && x.build.force ? (x.build.force === 'Classic' ? 'classic' : 'campaign') : 'campaign';
+const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
+const b64u = a => btoa(String.fromCharCode.apply(null, a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/* --- signing in (Discord, through Supabase Auth with PKCE) --- */
+let SESS = lsJ('rk.auth'), refreshing = null;
+async function sbSignIn() {
+  if (!SB.on) return;
+  const v = b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const ch = b64u(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))));
+  lsJ('rk.pkce', { v, at: Date.now() });
+  const back = location.origin + location.pathname;
+  location.assign(`${SB.url}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(back)}&code_challenge=${ch}&code_challenge_method=s256&scopes=identify`);
+}
+function sbKeep(s) {
+  if (!s || !s.access_token || !s.refresh_token) return null;
+  SESS = { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600), uid: (s.user && s.user.id) || (SESS && SESS.uid) || null };
+  lsJ('rk.auth', SESS); return SESS;
+}
+async function sbAuthPost(grant, body) {
+  const r = await fetch(`${SB.url}/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { apikey: SB.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.msg || ('auth ' + r.status)), { status: r.status });
+  return j;
+}
+// back from Discord: swap the one-time code for a session, and tidy the address bar
+async function sbCallback() {
+  const q = new URLSearchParams(location.search), code = q.get('code'), err = q.get('error_description') || q.get('error');
+  if (!code && !err) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  if (err) { BOARD.signinErr = err; return; }
+  const pk = lsJ('rk.pkce'); lsJ('rk.pkce', null);
+  if (!pk || Date.now() - pk.at > 15 * 60 * 1000) { BOARD.signinErr = 'The sign-in took too long. Please try again.'; return; }
+  try { sbKeep(await sbAuthPost('pkce', { auth_code: code, code_verifier: pk.v })); BOARD.justIn = true; }
+  catch (e) { BOARD.signinErr = 'Sign-in didn’t complete. Please try again.'; }
+}
+// a fresh access token, renewed a minute before it runs out (one renewal at a time)
+async function sbToken() {
+  if (!SESS) return null;
+  if (SESS.expires_at - Date.now() / 1000 > 60) return SESS.access_token;
+  if (!refreshing) refreshing = sbAuthPost('refresh_token', { refresh_token: SESS.refresh_token }).then(sbKeep)
+    .catch(e => { if (e.status >= 400 && e.status < 500) { SESS = null; lsJ('rk.auth', null); BOARD.me = null; } return null; })
+    .finally(() => { refreshing = null; });
+  const s = await refreshing; return s ? s.access_token : null;
+}
+async function sbSignOut() {
+  const t = SESS && SESS.access_token;
+  SESS = null; lsJ('rk.auth', null); BOARD.me = null; RUN = null; lsJ('rk.run', null);
+  if (t) fetch(`${SB.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: SB.key, Authorization: 'Bearer ' + t } }).catch(() => {});
+  boardPaint();
+}
+// the REST and RPC calls: signed in, as the player; otherwise with the public key (reading the board only)
+async function sbCall(path, body, asUser) {
+  const tok = asUser ? await sbToken() : null;
+  if (asUser && !tok) throw Object.assign(new Error('signed out'), { status: 401 });
+  const ctl = new AbortController(), tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    // the public key goes only in `apikey`: the new sb_publishable_ keys aren't JWTs and are refused as a Bearer token
+    const h = { apikey: SB.key, 'Content-Type': 'application/json' };
+    if (tok) h.Authorization = 'Bearer ' + tok;
+    const r = await fetch(SB.url + path, { method: body ? 'POST' : 'GET', signal: ctl.signal, headers: h, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) throw Object.assign(new Error('http ' + r.status), { status: r.status });
+    return r.status === 204 ? null : await r.json();
+  } finally { clearTimeout(tm); }
+}
+const sbRpc = (fn, args) => sbCall('/rest/v1/rpc/' + fn, args || {}, true);
+
+/* --- start-up --- */
 function boardInit() {
   if (BOARD.tried) return BOARD.ready;
   BOARD.tried = true;
   return BOARD.ready = (async () => {
-    const use = window.claude && typeof window.claude.use === 'function' ? n => window.claude.use(n).catch(() => null) : null;
-    if (!use) { BOARD.rows = []; BOARD.err = 'outside'; boardPaint(); return; }
-    const [db, user] = await Promise.all([use('db'), use('user')]);
-    BOARD.db = db; BOARD.user = user;
-    if (user) { try { BOARD.me = await user.me(); } catch (e) {} try { BOARD.canPost = await user.can('data.write'); } catch (e) {} }
-    if (!db) { BOARD.rows = []; BOARD.err = 'nodb'; boardPaint(); return; }
-    const t = setTimeout(() => { BOARD.slow = true; boardPaint(); }, 10000);   // the store not answering yet: say so, keep listening
-    try {
-      db.collection('scores').limit(500).onSnapshot(snap => {
-        BOARD.rows = snap.docs.filter(d => d.exists).map(d => Object.assign({ id: d.id }, d.data()));
-        if (!snap.metadata.fromCache) { BOARD.fresh = true; BOARD.slow = false; clearTimeout(t); }
-        boardPaint();
-      }, e => { clearTimeout(t); BOARD.err = e && e.code === 'revoked' ? 'nodb' : 'down'; if (!BOARD.rows) BOARD.rows = []; boardPaint(); });
-    } catch (e) { clearTimeout(t); BOARD.rows = []; BOARD.err = 'down'; boardPaint(); }
+    if (!SB.on) { BOARD.err = 'off'; boardPaint(); return; }
+    await sbCallback();
+    if (SESS) await boardLoadMe();
+    if (BOARD.signinErr) toast(BOARD.signinErr); else if (BOARD.justIn && BOARD.me) toast(`Signed in as ${BOARD.me.name}. Your runs now count on the scoreboard.`);
+    RUN = lsJ('rk.run'); if (RUN && (!SESS || RUN.uid !== SESS.uid)) RUN = null;
+    if (RUN && RUN.q && RUN.q.length) runFlush();
+    boardFetch(DIFFS[diffPick] ? diffPick : 'normal');
   })();
 }
-const boardMyId = () => (BOARD.me && BOARD.me.id) || null;
-const boardMine = () => { const id = boardMyId(); return id && BOARD.rows ? BOARD.rows.find(r => r.id === id) || null : null; };
-const boardEntry = (r, diff) => { const e = r && r[diff]; return e && typeof e === 'object' && Number.isFinite(+e.w) && +e.w > 0 ? e : null; };
-// the standings: the highest Rite of Passage first, then the best wave, the earlier one ahead on a tie
-const boardKey = e => (e.r | 0) * 100000 + +e.w;
-function boardRank(diff) {
-  return (BOARD.rows || []).map(r => ({ r, e: boardEntry(r, diff) })).filter(x => x.e)
-    .sort((a, b) => (boardKey(b.e) - boardKey(a.e)) || (Date.parse(a.e.at) || 0) - (Date.parse(b.e.at) || 0));
+async function boardLoadMe() {
+  try {
+    const tok = await sbToken(); if (!tok) return;
+    if (!SESS.uid) { const u = await fetch(`${SB.url}/auth/v1/user`, { headers: { apikey: SB.key, Authorization: 'Bearer ' + tok } }).then(r => r.ok ? r.json() : null); if (u && u.id) { SESS.uid = u.id; lsJ('rk.auth', SESS); } }
+    if (!SESS.uid) return;
+    const rows = await sbCall(`/rest/v1/profiles?select=display_name,banned&id=eq.${encodeURIComponent(SESS.uid)}`, null, true);
+    BOARD.me = rows && rows[0] ? { id: SESS.uid, name: rows[0].display_name, banned: !!rows[0].banned } : { id: SESS.uid, name: '', banned: false };
+  } catch (e) { if (SESS) BOARD.me = BOARD.me || { id: SESS.uid, name: '', banned: false }; }
+  boardPaint();
 }
-/* the mode each best was set in (the entry's m): 'campaign', a force run (Begin, or a location on the Chronicles map);
-   'classic', the elemental towers. An entry from before the board kept modes has none and reads as Campaign, the main
-   mode the whole time this board has stood. */
-const BOARD_MODES = { campaign: 'Campaign', classic: 'Classic', chronicles: 'Chronicles' };
-const boardModeNow = () => G && G.force ? 'campaign' : 'classic';
-const lbMode = e => e && BOARD_MODES[e.m] ? e.m : 'campaign';
-const lbModeTip = (m, r) => BOARD_MODES[m] + (r ? ` · ${riteName(r)}: ${RITES[r - 1].name}` : '');
-const boardNick = r => r && typeof r.nick === 'string' ? r.nick.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX) : '';
-// write my own document (one write at a time; it is whole, so it carries my other difficulties along)
-function boardWrite(patch) {
-  const id = boardMyId(); if (!BOARD.db || !id) return Promise.resolve(false);
-  return BOARD.wq = BOARD.wq.then(async () => {
-    const cur = boardMine(), body = Object.assign({ v: 1 }, cur ? Object.fromEntries(Object.entries(cur).filter(([k]) => k !== 'id')) : {}, patch);
-    try { await BOARD.db.doc('scores/' + id).set(body); BOARD.canPost = true;
-      if (BOARD.rows) BOARD.rows = BOARD.rows.filter(r => r.id !== id).concat([Object.assign({ id }, body)]);   // ours, right away (the live update follows)
-      boardPaint(); return true; }
-    catch (e) { if (e && e.code === 'invalid_argument') BOARD.canPost = false; else BOARD.err = e && e.code === 'quota_exceeded' ? 'full' : BOARD.err; boardPaint(); return false; }
-  });
-}
-// a run has ended: post it if it beats my best on that difficulty
-async function boardPost(w, won) {
-  if (!(w > 0) || G.chal || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return { why: 'skip' };
-  await boardInit();
-  if (!BOARD.db || !boardMyId()) return { why: BOARD.err || 'signin' };
-  if (BOARD.canPost === false) return { why: 'readonly' };
-  if (!BOARD.fresh) await new Promise(r => { const t0 = Date.now(), k = setInterval(() => { if (BOARD.fresh || Date.now() - t0 > 6000) { clearInterval(k); r(); } }, 200); });
-  const diff = G.diff, prev = boardEntry(boardMine(), diff), rite = G.rite | 0;
-  if (prev && boardKey(prev) >= boardKey({ r: rite, w })) return { why: 'notbest', best: +prev.w, rite: prev.r | 0, mode: lbMode(prev), rank: boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1 };
-  const ok = await boardWrite({ [diff]: { w, won: !!won, map: G.map || 'meadow', r: rite, m: boardModeNow(), at: new Date().toISOString() } });
-  if (!ok) return { why: BOARD.canPost === false ? 'readonly' : 'down' };
-  const rank = boardRank(diff).findIndex(x => x.r.id === boardMyId()) + 1;
-  return { why: 'posted', best: w, rank, prev: prev ? +prev.w : 0 };
-}
-// the line under a finished run
-function boardEndLine(res) {
-  if (res.why === 'posted') return res.rank === 1 ? 'New best, and top of the board!' : `New best posted: you're #${res.rank} on the board.`;
-  if (res.why === 'notbest') return `Your best on the board stays wave ${res.best} (${BOARD_MODES[res.mode] || 'Campaign'}${res.rite ? ', ' + riteName(res.rite) : ''})${res.rank ? `, #${res.rank}` : ''}.`;
-  if (res.why === 'skip') return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
-  if (res.why === 'readonly') return 'You can see the top scores, but this view can’t post to them.';
-  if (res.why === 'outside' || res.why === 'nodb' || res.why === 'signin') return 'Sign in to claude.ai and open the game there to post your score.';
-  return 'The scoreboard can’t be reached right now.';
-}
-// the leader on a difficulty, for the title screen
-function boardLeader(diff) { const top = boardRank(diff)[0]; return top ? top : null; }
-async function boardNames(ids) {
-  const out = {}; for (const id of ids) out[id] = { name: '', avatarUrl: '' };
-  if (BOARD.user && ids.length) { try { Object.assign(out, await BOARD.user.profiles(ids)); } catch (e) {} }
-  return out;
+// the standings on one difficulty, from the server's public view (kept a minute)
+async function boardFetch(diff, force) {
+  if (!SB.on) return;
+  if (!force && BOARD.rowsAt[diff] && Date.now() - BOARD.rowsAt[diff] < 60000) return;
+  BOARD.rowsAt[diff] = Date.now();
+  try {
+    const q = c => sbCall(`/rest/v1/leaderboard?select=${c}wave,won,map,run_seconds,achieved_at,user_id,display_name,rank&diff=eq.${diff}&order=rank.asc,achieved_at.asc&limit=50`);
+    let rows = null;   // ask for the newest columns first; a server not yet given mode.sql (or the rites) answers 400 to them
+    for (const c of ['mode,rite,', 'rite,', '']) { try { rows = await q(c); break; } catch (e) { if (e.status !== 400 || !c) throw e; } }
+    BOARD.rows[diff] = rows;
+    BOARD.err = '';
+  } catch (e) { BOARD.err = 'down'; BOARD.rowsAt[diff] = 0; if (!BOARD.rows[diff]) BOARD.rows[diff] = null; }
+  boardPaint();
 }
 
-/* the board itself, an overlay like the others */
+/* --- the run: opened on the server at the start, each cleared wave reported as it happens --- */
+let RUN = null, flushing = false, flushWait = 0;
+function runSave() { lsJ('rk.run', RUN); }
+async function boardRunStart() {
+  RUN = null; lsJ('rk.run', null);
+  if (!SB.on || !SESS || G.chal || G.vs || (typeof TW !== 'undefined' && TW) || !DIFFS[G.diff]) return;
+  const mine = RUN = { id: null, uid: SESS.uid, diff: G.diff, ack: 0, q: [], dead: '', best: 0, rank: 0 };
+  try {
+    const args = { p_diff: G.diff, p_map: G.map || 'meadow', p_version: GAME_VERSION };
+    let r; try { r = await sbRpc('run_start', Object.assign({ p_rite: G.rite | 0 }, args)); }
+    catch (e) { if (e.status !== 404 && e.status !== 400) throw e; r = await sbRpc('run_start', args); }   // a server from before the rites: the run counts without one
+    if (RUN !== mine) return;
+    if (r && r.ok) { mine.id = r.run; runSave(); if (mine.q.length) runFlush();
+      sbRpc('run_mode', { p_run: r.run, p_mode: boardModeNow() }).catch(() => {}); }   // (a server without mode.sql says no; the score still counts)
+    else mine.dead = (r && r.why) || 'start';
+  } catch (e) { if (RUN === mine) mine.dead = e.status === 401 ? 'signin' : 'offline'; }
+}
+function boardWaveCleared(ws) {
+  if (!RUN || RUN.dead || !ws || !ws.length) return;
+  RUN.q.push({ first: Math.min.apply(null, ws), last: Math.max.apply(null, ws), kills: G.stats.kills | 0 }); runSave();
+  runFlush();
+}
+// send what's waiting, in order: everything not yet counted goes as one stretch of waves (at most 10 at a time),
+// starting right after the last wave the server counted. A lost connection waits and tries again.
+async function runFlush() {
+  if (flushing || !RUN || !RUN.id || RUN.dead) return;
+  flushing = true; const run = RUN;
+  try {
+    while (run === RUN && run.q.length && !run.dead) {
+      const last = Math.max.apply(null, run.q.map(x => x.last)), kills = run.q[run.q.length - 1].kills, first = run.ack + 1;
+      if (last < first) { run.q = []; break; }
+      const upto = Math.min(last, first + 9);
+      let r;
+      try { r = await sbRpc('run_clear', { p_run: run.id, p_first: first, p_last: upto, p_kills: kills }); }
+      catch (e) { if (e.status === 401) { run.dead = 'signin'; break; } flushWait = Math.min(60000, (flushWait || 2000) * 2); setTimeout(runFlush, flushWait); break; }
+      flushWait = 0;
+      if (r && r.ok) { run.ack = r.wave; if (r.best) { run.best = r.best; run.rank = r.rank; } if (r.new_best) BOARD.rowsAt[run.diff] = 0; run.q = run.q.filter(x => x.last > run.ack); }
+      else { run.dead = (r && (r.reason || r.why)) || 'rejected'; run.q = []; }
+      runSave();
+    }
+  } finally { flushing = false; }
+}
+// a run has ended: send what's left, close it, and say where it stands
+async function boardPost(w, won) {
+  if (!SB.on) return { why: 'off' };
+  if (G.chal || (typeof TW !== 'undefined' && TW)) return { why: 'skip' };
+  if (!SESS) return { why: 'signin' };
+  const run = RUN;
+  if (!run) return { why: 'unranked' };
+  for (let k = 0; k < 20 && (flushing || (run.q.length && !run.dead && run.id)); k++) { if (!flushing) runFlush(); await new Promise(r => setTimeout(r, 300)); }
+  if (run.id && !run.dead) sbRpc('run_end', { p_run: run.id }).catch(() => {});
+  if (RUN === run) { RUN = null; lsJ('rk.run', null); }
+  if (run.dead) return { why: 'dead', reason: run.dead };
+  if (run.q.length) return { why: 'pending' };
+  boardFetch(run.diff, true);
+  return run.ack >= w && run.best ? { why: run.best === run.ack ? 'posted' : 'notbest', best: run.best, rank: run.rank, wave: run.ack } : { why: run.best ? 'notbest' : 'unranked', best: run.best, rank: run.rank };
+}
+function boardEndLine(res) {
+  switch (res.why) {
+    case 'posted': return res.rank === 1 ? `New best, wave ${res.best}, and top of the board!` : `New best: wave ${res.best}, #${res.rank} on the board.`;
+    case 'notbest': return `Your best on the board stays as it was${res.rank ? ` (#${res.rank})` : ''}.`;
+    case 'skip': return G.chal ? 'Challenge runs keep their own best; the board is for standard runs.' : '';
+    case 'signin': return 'Sign in with Discord (Top scores, on the title screen) before your next run to post your score.';
+    case 'pending': return 'Your last waves are still on their way to the scoreboard; they’ll count when the connection is back.';
+    case 'dead': return { offline: 'This run wasn’t counted: the scoreboard couldn’t be reached when it began.', old_version: 'This copy of the game is out of date: refresh the page to post scores again.', banned: 'This account can’t post scores.', rate_limited: 'Too many runs started in the last hour: this one wasn’t counted.', expired: 'This run went on too long (over a day and a half) to count.', signin: 'You were signed out during this run, so it wasn’t counted.' }[res.reason] || 'This run wasn’t counted: it didn’t pass the scoreboard’s checks.';
+    case 'off': return '';
+    default: return 'This run wasn’t counted on the scoreboard.';
+  }
+}
+function boardLeader(diff) { const r = BOARD.rows[diff]; return r && r.length ? r[0] : null; }
+
+/* --- the board itself, an overlay like the others --- */
 function openBoard(back) {
   boardInit(); BOARD.back = back || titleScreen; BOARD.tab = 'normal';
   showOverlay(`
@@ -103316,75 +103515,207 @@ function openBoard(back) {
     <ol class="lb" id="lbList" aria-live="polite"><li class="lb-note">Loading the board…</li></ol>
     <div class="lb-me" id="lbMe"></div>
     <button class="btn ghost" id="lbBack">Back</button>`, 'board');
-  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); };
+  for (const b of ovp.querySelectorAll('[data-lbd]')) b.onclick = () => { BOARD.tab = b.dataset.lbd; for (const o of ovp.querySelectorAll('[data-lbd]')) o.setAttribute('aria-pressed', o === b); sfx('click'); boardPaint(); boardFetch(BOARD.tab); };
   $('#lbBack').onclick = () => { sfx('click'); BOARD.back(); };
-  boardPaint();
+  boardPaint(); boardFetch(BOARD.tab, true);
 }
-const lbDate = s => { const t = Date.parse(s); if (!t) return ''; const d = new Date(t); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); };
-let lbPaintN = 0;
-async function boardPaint() {
-  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
+const lbDate = s => { const t = Date.parse(s); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+const lbDur = s => { s = +s || 0; const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`; };
+function boardPaint() {
   titleBoardLine();
+  const list = document.getElementById('lbList'), meBox = document.getElementById('lbMe');
   if (!list || !meBox) return;
-  const n = ++lbPaintN, diff = BOARD.tab, rows = BOARD.rows ? boardRank(diff).slice(0, 25) : null, my = boardMyId();
-  const ids = rows ? rows.map(x => x.r.id) : [];
-  const ps = await boardNames(ids.concat(my ? [my] : []));
-  if (n !== lbPaintN) return;   // a newer paint is on its way
+  const diff = BOARD.tab, rows = BOARD.rows[diff], my = BOARD.me && BOARD.me.id;
   list.textContent = '';
   const note = t => { const li = document.createElement('li'); li.className = 'lb-note'; li.textContent = t; list.appendChild(li); };
-  if (!rows) note(BOARD.slow ? 'The board can’t be reached yet. Still trying…' : 'Loading the board…');
-  else if (!rows.length) note(BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.');
-  else rows.forEach((x, i) => {
-    const li = document.createElement('li'); li.className = 'lb-row' + (x.r.id === my ? ' me' : '') + (i < 3 ? ' top' + (i + 1) : '');
-    const p = ps[x.r.id] || {}, nm = boardNick(x.r) || p.name || 'A defender';
-    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = i + 1;
-    const av = document.createElement('img'); av.className = 'lb-av'; av.alt = ''; if (p.avatarUrl) av.src = p.avatarUrl; else av.style.visibility = 'hidden';
-    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = nm + (x.r.id === my ? ' (you)' : '');
-    const sm = document.createElement('small'); sm.textContent = [MAPS[x.e.map] ? MAPS[x.e.map].name : '', lbDate(x.e.at)].filter(Boolean).join(' · '); who.appendChild(sm);
-    const md = lbMode(x.e), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.e.r | 0);
-    if (x.e.r) { const rs = document.createElement('small'); rs.textContent = riteName(x.e.r | 0); rt.appendChild(rs); }
-    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + Math.round(+x.e.w); if (x.e.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
+  if (BOARD.err === 'off') note('Online scores aren’t switched on for this copy of the game.');
+  else if (rows === undefined) note('Loading the board…');
+  else if (rows === null) note('The scoreboard can’t be reached right now.');
+  else if (!rows.length) note('No scores yet. Hold the keep and claim the top spot.');
+  else rows.slice(0, 25).forEach(x => {
+    const li = document.createElement('li'); li.className = 'lb-row' + (x.user_id === my ? ' me' : '') + (x.rank <= 3 ? ' top' + x.rank : '');
+    const rk = document.createElement('b'); rk.className = 'lb-rk'; rk.textContent = x.rank;
+    const av = document.createElement('span'); av.className = 'lb-av lb-ini'; av.textContent = (String(x.display_name || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('span'); who.className = 'lb-who'; who.textContent = (x.display_name || 'A defender') + (x.user_id === my ? ' (you)' : '');
+    const sm = document.createElement('small'); sm.textContent = [MAPS[x.map] ? MAPS[x.map].name : '', lbDate(x.achieved_at), x.run_seconds ? lbDur(x.run_seconds) : ''].filter(Boolean).join(' · '); who.appendChild(sm);
+    const md = lbMode(x), rt = document.createElement('span'); rt.className = 'lb-rt'; rt.textContent = BOARD_MODES[md]; rt.title = lbModeTip(md, x.rite | 0);
+    if (x.rite) { const rs = document.createElement('small'); rs.textContent = riteName(x.rite | 0); rt.appendChild(rs); }
+    const wv = document.createElement('span'); wv.className = 'lb-w'; wv.textContent = 'Wave ' + x.wave; if (x.won) { const s = document.createElement('i'); s.textContent = ' ★'; s.title = 'Held all ' + MAX_WAVE + ' waves'; wv.appendChild(s); }
     li.append(rk, av, who, rt, wv); list.appendChild(li);
   });
-  if (BOARD.slow && rows && rows.length) note('This may be out of date: the board isn’t answering right now.');
-  // who you are on the board
+  if (BOARD.err === 'down' && rows && rows.length) note('This may be out of date: the scoreboard isn’t answering right now.');
   meBox.textContent = '';
-  const p = document.createElement('p'), local = bestWave();
-  if (!my) {
-    p.textContent = BOARD.err === 'outside' ? 'Scores are shared through claude.ai: open the game there, signed in, to post yours.' : 'Sign in to claude.ai to put your name on the board.';
-    meBox.appendChild(p);
-    if (local) { const q = document.createElement('p'); q.className = 'lb-sm'; q.textContent = `Your best on this device: wave ${local}.`; meBox.appendChild(q); }
+  const p = (t, cls) => { const e = document.createElement('p'); if (cls) e.className = cls; e.textContent = t; meBox.appendChild(e); return e; };
+  if (!SB.on) { const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm'); return; }
+  if (!SESS) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn lb-discord'; b.textContent = 'Sign in with Discord'; b.onclick = () => { sfx('click'); sbSignIn(); };
+    meBox.appendChild(b);
+    p('Sign in before a run and it counts: the scoreboard only uses your Discord name, and you can change how it shows.', 'lb-sm');
+    const local = bestWave(); if (local) p(`Your best on this device: wave ${local}.`, 'lb-sm');
     return;
   }
-  const mine = boardMine(), shown = boardNick(mine) || (ps[my] && ps[my].name) || '';
-  const av = document.createElement('img'), au = BOARD.me && BOARD.me.avatarUrl; av.className = 'lb-av'; av.alt = ''; if (au) av.src = au; else av.hidden = true;
-  const t = document.createElement('span'); t.textContent = 'Signed in' + (shown ? ' as ' + shown : '');
-  p.className = 'lb-sig'; p.append(av, t); meBox.appendChild(p);
-  const e = boardEntry(mine, diff), rk = e ? boardRank(diff).findIndex(x => x.r.id === my) + 1 : 0;
-  const q = document.createElement('p'); q.className = 'lb-sm';
-  q.textContent = e ? `Your best: wave ${Math.round(+e.w)} (${BOARD_MODES[lbMode(e)]}${e.r ? ', ' + riteName(e.r | 0) : ''}), #${rk}.` : 'No score from you yet: finish a run to post one.';
-  meBox.appendChild(q);
-  if (BOARD.canPost === false) { const r = document.createElement('p'); r.className = 'lb-sm'; r.textContent = 'This view can read the board but not post to it. The keep’s owner can give you access from the Share menu.'; meBox.appendChild(r); return; }
-  // the name shown on the board (yours to choose; blank uses your claude.ai name)
-  const f = document.createElement('form'); f.className = 'lb-nick';
-  const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.placeholder = (ps[my] && ps[my].name) || 'Name on the board'; inp.value = boardNick(mine); inp.setAttribute('aria-label', 'Name on the board');
-  const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
-  f.append(inp, bt); meBox.appendChild(f);
-  f.onsubmit = async ev => { ev.preventDefault(); const v = inp.value.replace(/[\u0000-\u001f]/g, '').trim().slice(0, BOARD_NICK_MAX); if (v === boardNick(mine)) return; bt.disabled = true; const ok = await boardWrite({ nick: v }); bt.disabled = false; toast(ok ? (v ? `You're "${v}" on the board.` : 'The board shows your claude.ai name.') : 'Couldn’t save your name just now.'); };
+  const me = BOARD.me || { name: '' };
+  p('Signed in' + (me.name ? ' as ' + me.name : ''), 'lb-sig');
+  if (me.banned) { p('This account can’t post scores.', 'lb-sm'); }
+  else {
+    const mine = rows && rows.find(x => x.user_id === my);
+    p(mine ? `Your best: wave ${mine.wave} (${BOARD_MODES[lbMode(mine)]}${mine.rite ? ', ' + riteName(mine.rite | 0) : ''}), #${mine.rank}.` : 'No score from you yet: finish a run to post one.', 'lb-sm');
+    if (RUN && RUN.id && !RUN.dead && G.state === 'play') p(`This run is being counted (wave ${RUN.ack} so far).`, 'lb-sm');
+    const f = document.createElement('form'); f.className = 'lb-nick';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = BOARD_NICK_MAX; inp.value = me.name || ''; inp.placeholder = 'Name on the board'; inp.setAttribute('aria-label', 'Name on the board');
+    const bt = document.createElement('button'); bt.type = 'submit'; bt.className = 'btn ghost sm'; bt.textContent = 'Save name';
+    f.append(inp, bt); meBox.appendChild(f);
+    f.onsubmit = async ev => {
+      ev.preventDefault(); const v = inp.value.trim(); if (!v || v === me.name) return; bt.disabled = true;
+      try { const r = await sbRpc('set_display_name', { new_name: v });
+        if (r && r.ok) { BOARD.me.name = r.name; BOARD.rowsAt[diff] = 0; boardFetch(diff); toast(`You're "${r.name}" on the board.`); }
+        else toast({ taken: 'That name is taken.', wait: 'Wait a minute before changing your name again.', bad: 'That name can’t be used. Try another (2 to 20 characters).', banned: 'This account can’t change its name.' }[r && r.why] || 'Couldn’t save your name.'); }
+      catch (e) { toast('Couldn’t save your name just now.'); }
+      bt.disabled = false; boardPaint();
+    };
+  }
+  const so = document.createElement('button'); so.type = 'button'; so.className = 'lb-link'; so.textContent = 'Sign out'; so.onclick = () => { sfx('click'); sbSignOut(); };
+  meBox.appendChild(so);
 }
 // the title screen's top scores panel: the first few on the board
 function titleBoardLine() {
-  const el = document.getElementById('tScores'); if (!el) return false;
-  const rows = BOARD.rows ? boardRank('normal').slice(0, 8) : null, my = boardMyId();
-  if (!rows || !rows.length) { el.innerHTML = `<li class="t2-note">${!rows ? (BOARD.slow ? 'The board can’t be reached yet.' : 'Loading…') : BOARD.err === 'outside' || BOARD.err === 'nodb' ? 'Top scores are on the online version: godmodenz.github.io/ravenswood-keep-play/online' : 'No scores yet. Hold the keep and claim the top spot.'}</li>`; return true; }
-  boardNames(rows.map(x => x.r.id)).then(ps => { if (!el.isConnected) return;
-    el.innerHTML = rows.map((x, i) => `<li class="${x.r.id === my ? 'me' : ''}"><b>${i + 1}</b><span class="t2-nm">${esc(boardNick(x.r) || (ps[x.r.id] && ps[x.r.id].name) || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x.e), x.e.r | 0))}">${BOARD_MODES[lbMode(x.e)]}${x.e.r ? ' · Rite ' + RITE_ROMAN[x.e.r | 0] : ''}</i><em>${Math.round(+x.e.w)}${x.e.won ? '★' : ''}</em></li>`).join(''); });
-  return true;
+  const el = document.getElementById('tScores'); if (!el) return;
+  const rows = BOARD.rows.normal, my = BOARD.me && BOARD.me.id;
+  if (!SB.on) { const b = bestWave(); el.innerHTML = `<li class="t2-note">${b ? `Your best on this device: wave ${b}.` : 'Scores are kept on this device.'}</li>`; return; }
+  if (!rows || !rows.length) el.innerHTML = `<li class="t2-note">${rows === null ? 'The scoreboard can’t be reached right now.' : rows ? 'No scores yet. Hold the keep and claim the top spot.' : 'Loading…'}</li>`;
+  else el.innerHTML = rows.slice(0, 8).map(x => `<li class="${x.user_id === my ? 'me' : ''}"><b>${x.rank}</b><span class="t2-nm">${esc(x.display_name || 'A defender')}</span><i title="${esc(lbModeTip(lbMode(x), x.rite | 0))}">${BOARD_MODES[lbMode(x)]}${x.rite ? ' · Rite ' + RITE_ROMAN[x.rite | 0] : ''}</i><em>${x.wave}${x.won ? '★' : ''}</em></li>`).join('');
+  if (rows === undefined && BOARD.tried) boardFetch('normal');
 }
 
-// (the web version's board counts runs on its server as they go; here a run posts when it ends)
-function boardRunStart() {}
-function boardWaveCleared() {}
+/* --- the owner's private run log (web/supabase/tracking.sql): who plays, with what, where they die. Notes go through
+   run_note on the player's own run; nothing here is readable from the game. A server without tracking.sql just says
+   no and the game carries on. --- */
+const TRK = { notes: [], sending: false, leaks: {}, off: false };
+function trkArmy() {
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = (t.def.name || t.type) + ' ' + (ROMAN[t.tier | 0] || 'I'); by[k] = (by[k] || 0) + 1; }
+  return by;
+}
+function trkNote(kind, wave, data) {
+  if (TRK.off || !SB.on || !SESS || !RUN || RUN.dead) return;
+  TRK.notes.push({ run: RUN, kind, wave: wave | 0, data }); trkSend();
+}
+async function trkSend() {
+  if (TRK.sending) return; TRK.sending = true;
+  try {
+    for (let guard = 0; TRK.notes.length && guard < 60; guard++) {
+      const n = TRK.notes[0];
+      if (!n.run.id) { if (n.run.dead || n.run !== RUN) { TRK.notes.shift(); continue; } await new Promise(r => setTimeout(r, 1500)); continue; }
+      try { const r = await sbRpc('run_note', { p_run: n.run.id, p_kind: n.kind, p_wave: n.wave, p_data: n.data }); if (r && r.why === 'bad') TRK.off = true; }
+      catch (e) { if (e.status === 404) { TRK.off = true; TRK.notes = []; break; } if (e.status !== 400) { await new Promise(r => setTimeout(r, 4000)); continue; } }
+      TRK.notes.shift();
+    }
+  } finally { TRK.sending = false; }
+}
+{
+  const s0 = boardRunStart;
+  boardRunStart = async function () {
+    TRK.leaks = {}; const r = await s0.apply(this, arguments);
+    trkNote('start', G.wave | 0, { force: G.force || 'classic', hero: G.hero || '', map: G.map || '', diff: G.diff, rite: G.rite | 0 });
+    return r;
+  };
+  const c0 = boardWaveCleared;
+  boardWaveCleared = function (ws) {
+    const r = c0.apply(this, arguments);
+    for (const w of ws || []) { const L = TRK.leaks[w]; if (L) { trkNote('leak', w, { foes: L.foes, lives_lost: L.lost, lives_left: G.lives | 0 }); delete TRK.leaks[w]; } }
+    return r;
+  };
+  const p0 = boardPost;
+  boardPost = async function (w, won) {
+    const recent = {}; for (const k of Object.keys(TRK.leaks)) for (const [f, n] of Object.entries(TRK.leaks[k].foes)) recent[f] = (recent[f] || 0) + n;
+    trkNote('end', w | 0, { won: !!won, force: G.force || 'classic', hero: G.hero || '', lives_left: G.lives | 0, killers: recent, army: trkArmy(), kills: (G.stats && G.stats.kills) | 0 });
+    for (let k = 0; k < 15 && TRK.notes.length; k++) { trkSend(); await new Promise(r => setTimeout(r, 300)); }
+    return p0.apply(this, arguments);
+  };
+}
+if (typeof leak === 'function') {
+  const l0 = leak;
+  leak = function (c) {
+    const lives0 = G.lives, r = l0.apply(this, arguments);
+    try {
+      const lost = (lives0 | 0) - (G.lives | 0);
+      if (lost > 0 && RUN && !G.vs) { const w = (c && c.wv) || G.wave, L = TRK.leaks[w] || (TRK.leaks[w] = { foes: {}, lost: 0 }), nm = (c && c.def && c.def.name) || 'foe'; L.foes[nm] = (L.foes[nm] || 0) + 1; L.lost += lost; }
+    } catch (e) { /* never in the way of the game */ }
+    return r;
+  };
+}
+
+/* --- sign in on opening (owner): a player who isn't signed in is asked straight away, before the title. "Play without
+   signing in" is remembered on this device, so they're not asked again (the Top scores panel can still sign them in). --- */
+function signGate() {
+  if (!SB.on || SESS || document.getElementById('signGate')) return;
+  try { if (localStorage.getItem('rk.noSignin') === '1') return; } catch (e) {}
+  const d = document.createElement('div'); d.id = 'signGate';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.82);font-family:inherit';
+  d.innerHTML = `<div style="max-width:360px;margin:16px;padding:26px 24px;border-radius:14px;background:#141a24;border:1px solid #3a4560;color:#e8e2d0;text-align:center;box-shadow:0 10px 40px #000a">
+    <div style="font-size:22px;margin-bottom:8px">Ravenswood Keep</div>
+    <div style="font-size:14px;color:#b8b2a0;margin-bottom:18px">Sign in with Discord so your runs count on the scoreboard.</div>
+    <button id="sgIn" style="width:100%;padding:12px;border:0;border-radius:8px;background:#5865f2;color:#fff;font-size:16px;cursor:pointer">Sign in with Discord</button>
+    <button id="sgSkip" style="width:100%;margin-top:10px;padding:9px;border:0;border-radius:8px;background:transparent;color:#9aa3b8;font-size:13px;cursor:pointer;text-decoration:underline">Play without signing in</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sgIn').onclick = () => { sbSignIn(); };
+  d.querySelector('#sgSkip').onclick = () => { try { localStorage.setItem('rk.noSignin', '1'); } catch (e) {} d.remove(); };
+}
+{
+  const i0 = boardInit;
+  boardInit = function () { const p = i0.apply(this, arguments); Promise.resolve(p).then(signGate, signGate); return p; };
+}
+
+/* --- the build on the board (web/supabase/build.sql): each run tells the server what it plays with (force, commander,
+   its strongest units), and the board shows the build of each player's best run. --- */
+const BLD = { last: '' };
+function bldNow() {
+  const F = G.force && typeof FORCES !== 'undefined' ? FORCES[G.force] : null;
+  let hero = '';
+  try { const h = (typeof FORCE_HEROES !== 'undefined' && FORCE_HEROES.find(x => x.id === G.hero)) || (typeof HEROES !== 'undefined' && (Array.isArray(HEROES) ? HEROES.find(x => x.id === G.hero) : HEROES[G.hero])); hero = (h && h.name) || ''; } catch (e) {}
+  const by = {};
+  for (const t of G.towers || []) { if (!t.def || t.type === 'wall' || t.wrecked) continue; const k = t.def.name || t.type; by[k] = (by[k] || 0) + 1 + (t.tier | 0); }
+  const units = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, 4).map(e => e[0]);
+  return { force: F ? F.name : 'Classic', hero: String(hero).slice(0, 40), units };
+}
+function bldSend() {
+  if (!SB.on || !SESS || !RUN || !RUN.id || RUN.dead) return;
+  const b = bldNow(), s = JSON.stringify(b); if (s === BLD.last) return; BLD.last = s;
+  sbRpc('run_build', { p_run: RUN.id, p_build: b }).catch(() => {});
+}
+{
+  const s1 = boardRunStart;
+  boardRunStart = async function () { BLD.last = ''; const r = await s1.apply(this, arguments); bldSend(); return r; };
+  const c1 = boardWaveCleared;
+  boardWaveCleared = function (ws) { const r = c1.apply(this, arguments); bldSend(); return r; };
+  const f0 = boardFetch;   // ask the board for the build column; a server without build.sql still answers without it
+  boardFetch = async function (diff, force) {
+    const r = await f0.apply(this, arguments);
+    try {
+      const rows = BOARD.rows[diff];
+      if (rows && rows.length && !('build' in rows[0])) {
+        const b = await sbCall(`/rest/v1/leaderboard?select=user_id,build&diff=eq.${diff}&limit=50`);
+        const m = new Map((b || []).map(x => [x.user_id, x.build])); for (const x of rows) x.build = m.get(x.user_id) || null;
+        boardPaint();
+      }
+    } catch (e) { /* no build column yet */ }
+    return r;
+  };
+  const p1 = boardPaint;
+  boardPaint = function () {
+    const r = p1.apply(this, arguments);
+    try {
+      const list = document.getElementById('lbList'), rows = BOARD.rows[BOARD.tab];
+      if (list && rows) [...list.querySelectorAll('li.lb-row')].forEach((li, i) => {
+        const x = rows[i], b = x && x.build; if (!b || li.querySelector('.lb-bld')) return;
+        const e = document.createElement('small'); e.className = 'lb-bld'; e.style.cssText = 'display:block;opacity:.8';
+        e.textContent = [b.force, b.hero].filter(Boolean).join(' · ') + (b.units && b.units.length ? ': ' + b.units.join(', ') : '');
+        const who = li.querySelector('.lb-who'); if (who) who.appendChild(e);
+      });
+    } catch (e) {}
+    return r;
+  };
+}
 
 /* ================= UI: HUD, command card, input, screens ================= */
 const $ = s => document.querySelector(s);
